@@ -555,8 +555,17 @@ class _HomeDashboardState extends State<HomeDashboard>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -595,7 +604,32 @@ class _HomeDashboardState extends State<HomeDashboard>
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Container(height: 1, color: const Color(0xFFE2E8F0)),
+          const SizedBox(height: 16),
+          _buildSkeletonLine(width: double.infinity, height: 44),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _buildSkeletonLine(
+              width: isMobile ? 170 : 220,
+              height: 44,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildSkeletonLine(width: isMobile ? 140 : 180, height: 34),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLine({required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
       ),
     );
   }
@@ -761,6 +795,163 @@ class _HomeDashboardState extends State<HomeDashboard>
         .trim();
   }
 
+  Widget _buildHomeCard({
+    required Widget child,
+    required Color accentColor,
+    required bool isMobile,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        border: Border.all(color: accentColor.withOpacity(0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withOpacity(0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildCardHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required bool isMobile,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.18)),
+          ),
+          child: Icon(icon, color: color, size: isMobile ? 22 : 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: isMobile ? 12 : 13,
+                  color: const Color(0xFF64748B),
+                  height: 1.25,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Color color,
+    required bool isMobile,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(isMobile ? 10 : 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.14)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: isMobile ? 28 : 30,
+            height: isMobile ? 28 : 30,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: isMobile ? 16 : 17),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    color: const Color(0xFF111827),
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: isMobile ? 10 : 11,
+                      color: const Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardAction({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.arrow_forward, size: 18),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          foregroundColor: color,
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdmissionCard() {
     final isMobile = _isMobile(context);
 
@@ -791,104 +982,42 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     return GestureDetector(
       onTap: () => _navigateToTab(context, 3),
-      child: Container(
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4CAF50).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+      child: _buildHomeCard(
+        accentColor: const Color(0xFF2E7D32),
+        isMobile: isMobile,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF43A047).withOpacity(0.30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.school,
-                    color: Colors.white,
-                    size: isMobile ? 20 : 24,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Admission Info',
-                    style: TextStyle(
-                      fontSize: isMobile ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
+            _buildCardHeader(
+              icon: Icons.school,
+              title: 'Admission Info',
+              subtitle: 'Track the steps for your application.',
+              color: const Color(0xFF2E7D32),
+              isMobile: isMobile,
             ),
             const SizedBox(height: 16),
             Text(
-              'Application Steps:',
+              'Application Steps',
               style: TextStyle(
                 fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF111827),
               ),
             ),
             const SizedBox(height: 8),
-            ...steps.map((step) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: const Color(0xFF43A047),
-                      size: isMobile ? 14 : 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        cleanStep(step),
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                  ],
+            ...steps.take(4).map(
+                  (step) => _buildInfoTile(
+                    icon: Icons.check_rounded,
+                    title: cleanStep(step),
+                    color: const Color(0xFF2E7D32),
+                    isMobile: isMobile,
+                  ),
                 ),
-              );
-            }).toList(),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _navigateToTab(context, 3),
-                child: const Text('See more →'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF43A047),
-                ),
-              ),
+            _buildCardAction(
+              label: 'See more',
+              color: const Color(0xFF2E7D32),
+              onPressed: () => _navigateToTab(context, 3),
             ),
           ],
         ),
@@ -925,127 +1054,43 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     return GestureDetector(
       onTap: () => _navigateToTab(context, 4),
-      child: Container(
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF4CAF50).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+      child: _buildHomeCard(
+        accentColor: const Color(0xFF00897B),
+        isMobile: isMobile,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF388E3C), Color(0xFF4CAF50)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4CAF50).withOpacity(0.30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.card_giftcard,
-                    color: Colors.white,
-                    size: isMobile ? 20 : 24,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Scholarships',
-                    style: TextStyle(
-                      fontSize: isMobile ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
+            _buildCardHeader(
+              icon: Icons.card_giftcard,
+              title: 'Scholarships',
+              subtitle: 'Browse available grants and providers.',
+              color: const Color(0xFF00897B),
+              isMobile: isMobile,
             ),
             const SizedBox(height: 16),
             Text(
-              'Available Scholarships:',
+              'Available Scholarships',
               style: TextStyle(
                 fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF111827),
               ),
             ),
             const SizedBox(height: 8),
-            ...scholarships.map((scholarship) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.all(isMobile ? 10 : 12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.withOpacity(0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                      size: isMobile ? 16 : 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            scholarship['name']!,
-                            style: TextStyle(
-                              fontSize: isMobile ? 12 : 13,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            scholarship['provider']!,
-                            style: TextStyle(
-                              fontSize: isMobile ? 10 : 11,
-                              color: Colors.black54,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _navigateToTab(context, 4),
-                child: const Text('See more →'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF4CAF50),
-                ),
+            ...scholarships.map(
+              (scholarship) => _buildInfoTile(
+                icon: Icons.star_rounded,
+                title: scholarship['name']!,
+                subtitle: scholarship['provider']!,
+                color: const Color(0xFF00897B),
+                isMobile: isMobile,
               ),
+            ),
+            const SizedBox(height: 12),
+            _buildCardAction(
+              label: 'See more',
+              color: const Color(0xFF00897B),
+              onPressed: () => _navigateToTab(context, 4),
             ),
           ],
         ),
@@ -1062,81 +1107,35 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     return GestureDetector(
       onTap: () => _navigateToTab(context, 5),
-      child: Container(
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF388E3C).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+      child: _buildHomeCard(
+        accentColor: const Color(0xFF1976D2),
+        isMobile: isMobile,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF43A047), Color(0xFF66BB6A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF66BB6A).withOpacity(0.30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.work,
-                    color: Colors.white,
-                    size: isMobile ? 20 : 24,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Placement Assistance',
-                    style: TextStyle(
-                      fontSize: isMobile ? 16 : 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
+            _buildCardHeader(
+              icon: Icons.work,
+              title: 'Placement Assistance',
+              subtitle: 'Find hiring opportunities and positions.',
+              color: const Color(0xFF1976D2),
+              isMobile: isMobile,
             ),
             const SizedBox(height: 16),
             Text(
-              'Upcoming Companies:',
+              'Upcoming Companies',
               style: TextStyle(
                 fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF111827),
               ),
             ),
             const SizedBox(height: 8),
             ..._buildPlacementItems(isMobile),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => _navigateToTab(context, 5),
-                child: const Text('See more →'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF66BB6A),
-                ),
-              ),
+            _buildCardAction(
+              label: 'See more',
+              color: const Color(0xFF1976D2),
+              onPressed: () => _navigateToTab(context, 5),
             ),
           ],
         ),
@@ -1152,46 +1151,12 @@ class _HomeDashboardState extends State<HomeDashboard>
     ];
 
     return companies.map((company) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: EdgeInsets.all(isMobile ? 10 : 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF66BB6A).withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF66BB6A).withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.business,
-              color: const Color(0xFF66BB6A),
-              size: isMobile ? 16 : 18,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    company['name']!,
-                    style: TextStyle(
-                      fontSize: isMobile ? 12 : 13,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    company['positions']!,
-                    style: TextStyle(
-                      fontSize: isMobile ? 11 : 12,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      return _buildInfoTile(
+        icon: Icons.business_rounded,
+        title: company['name']!,
+        subtitle: company['positions']!,
+        color: const Color(0xFF1976D2),
+        isMobile: isMobile,
       );
     }).toList();
   }
@@ -1280,65 +1245,18 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     return GestureDetector(
       onTap: () => _navigateToTab(context, 2),
-      child: Container(
-        margin: const EdgeInsets.only(top: 0, bottom: 0),
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF388E3C).withOpacity(0.15),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
+      child: _buildHomeCard(
+        accentColor: const Color(0xFF7B1FA2),
+        isMobile: isMobile,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1B5E20), Color(0xFF388E3C)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF388E3C).withOpacity(0.30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.campaign,
-                    color: Colors.white,
-                    size: isMobile ? 24 : 28,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Announcements',
-                        style: TextStyle(
-                          fontSize: isMobile ? 16 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            _buildCardHeader(
+              icon: Icons.campaign,
+              title: 'Announcements',
+              subtitle: 'Latest updates and important notices.',
+              color: const Color(0xFF7B1FA2),
+              isMobile: isMobile,
             ),
             const SizedBox(height: 16),
             const Divider(height: 1),
@@ -1355,9 +1273,9 @@ class _HomeDashboardState extends State<HomeDashboard>
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: EdgeInsets.all(isMobile ? 12 : 14),
                 decoration: BoxDecoration(
-                  color: priorityColor.withOpacity(0.05),
+                  color: priorityColor.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: priorityColor.withOpacity(0.2)),
+                  border: Border.all(color: priorityColor.withOpacity(0.18)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1378,8 +1296,8 @@ class _HomeDashboardState extends State<HomeDashboard>
                             announcement['title']!,
                             style: TextStyle(
                               fontSize: isMobile ? 14 : 15,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF111827),
+                              fontWeight: FontWeight.w800,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1413,16 +1331,10 @@ class _HomeDashboardState extends State<HomeDashboard>
               );
             }).toList(),
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _navigateToTab(context, 2),
-                icon: const Icon(Icons.arrow_forward, size: 18),
-                label: const Text('View All'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF388E3C),
-                ),
-              ),
+            _buildCardAction(
+              label: 'View All',
+              color: const Color(0xFF7B1FA2),
+              onPressed: () => _navigateToTab(context, 2),
             ),
           ],
         ),
