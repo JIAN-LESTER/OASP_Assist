@@ -930,7 +930,7 @@ Widget _buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -966,7 +966,6 @@ Widget _buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 4,
                 child: Text(
                   'Question',
                   style: TextStyle(
@@ -976,19 +975,6 @@ Widget _buildTableHeader(
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                flex: 3,
-                child: Text(
-                  'Answer',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 5),
               const SizedBox(width: 40),
             ],
           ),
@@ -1187,7 +1173,10 @@ Widget _buildFAQRow({
 
   return Container(
     key: ValueKey(doc.id),
-    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+    padding: EdgeInsets.symmetric(
+      vertical: isMobile ? 12 : 8,
+      horizontal: isMobile ? 12 : 10,
+    ),
     decoration: BoxDecoration(
       color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!, width: 1),
@@ -1225,25 +1214,64 @@ Widget _buildFAQRow({
           ),
           const SizedBox(width: 12),
           Expanded(
-            flex: 4,
-            child: Text(
-              question,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              softWrap: true,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
+            flex: isMobile ? 1 : 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+                if (isMobile) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    answer,
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryStyle.backgroundColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        categoryStyle.displayName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: categoryStyle.textColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (isMobile) const SizedBox(width: 12),
-          Expanded(
-            flex: 3,
-            child: Text(
-              answer,
-              style: const TextStyle(fontSize: 13),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          if (!isMobile)
+            Expanded(
+              flex: 3,
+              child: Text(
+                answer,
+                style: const TextStyle(fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
           if (!isMobile) const SizedBox(width: 40),
           if (!isMobile)
             Expanded(

@@ -524,7 +524,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -532,9 +532,8 @@ Widget _buildTableHeader() {
           child: const Row(
             children: [
               Expanded(
-                flex: 2,
                 child: Text(
-                  'User',
+                  'System Log',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
@@ -542,29 +541,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              Expanded(
-                flex: 3,
-                child: Text(
-                  'Action',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 4,
-                child: Text(
-                  'Time',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              SizedBox(width: 48),
+              SizedBox(width: 40),
             ],
           ),
         );
@@ -783,6 +760,99 @@ Widget _buildLogsRow({
 }) {
   double screenWidth = MediaQuery.of(context).size.width;
   bool isMobile = screenWidth < 600;
+
+  if (isMobile) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap:
+            () => showLogsInfoModal(
+              context,
+              doc,
+              messages,
+              false,
+              showDeleteButton: true,
+            ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    logs.user,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: getActionColor(logs.action),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      logs.action,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    logs.time,
+                    style: const TextStyle(fontSize: 12, color: Colors.black87),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              padding: EdgeInsets.zero,
+              onSelected: (value) {
+                if (value == 'delete') {
+                  showDeleteConfirmation(context, doc, DeleteConfigs.log, 'logs');
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),

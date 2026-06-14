@@ -1161,6 +1161,44 @@ Widget _buildControlsRow(
   AdminDashboardData? ad, {
   required bool isMobile,
 }) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomDropdownButton(
+          items: [
+            'All',
+            'Today',
+            'This Week',
+            'This Month',
+            'This Year',
+            'Custom',
+          ],
+          initialValue: selectedTimeFrame,
+          onChanged: onTimeFrameChanged,
+        ),
+        if (selectedTimeFrame == 'Custom') ...[
+          const SizedBox(height: 10),
+          DateRangeFilter(
+            selectedDateRange: customDateRange,
+            onDateRangeChanged: onDateRangeChanged,
+          ),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ExportButton(
+            pageType: 'inquiry',
+            timeFrame: selectedTimeFrame,
+            userName: userName,
+            inq: inq,
+            ad: ad,
+          ),
+        ),
+      ],
+    );
+  }
+
   return Row(
     children: [
       CustomDropdownButton(

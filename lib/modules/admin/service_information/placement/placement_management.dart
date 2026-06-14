@@ -997,7 +997,7 @@ Widget _buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -1033,7 +1033,6 @@ Widget _buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 4,
                 child: Text(
                   'Company',
                   style: TextStyle(
@@ -1043,20 +1042,7 @@ Widget _buildTableHeader(
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                flex: 5,
-                child: Text(
-                  'Positions',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const SizedBox(width: 48),
+              const SizedBox(width: 40),
             ],
           ),
         );
@@ -1301,7 +1287,7 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
 
     return Container(
       key: ValueKey(widget.doc.id),
-      padding: EdgeInsets.all(isMobile ? 8 : 10),
+      padding: EdgeInsets.all(isMobile ? 12 : 10),
       decoration: BoxDecoration(
         color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
         border: Border.all(color: Colors.grey[200]!),
@@ -1348,27 +1334,55 @@ class _PlacementRowWidgetState extends State<_PlacementRowWidget> {
             ),
             SizedBox(width: isMobile ? 12 : 16),
             Expanded(
-              flex: isMobile ? 4 : 3,
-              child: Text(
-                widget.partnerCompany,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
+              flex: isMobile ? 1 : 3,
+              child:
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.partnerCompany,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildExpandableListYellow(
+                            items: widget.positions ?? [],
+                            emptyText: 'No Vacancy',
+                            isExpanded: positionsExpanded,
+                            onToggle:
+                                (value) =>
+                                    setState(() => positionsExpanded = value),
+                          ),
+                        ],
+                      )
+                      : Text(
+                        widget.partnerCompany,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+              ),
+            if (!isMobile) ...[
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 4,
+                child: _buildExpandableListYellow(
+                  items: widget.positions ?? [],
+                  emptyText: 'No Vacancy',
+                  isExpanded: positionsExpanded,
+                  onToggle:
+                      (value) => setState(() => positionsExpanded = value),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            SizedBox(width: isMobile ? 12 : 16),
-            Expanded(
-              flex: isMobile ? 5 : 4,
-              child: _buildExpandableListYellow(
-                items: widget.positions ?? [],
-                emptyText: 'No Vacancy',
-                isExpanded: positionsExpanded,
-                onToggle: (value) => setState(() => positionsExpanded = value),
-              ),
-            ),
+            ],
             if (!isMobile) ...[
               const SizedBox(width: 16),
               Expanded(

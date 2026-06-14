@@ -959,7 +959,7 @@ Widget _buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -995,7 +995,6 @@ Widget _buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 3,
                 child: Text(
                   'Scholarship',
                   style: TextStyle(
@@ -1005,20 +1004,7 @@ Widget _buildTableHeader(
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                flex: 3,
-                child: Text(
-                  'Eligibility/Requirements',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const SizedBox(width: 48),
+              const SizedBox(width: 40),
             ],
           ),
         );
@@ -1256,7 +1242,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
     if (isMobile) {
       return Container(
         key: ValueKey(widget.doc.id),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
           border: Border.all(color: Colors.grey[200]!),
@@ -1302,9 +1288,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Scholarship Name Column
               Expanded(
-                flex: 3,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1312,7 +1296,7 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                       widget.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -1330,19 +1314,15 @@ class _ScholarshipRowWidgetState extends State<_ScholarshipRowWidget> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    _buildExpandableList(
+                      items: widget.eligibilityRequirements ?? [],
+                      emptyText: 'No eligibility',
+                      isExpanded: eligibilityExpanded,
+                      onToggle:
+                          (value) => setState(() => eligibilityExpanded = value),
+                    ),
                   ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Eligibility Column
-              Expanded(
-                flex: 3,
-                child: _buildExpandableList(
-                  items: widget.eligibilityRequirements ?? [],
-                  emptyText: 'No eligibility',
-                  isExpanded: eligibilityExpanded,
-                  onToggle:
-                      (value) => setState(() => eligibilityExpanded = value),
                 ),
               ),
               const SizedBox(width: 8),

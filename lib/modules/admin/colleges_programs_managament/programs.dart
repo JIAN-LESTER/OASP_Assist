@@ -470,7 +470,10 @@ Widget _buildProgramRow({
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
   return Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+    padding: EdgeInsets.symmetric(
+      vertical: isMobile ? 10 : 12,
+      horizontal: isMobile ? 10 : 12,
+    ),
     decoration: BoxDecoration(
       color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
       border: Border.all(color: Colors.grey[200]!),
@@ -531,9 +534,10 @@ Widget _buildProgramRow({
               ],
             ),
           ),
-          SizedBox(width: isTablet ? 60 : 80),
+          SizedBox(width: isMobile ? 4 : (isTablet ? 60 : 80)),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_horiz),
+            padding: EdgeInsets.zero,
             onSelected: (value) {
               if (value == 'edit') {
                 showAddEditProgramModal(context, doc);
@@ -631,7 +635,7 @@ Widget _buildTableHeader() {
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -650,7 +654,7 @@ Widget _buildTableHeader() {
                   ),
                 ),
               ),
-              SizedBox(width: 48),
+              SizedBox(width: 40),
             ],
           ),
         );

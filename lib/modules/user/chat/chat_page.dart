@@ -116,6 +116,23 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         return;
       }
 
+      if (chatProvider.conversationId == widget.conversationId &&
+          chatProvider.messages.isNotEmpty) {
+        _initialMessageIds.clear();
+        for (var message in chatProvider.messages) {
+          _initialMessageIds.add(message.id);
+        }
+
+        if (mounted) {
+          setState(() {
+            _currentLoadedConversationId = widget.conversationId;
+            _showFAQs = false;
+            _isLoadingConversation = false;
+          });
+        }
+        return;
+      }
+
       if (_currentLoadedConversationId == widget.conversationId) {
         print(' Conversation already loaded: ${widget.conversationId}');
         if (mounted) {

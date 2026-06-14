@@ -825,6 +825,147 @@ Widget _buildUserRow({
   bool isMobile = screenWidth < 600;
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
+  if (isMobile) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap:
+            isSelectionMode
+                ? onToggleSelection
+                : () => showUserInfoModal(context, doc),
+        onLongPress: onToggleSelection,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: onToggleSelection,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    border: Border.all(
+                      color:
+                          isSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child:
+                      isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    email,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _buildUserChip(
+                        role,
+                        role == 'OASP Admin'
+                            ? Colors.red
+                            : role == 'OASP Staff'
+                            ? Colors.orange
+                            : Colors.blue,
+                      ),
+                      _buildUserChip(
+                        status,
+                        status == 'Active' ? Colors.green : Colors.orange,
+                        soft: true,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_horiz),
+              padding: EdgeInsets.zero,
+              onSelected: (value) {
+                if (value == 'edit') {
+                  showEditUserModal(
+                    context,
+                    doc,
+                    onNavigateToPage: onNavigateToPage,
+                  );
+                } else if (value == 'delete') {
+                  showDeleteConfirmation(
+                    context,
+                    doc,
+                    DeleteConfigs.users,
+                    'users',
+                    customDeleteHandler: handleUserDelete,
+                  );
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 18),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
     decoration: BoxDecoration(
@@ -1038,6 +1179,26 @@ Widget _buildUserRow({
   );
 }
 
+Widget _buildUserChip(String label, MaterialColor color, {bool soft = false}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: soft ? color[50] : color[700],
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 11,
+        color: soft ? color[700] : color[50],
+        fontWeight: FontWeight.w500,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
+}
+
 Widget _buildHeader(
   String selectedRole,
   ValueChanged<String> onRoleChanged,
@@ -1161,7 +1322,7 @@ Widget _buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -1197,7 +1358,6 @@ Widget _buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 3,
                 child: Text(
                   'User',
                   style: TextStyle(
@@ -1207,30 +1367,7 @@ Widget _buildTableHeader(
                   ),
                 ),
               ),
-              const Expanded(
-                flex: 3,
-                child: Text(
-                  'Role',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const Expanded(
-                flex: 2,
-                child: Text(
-                  'Status',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 60),
-              const SizedBox(width: 48),
+              const SizedBox(width: 40),
             ],
           ),
         );

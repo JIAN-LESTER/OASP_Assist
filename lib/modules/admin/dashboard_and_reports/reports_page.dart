@@ -2680,6 +2680,56 @@ Widget _buildControlsRow(
   AdminDashboardData? ad, {
   required bool isMobile,
 }) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            CustomDropdownButton(
+              items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+              initialValue: selectedReportType,
+              onChanged: onReportTypeChanged,
+            ),
+            const SizedBox(width: 8),
+            CustomDropdownButton(
+              items: [
+                'All',
+                'Today',
+                'This Week',
+                'This Month',
+                'This Year',
+                'Custom',
+              ],
+              initialValue: selectedTimeFrame,
+              onChanged: onTimeFrameChanged,
+            ),
+          ],
+        ),
+        if (selectedTimeFrame == 'Custom') ...[
+          const SizedBox(height: 10),
+          DateRangeFilter(
+            selectedDateRange: customDateRange,
+            onDateRangeChanged: onDateRangeChanged,
+          ),
+        ],
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: ExportButton(
+            pageType: pageType,
+            timeFrame: selectedTimeFrame,
+            userName: userName,
+            inq: inq,
+            cb: cb,
+            ud: ud,
+            ad: ad,
+          ),
+        ),
+      ],
+    );
+  }
+
   return Row(
     children: [
       CustomDropdownButton(

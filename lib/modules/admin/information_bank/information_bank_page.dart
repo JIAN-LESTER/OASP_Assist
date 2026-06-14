@@ -749,7 +749,7 @@ Widget buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -785,7 +785,6 @@ Widget buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 3,
                 child: Text(
                   'Document',
                   style: TextStyle(
@@ -795,19 +794,6 @@ Widget buildTableHeader(
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              const Expanded(
-                flex: 3,
-                child: Text(
-                  'Category',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               const SizedBox(width: 40),
             ],
           ),
@@ -1004,6 +990,163 @@ Widget _buildIBRow({
   bool isTablet = screenWidth >= 600 && screenWidth < 1100;
 
   final categoryStyle = getCategoryStyle(category);
+
+  if (isMobile) {
+    return Container(
+      key: ValueKey(doc.id),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: () => showIBInfoModal(context, doc),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: onToggleSelection,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF2E7D32) : Colors.white,
+                    border: Border.all(
+                      color:
+                          isSelected
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFD1D5DB),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child:
+                      isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    content,
+                    style: const TextStyle(fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: categoryStyle.backgroundColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        categoryStyle.displayName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: categoryStyle.textColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 40,
+              child: PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    showEditIBModal(context, doc);
+                  } else if (value == 'delete') {
+                    showDeleteConfirmation(
+                      context,
+                      doc,
+                      DeleteConfigs.document,
+                      'information_bank',
+                      customDeleteHandler: handleInformationBankDelete,
+                    );
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: Color(0xFF6B7280),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Edit',
+                              style: TextStyle(color: Color(0xFF1F2937)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: Color(0xFFEF4444),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: TextStyle(color: Color(0xFFEF4444)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   return Container(
     key: ValueKey(doc.id),

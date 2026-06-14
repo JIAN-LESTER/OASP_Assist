@@ -939,7 +939,7 @@ Widget _buildTableHeader(
 
       if (isMobile) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
             color: const Color(0xFF2E7D32),
             borderRadius: BorderRadius.circular(6),
@@ -975,7 +975,6 @@ Widget _buildTableHeader(
               ),
               const SizedBox(width: 12),
               const Expanded(
-                flex: 4,
                 child: Text(
                   'Title',
                   style: TextStyle(
@@ -985,20 +984,7 @@ Widget _buildTableHeader(
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                flex: 5,
-                child: Text(
-                  'Steps',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const SizedBox(width: 48),
+              const SizedBox(width: 40),
             ],
           ),
         );
@@ -1255,7 +1241,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
     if (isMobile) {
       return Container(
         key: ValueKey(widget.doc.id),
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: widget.index.isEven ? Colors.white : const Color(0xFFF8FFFE),
           border: Border.all(color: Colors.grey[200]!),
@@ -1293,7 +1279,7 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
                             ? const Icon(
                               Icons.check,
                               size: 14,
-                              color: Color(0xFF2E7D32),
+                              color: Colors.white,
                             )
                             : null,
                   ),
@@ -1306,51 +1292,38 @@ class _AdmissionRowWidgetState extends State<_AdmissionRowWidget> {
             Expanded(
               child: GestureDetector(
                 onTap: () => showADInfoModal(context, widget.doc),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title Column
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (widget.academicYear.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                widget.academicYear,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                        ],
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 12),
-                    // Steps Column
-                    Expanded(
-                      flex: 5,
-                      child: _buildExpandableList(
-                        items: steps,
-                        emptyText: 'No steps',
-                        isExpanded: stepsExpanded,
-                        onToggle:
-                            (value) => setState(() => stepsExpanded = value),
+                    if (widget.academicYear.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          widget.academicYear,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
+                    const SizedBox(height: 8),
+                    _buildExpandableList(
+                      items: steps,
+                      emptyText: 'No steps',
+                      isExpanded: stepsExpanded,
+                      onToggle:
+                          (value) => setState(() => stepsExpanded = value),
                     ),
                   ],
                 ),

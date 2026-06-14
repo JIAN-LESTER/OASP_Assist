@@ -494,16 +494,6 @@ class _UserMainPageState extends State<UserMainPage>
       return;
     }
 
-    //  Only show loading for index 1 (Chat)
-    final shouldShowLoading =
-        index == 1 && (_conversationId != null && _conversationId!.isNotEmpty);
-
-    if (shouldShowLoading) {
-      setState(() {
-        _isNavigating = true;
-      });
-    }
-
     try {
       if (index == 1) {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -516,7 +506,9 @@ class _UserMainPageState extends State<UserMainPage>
           });
         } else {
           print(' Loading existing conversation $_conversationId');
-          await chatProvider.setConversationId(_conversationId!);
+          if (chatProvider.conversationId != _conversationId) {
+            await chatProvider.setConversationId(_conversationId!);
+          }
 
           final hasMessages = chatProvider.messages.isNotEmpty;
 
