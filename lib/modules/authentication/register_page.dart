@@ -768,7 +768,156 @@ class _RegisterPageState extends State<RegisterPage> {
     required double titleFontSize,
     required double descriptionFontSize,
     required double cardPadding,
+    bool useFormCard = false,
   }) {
+    final formContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Register",
+          style: TextStyle(
+            fontFamily: primaryFontFamily,
+            fontSize: titleFontSize * 0.82,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Create your OASP Assist account",
+          style: TextStyle(
+            fontFamily: primaryFontFamily,
+            fontSize: descriptionFontSize * 0.95,
+            fontWeight: FontWeight.w400,
+            color: textSecondaryColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        _buildGeneralError(),
+        _buildModernTextField(
+          controller: emailController,
+          label: 'Email',
+          hint: 'Enter your email',
+          keyboardType: TextInputType.emailAddress,
+          errorText: _emailError,
+          cardPadding: cardPadding,
+          onSubmitted: (_) => registerUser(),
+        ),
+        const SizedBox(height: 16),
+        _buildModernTextField(
+          controller: passwordController,
+          label: 'Password',
+          hint: 'Enter your password',
+          isPassword: true,
+          errorText: _passwordError,
+          cardPadding: cardPadding,
+          onSubmitted: (_) => registerUser(),
+        ),
+        const SizedBox(height: 16),
+        _buildModernTextField(
+          controller: confirmPasswordController,
+          label: 'Confirm Password',
+          hint: 'Re-enter your password',
+          isPassword: true,
+          errorText: _confirmPasswordError,
+          cardPadding: cardPadding,
+          onSubmitted: (_) => registerUser(),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              disabledBackgroundColor: Colors.grey[300],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: _isLoading ? null : registerUser,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.0,
+                      ),
+                    )
+                    : Text(
+                      "Sign Up",
+                      style: TextStyle(
+                        fontFamily: primaryFontFamily,
+                        fontSize: descriptionFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                "OR",
+                style: TextStyle(
+                  fontFamily: primaryFontFamily,
+                  color: textSecondaryColor,
+                  fontSize: descriptionFontSize * 0.85,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
+          ],
+        ),
+        const SizedBox(height: 24),
+        if (!(!kIsWeb &&
+            (Platform.isWindows || Platform.isLinux || Platform.isMacOS))) ...[
+          const SquareTile(imagePath: 'lib/images/google.png'),
+          const SizedBox(height: 24),
+        ],
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              "Already have an account? ",
+              style: TextStyle(
+                fontFamily: primaryFontFamily,
+                color: textSecondaryColor,
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+              },
+              child: Text(
+                "Sign In",
+                style: TextStyle(
+                  fontFamily: primaryFontFamily,
+                  color: linkColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: descriptionFontSize * 0.9,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
         horizontal: horizontalPadding,
@@ -796,7 +945,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
             const SizedBox(height: 24),
             Text(
-              "Create Account",
+              "OASP Assist",
               style: TextStyle(
                 fontFamily: primaryFontFamily,
                 fontSize: titleFontSize,
@@ -806,142 +955,89 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            Text(
-              "Sign up to get started",
-              style: TextStyle(
-                fontFamily: primaryFontFamily,
-                fontSize: descriptionFontSize,
-                fontWeight: FontWeight.w400,
-                color: textSecondaryColor,
-                letterSpacing: 0.1,
-              ),
-              textAlign: TextAlign.center,
-            ),
+       
             const SizedBox(height: 32),
-            _buildGeneralError(),
-            _buildModernTextField(
-              controller: emailController,
-              label: 'Email',
-              hint: 'Enter your email',
-              keyboardType: TextInputType.emailAddress,
-              errorText: _emailError,
-              cardPadding: cardPadding,
-              onSubmitted: (_) => registerUser(),
-            ),
-            const SizedBox(height: 16),
-            _buildModernTextField(
-              controller: passwordController,
-              label: 'Password',
-              hint: 'Enter your password',
-              isPassword: true,
-              errorText: _passwordError,
-              cardPadding: cardPadding,
-              onSubmitted: (_) => registerUser(),
-            ),
-            const SizedBox(height: 16),
-            _buildModernTextField(
-              controller: confirmPasswordController,
-              label: 'Confirm Password',
-              hint: 'Re-enter your password',
-              isPassword: true,
-              errorText: _confirmPasswordError,
-              cardPadding: cardPadding,
-              onSubmitted: (_) => registerUser(),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  disabledBackgroundColor: Colors.grey[300],
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+            useFormCard
+                ? Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Color(0xFFE0F0E4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 30,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
                   ),
-                  elevation: 0,
-                ),
-                onPressed: _isLoading ? null : registerUser,
-                child:
-                    _isLoading
-                        ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.0,
-                          ),
-                        )
-                        : Text(
-                          "Sign Up",
-                          style: TextStyle(
-                            fontFamily: primaryFontFamily,
-                            fontSize: descriptionFontSize,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    "OR",
-                    style: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      color: textSecondaryColor,
-                      fontSize: descriptionFontSize * 0.85,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-                Expanded(child: Divider(thickness: 1, color: Colors.grey[350])),
-              ],
-            ),
-            const SizedBox(height: 24),
-            if (!(!kIsWeb &&
-                (Platform.isWindows ||
-                    Platform.isLinux ||
-                    Platform.isMacOS))) ...[
-              const SquareTile(imagePath: 'lib/images/google.png'),
-              const SizedBox(height: 24),
-            ],
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Already have an account? ",
-                  style: TextStyle(
-                    fontFamily: primaryFontFamily,
-                    color: textSecondaryColor,
-                    fontSize: descriptionFontSize * 0.9,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text(
-                    "Sign In",
-                    style: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      color: linkColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: descriptionFontSize * 0.9,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                  child: formContent,
+                )
+                : formContent,
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDecoratedBody({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFE7F6EC),
+            Color(0xFFF8FAFC),
+            Color(0xFFFFF7ED),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            right: -70,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.12),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -90,
+            left: -80,
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x22F59E0B),
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileBody() {
+    return _buildDecoratedBody(
+      child: _buildContent(
+        maxWidth: double.infinity,
+        horizontalPadding: 20,
+        iconSize: 108,
+        titleFontSize: 26,
+        descriptionFontSize: 14,
+        cardPadding: 20,
+        useFormCard: true,
       ),
     );
   }
@@ -961,68 +1057,33 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFFFF7ED),
       body: SafeArea(
         child: ResponsiveLayout(
-          mobileBody: _buildContent(
-            maxWidth: double.infinity,
-            horizontalPadding: 20,
-            iconSize: 100,
-            titleFontSize: 24,
-            descriptionFontSize: 14,
-            cardPadding: 20,
-          ),
-          tabletBody: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 500),
-              margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
+          mobileBody: _buildMobileBody(),
+          tabletBody: _buildDecoratedBody(
+            child: Center(
               child: _buildContent(
                 maxWidth: 500,
-                horizontalPadding: 0,
+                horizontalPadding: 32,
                 iconSize: 110,
                 titleFontSize: 28,
                 descriptionFontSize: 15,
                 cardPadding: 32,
+                useFormCard: true,
               ),
             ),
           ),
-          desktopBody: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 480),
-              margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
+          desktopBody: _buildDecoratedBody(
+            child: Center(
               child: _buildContent(
                 maxWidth: 480,
-                horizontalPadding: 0,
+                horizontalPadding: 40,
                 iconSize: 120,
                 titleFontSize: 32,
                 descriptionFontSize: 16,
                 cardPadding: 40,
+                useFormCard: true,
               ),
             ),
           ),
