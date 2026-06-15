@@ -30,9 +30,19 @@ class Admissions {
   });
 
   factory Admissions.fromJson(Map<String, dynamic> json) {
-    Map<String, int>? parseAcademicYear(String? yearStr) {
+    Map<String, int>? parseAcademicYear(dynamic value) {
+      if (value is Map) {
+        final start = int.tryParse(value['start']?.toString() ?? '');
+        final end = int.tryParse(value['end']?.toString() ?? '');
+
+        if (start != null && end != null) return {'start': start, 'end': end};
+        if (start != null) return {'start': start};
+        return null;
+      }
+
+      final yearStr = value?.toString();
       if (yearStr == null || yearStr.trim().isEmpty) return null;
-      final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
+      final rangeRegex = RegExp('(\\d{4})\\s*(?:-|\\u2013)\\s*(\\d{4})');
       final singleRegex = RegExp(r'(\d{4})');
 
       final rangeMatch = rangeRegex.firstMatch(yearStr);
@@ -75,7 +85,7 @@ class Admissions {
       List<String>? contactList = _parseStringList(json['contact']);
 
       Map<String, int>? academicYearMap = parseAcademicYear(
-        json['academicYear']?.toString(),
+        json['academicYear'],
       );
 
       List<Map<String, dynamic>>? schedulesList;

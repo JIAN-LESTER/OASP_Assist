@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:capstone_project/models/admissions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AdmissionInfo extends StatefulWidget {
@@ -14,7 +14,7 @@ class AdmissionInfo extends StatefulWidget {
 class _AdmissionInfoState extends State<AdmissionInfo>
     with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Admissions> _admissionsByType = [];
+  final List<Admissions> _admissions = [];
   String? _selectedType;
   bool _isLoading = true;
   String? _error;
@@ -22,9 +22,14 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   late Animation<double> _fadeAnimation;
 
   final Color primaryGreen = const Color(0xFF2E7D32);
-  final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
-  final Color successGreen = const Color(0xFF66BB6A);
+
+  static const List<String> _examTypes = ['GSAT', 'CMUCAT', 'ULHSAT'];
+  static const Map<String, String> _examNames = {
+    'GSAT': 'Graduate School Admission Test',
+    'CMUCAT': 'Central Mindanao University College Admission Test',
+    'ULHSAT': 'University Laboratory High School Admission Test',
+  };
 
   @override
   void initState() {
@@ -33,7 +38,7 @@ class _AdmissionInfoState extends State<AdmissionInfo>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _fetchAdmissionProcesses();
@@ -58,56 +63,34 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               .orderBy('createdAt', descending: true)
               .get();
 
-      if (querySnapshot.docs.isNotEmpty) {
-        final List<Admissions> admissions =
-            querySnapshot.docs
-                .map(
-                  (doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}),
-                )
-                .toList();
+      final admissions =
+          querySnapshot.docs
+              .map((doc) => Admissions.fromJson({...doc.data(), 'id': doc.id}))
+              .where((admission) {
+                final type = _normalizeType(admission.type);
+                return _examTypes.contains(type);
+              })
+              .toList()
+            ..sort(_sortAdmissions);
 
-        //  Filter out entries without a type
-        final validAdmissions =
-            admissions
-                .where(
-                  (a) =>
-                      a.type != null &&
-                      a.type!.isNotEmpty &&
-                      a.type!.toLowerCase() != 'null',
-                )
-                .toList();
+      if (!mounted) return;
 
-        // Group by type and keep the most recent one per type
-        final Map<String, Admissions> typeMap = {};
-        for (final admission in validAdmissions) {
-          final type = admission.type!; //  No fallback, type is guaranteed
-          if (!typeMap.containsKey(type)) {
-            typeMap[type] = admission;
-          }
-        }
+      setState(() {
+        _admissions
+          ..clear()
+          ..addAll(admissions);
+        _selectedType =
+            _examTypes.firstWhere(
+              (type) => _admissions.any((item) => _normalizeType(item.type) == type),
+              orElse: () => _examTypes.first,
+            );
+        _isLoading = false;
+        _error = admissions.isEmpty ? 'No admission information available' : null;
+      });
 
-        // Sort by type name
-        final sortedAdmissions =
-            typeMap.values.toList()..sort((a, b) {
-              return a.type!.compareTo(b.type!); //  No fallback
-            });
-
-        setState(() {
-          _admissionsByType = sortedAdmissions;
-          if (_admissionsByType.isNotEmpty) {
-            _selectedType = _admissionsByType.first.type; //  No fallback
-          }
-          _isLoading = false;
-        });
-
-        _animationController.forward();
-      } else {
-        setState(() {
-          _error = 'No admission information available';
-          _isLoading = false;
-        });
-      }
+      _animationController.forward(from: 0);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to load admission information: $e';
         _isLoading = false;
@@ -115,17 +98,24 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     }
   }
 
-  Admissions? get _selectedAdmission {
-    if (_admissionsByType.isEmpty || _selectedType == null) return null;
+  int _sortAdmissions(Admissions a, Admissions b) {
+    final typeCompare = _examTypes
+        .indexOf(_normalizeType(a.type))
+        .compareTo(_examTypes.indexOf(_normalizeType(b.type)));
+    if (typeCompare != 0) return typeCompare;
 
-    try {
-      return _admissionsByType.firstWhere(
-        (admission) => admission.type == _selectedType,
-      );
-    } catch (e) {
-      // If no match found, return the first one
-      return _admissionsByType.isNotEmpty ? _admissionsByType.first : null;
-    }
+    final bYear = b.academicYear?['start'] ?? 0;
+    final aYear = a.academicYear?['start'] ?? 0;
+    if (bYear != aYear) return bYear.compareTo(aYear);
+    return b.createdAt.compareTo(a.createdAt);
+  }
+
+  String _normalizeType(String? type) => (type ?? '').trim().toUpperCase();
+
+  List<Admissions> get _selectedAdmissions {
+    return _admissions
+        .where((admission) => _normalizeType(admission.type) == _selectedType)
+        .toList();
   }
 
   @override
@@ -137,76 +127,30 @@ class _AdmissionInfoState extends State<AdmissionInfo>
   }
 
   Widget _buildContent() {
-    if (_isLoading) {
-      //   Show loading state
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
-                  strokeWidth: 3,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Loading Admission Information',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Please wait a moment',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_error != null || _admissionsByType.isEmpty) {
-      return _buildErrorState();
-    }
+    if (_isLoading) return _buildLoadingState();
+    if (_error != null || _admissions.isEmpty) return _buildErrorState();
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return RefreshIndicator(
       onRefresh: _fetchAdmissionProcesses,
-      color: Colors.green[600],
+      color: primaryGreen,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  _buildTypeSelector(),
-                  _buildScheduleSection(),
-                  _buildStepsAndRequirements(),
-                  _buildHelpSection(),
-                  const SizedBox(height: 32),
+        padding: _pagePadding(context),
+        child: SizedBox(
+          width: double.infinity,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildExamCards(),
+                if (!isMobile) ...[
+                  const SizedBox(height: 20),
+                  _buildSelectedExamHeader(),
+                  const SizedBox(height: 14),
+                  _buildAdmissionVersions(),
                 ],
-              ),
+              ],
             ),
           ),
         ),
@@ -214,52 +158,55 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 
+  EdgeInsets _pagePadding(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    if (width < 600) return const EdgeInsets.fromLTRB(10, 10, 10, 20);
+    if (width < 1024) return const EdgeInsets.fromLTRB(14, 14, 14, 24);
+    return const EdgeInsets.fromLTRB(12, 12, 12, 24);
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Loading Admission Information',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildErrorState() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Center(
       child: Container(
-        padding: const EdgeInsets.all(48),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+        margin: EdgeInsets.all(isMobile ? 12 : 16),
+        padding: EdgeInsets.all(isMobile ? 22 : 32),
+        decoration: _cardDecoration(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.error_outline_rounded,
-                size: 64,
-                color: Colors.red[400],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Oops! Something went wrong',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 12),
+            Icon(Icons.error_outline_rounded, size: 56, color: Colors.red[400]),
+            const SizedBox(height: 16),
             Text(
               _error ?? 'Unable to load admission information',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+              style: TextStyle(fontSize: 16, color: Colors.grey[700]),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _fetchAdmissionProcesses,
               icon: const Icon(Icons.refresh_rounded),
@@ -267,14 +214,6 @@ class _AdmissionInfoState extends State<AdmissionInfo>
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryGreen,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
               ),
             ),
           ],
@@ -283,812 +222,617 @@ class _AdmissionInfoState extends State<AdmissionInfo>
     );
   }
 
-  Widget _buildTypeSelector() {
-    if (_admissionsByType.length <= 1) return const SizedBox.shrink();
+  Widget _buildExamCards() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final isTablet = constraints.maxWidth >= 600 && constraints.maxWidth < 980;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.category_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Select Admission Type',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey[900],
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _admissionsByType.map((admission) {
-                  try {
-                    final type = admission.type; //  No fallback
-                    if (type == null ||
-                        type.isEmpty ||
-                        type.toLowerCase() == 'null')
-                      return const SizedBox.shrink();
+        return GridView.count(
+          crossAxisCount: isMobile ? 1 : (isTablet ? 2 : 3),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: isMobile ? 10 : 12,
+          crossAxisSpacing: isMobile ? 10 : 12,
+          childAspectRatio: isMobile ? 2.35 : (isTablet ? 2.15 : 2.45),
+          children:
+              _examTypes.map((type) {
+                final versions =
+                    _admissions
+                        .where((item) => _normalizeType(item.type) == type)
+                        .toList();
+                final isSelected =
+                    !isMobile && _selectedType == type;
+                final hasData = versions.isNotEmpty;
+                final latestYear =
+                    hasData ? _formatAcademicYear(versions.first.academicYear) : 'No version';
 
-                    final isSelected = type == _selectedType;
-
-                    return InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedType = type;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient:
-                              isSelected
-                                  ? LinearGradient(
-                                    colors: [
-                                      Colors.green[600]!,
-                                      Colors.green[700]!,
-                                    ],
-                                  )
-                                  : null,
-                          color: isSelected ? null : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? Colors.green[700]!
-                                    : Colors.grey[300]!,
-                          ),
-                          boxShadow:
-                              isSelected
-                                  ? [
-                                    BoxShadow(
-                                      color: Colors.green[600]!.withOpacity(
-                                        0.4,
-                                      ),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                  : null,
-                        ),
-                        child: Text(
-                          type,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[700],
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
+                return InkWell(
+                  onTap: () => _selectExamType(type, isMobile),
+                  borderRadius: BorderRadius.circular(12),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: EdgeInsets.all(isMobile ? 16 : 18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? primaryGreen : Colors.grey[300]!,
+                        width: isSelected ? 2 : 1,
                       ),
-                    );
-                  } catch (e) {
-                    print('Error displaying admission type: $e');
-                    return const SizedBox.shrink();
-                  }
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScheduleSection() {
-    final schedules = _selectedAdmission?.schedules;
-
-    if (schedules == null || schedules.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isSelected ? 0.12 : 0.06),
+                          blurRadius: isSelected ? 20 : 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.event_note_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Exam Schedule',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey[900],
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          ...schedules.map((schedule) {
-            final date = schedule['date']?.toString() ?? '';
-            final dayOfWeek = schedule['dayOfWeek']?.toString() ?? '';
-            final locations = schedule['locations'] as List<dynamic>? ?? [];
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    accentGreen.withOpacity(0.1),
-                    accentGreen.withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: accentGreen.withOpacity(0.3),
-                  width: 1.5,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: primaryGreen,
-                          borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(isMobile ? 8 : 10),
+                              decoration: BoxDecoration(
+                                color:
+                                    isSelected
+                                        ? primaryGreen
+                                        : primaryGreen.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.school_outlined,
+                                color: isSelected ? Colors.white : primaryGreen,
+                                size: isMobile ? 20 : 22,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${versions.length}',
+                              style: TextStyle(
+                                color: hasData ? primaryGreen : Colors.grey[500],
+                                fontWeight: FontWeight.w700,
+                                fontSize: isMobile ? 15 : 16,
+                              ),
+                            ),
+                          ],
                         ),
-                        child: Icon(
-                          Icons.calendar_today,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              date,
+                              type,
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontSize: isMobile ? 20 : 22,
+                                fontWeight: FontWeight.w800,
                                 color: Colors.grey[900],
                               ),
                             ),
-                            if (dayOfWeek.isNotEmpty)
-                              Text(
-                                dayOfWeek,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey[600],
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _examNames[type]!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 13,
+                                height: 1.3,
+                                color: Colors.grey[600],
                               ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Latest: $latestYear',
+                              style: TextStyle(
+                                fontSize: isMobile ? 12 : 13,
+                                fontWeight: FontWeight.w600,
+                                color: hasData ? primaryGreen : Colors.grey[500],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                  if (locations.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[300]!, width: 1),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on_rounded,
-                                size: 16,
-                                color: primaryGreen,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Locations:',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          ...locations.map((location) {
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                left: 24,
-                                bottom: 4,
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 8),
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: primaryGreen,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      location.toString(),
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            );
-          }).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepsAndRequirements() {
-    final steps = _selectedAdmission?.steps ?? [];
-    final requirements = _selectedAdmission?.requirements ?? [];
-
-    if (steps.isEmpty && requirements.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.all(48),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.info_outline_rounded,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'No admission information available',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Please check back later or contact the admissions office',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 800;
-
-        if (isMobile) {
-          return Column(
-            children: [
-              if (steps.isNotEmpty) _buildStepsSection(steps),
-              if (steps.isNotEmpty && requirements.isNotEmpty)
-                const SizedBox(height: 24),
-              if (requirements.isNotEmpty) _buildRequirementsCard(requirements),
-            ],
-          );
-        } else {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (steps.isNotEmpty)
-                Expanded(flex: 6, child: _buildStepsSection(steps)),
-              if (steps.isNotEmpty && requirements.isNotEmpty)
-                const SizedBox(width: 24),
-              if (requirements.isNotEmpty)
-                Expanded(flex: 4, child: _buildRequirementsCard(requirements)),
-            ],
-          );
-        }
+                  ),
+                );
+              }).toList(),
+        );
       },
     );
   }
 
-  Widget _buildStepsSection(List<String> steps) {
-    return Column(
-      children:
-          steps.asMap().entries.map((entry) {
-            final index = entry.key;
-            final step = entry.value;
-            return Container(
-              margin: const EdgeInsets.only(bottom: 24),
-              child: _buildStepCard(index + 1, step),
-            );
-          }).toList(),
+  void _selectExamType(String type, bool isMobile) {
+    setState(() => _selectedType = type);
+    if (!isMobile) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => Scaffold(
+              backgroundColor: const Color.fromARGB(255, 245, 245, 245),
+              appBar: AppBar(
+                title: Text(type),
+                backgroundColor: primaryGreen,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+              body: SingleChildScrollView(
+                padding: _pagePadding(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSelectedExamHeader(),
+                    const SizedBox(height: 14),
+                    _buildAdmissionVersions(),
+                  ],
+                ),
+              ),
+            ),
+      ),
     );
   }
 
-  Widget _buildRequirementsCard(List<String> requirements) {
+  Widget _buildSelectedExamHeader() {
+    final type = _selectedType ?? _examTypes.first;
+    final count = _selectedAdmissions.length;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 18 : 22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: primaryGreen,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.description_outlined,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Requirements',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.grey[900],
-                  letterSpacing: -0.3,
-                ),
-              ),
-            ],
+          Text(
+            type,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isMobile ? 24 : 28,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: 20),
-          ...requirements.map((requirement) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: primaryGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      requirement,
-                      style: TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+          const SizedBox(height: 6),
+          Text(
+            '${_examNames[type]} - $count version${count == 1 ? '' : 's'} available',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: isMobile ? 13 : 15,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStepCard(int stepNumber, String stepTitle) {
-    final cleanedTitle = stepTitle.replaceFirst(
-      RegExp(
-        r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*',
-        caseSensitive: false,
-      ),
-      '',
-    );
+  Widget _buildAdmissionVersions() {
+    final admissions = _selectedAdmissions;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey[300]!, width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: primaryGreen.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  stepNumber.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Linkify(
-                text: cleanedTitle,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
-                  height: 1.5,
-                  letterSpacing: 0.1,
-                ),
-                linkStyle: const TextStyle(
-                  color: Colors.blue,
-                  decoration: TextDecoration.underline,
-                  fontWeight: FontWeight.w600,
-                ),
-                onOpen: (link) async {
-                  final uri = Uri.parse(link.url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-              ),
-            ),
-          ],
+    if (admissions.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(isMobile ? 20 : 32),
+        decoration: _cardDecoration(),
+        child: Text(
+          'No ${_selectedType ?? ''} admission information available.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey[600], fontSize: 16),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHelpSection() {
-    final admission = _selectedAdmission;
-    if (admission?.contact == null || admission!.contact!.isEmpty) {
-      return const SizedBox.shrink();
+      );
     }
 
+    return Column(
+      children:
+          admissions.map((admission) {
+            return Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: _cardDecoration(),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                ),
+                child: ExpansionTile(
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  initiallyExpanded: admissions.length == 1,
+                  tilePadding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 16 : 22,
+                    vertical: isMobile ? 6 : 8,
+                  ),
+                  childrenPadding: EdgeInsets.fromLTRB(
+                    isMobile ? 16 : 22,
+                    0,
+                    isMobile ? 16 : 22,
+                    isMobile ? 16 : 22,
+                  ),
+                  iconColor: primaryGreen,
+                  collapsedIconColor: primaryGreen,
+                  title: Text(
+                    _formatAcademicYear(admission.academicYear),
+                    style: TextStyle(
+                      color: primaryGreen,
+                      fontSize: isMobile ? 16 : 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      admission.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                  ),
+                  children: [_buildAdmissionDetails(admission)],
+                ),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _buildAdmissionDetails(Admissions admission) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildScheduleSection(admission.schedules ?? []),
+        _buildListSection('Steps', Icons.list_alt_outlined, admission.steps, numbered: true),
+        _buildListSection(
+          'Requirements',
+          Icons.checklist_outlined,
+          admission.requirements ?? [],
+        ),
+        _buildLinksSection(admission.links ?? []),
+        _buildContactSection(admission.contact ?? []),
+      ],
+    );
+  }
+
+  Widget _buildScheduleSection(List<Map<String, dynamic>> schedules) {
+    if (schedules.isEmpty) return const SizedBox.shrink();
+
+    return _buildSectionShell(
+      'Exam Schedule',
+      Icons.event_note_rounded,
+      Column(
+        children:
+            schedules.map((schedule) {
+              final date = schedule['date']?.toString() ?? '';
+              final dayOfWeek = schedule['dayOfWeek']?.toString() ?? '';
+              final locations = schedule['locations'] as List<dynamic>? ?? [];
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.all(MediaQuery.of(context).size.width < 600 ? 12 : 16),
+                decoration: BoxDecoration(
+                  color: accentGreen.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: accentGreen.withOpacity(0.25)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      date.isEmpty ? 'Schedule date not specified' : date,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[900],
+                      ),
+                    ),
+                    if (dayOfWeek.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(dayOfWeek, style: TextStyle(color: Colors.grey[600])),
+                    ],
+                    if (locations.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      ...locations.map(
+                        (location) => _buildBulletText(location.toString()),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildListSection(
+    String title,
+    IconData icon,
+    List<String> items, {
+    bool numbered = false,
+  }) {
+    final cleanItems =
+        items.map((item) => item.trim()).where((item) => item.isNotEmpty).toList();
+    if (cleanItems.isEmpty) return const SizedBox.shrink();
+
+    return _buildSectionShell(
+      title,
+      icon,
+      Column(
+        children:
+            cleanItems.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item =
+                  numbered
+                      ? entry.value.replaceFirst(
+                        RegExp(
+                          r'^(Step\s*\d+[:.\-\s]*)|(^\d+[.:-\s]*)|^\[\d+\]\s*',
+                          caseSensitive: false,
+                        ),
+                        '',
+                      )
+                      : entry.value;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: numbered ? 28 : 8,
+                      height: numbered ? 28 : 8,
+                      margin: EdgeInsets.only(top: numbered ? 0 : 8),
+                      decoration: BoxDecoration(
+                        color: primaryGreen,
+                        shape: numbered ? BoxShape.rectangle : BoxShape.circle,
+                        borderRadius:
+                            numbered ? BorderRadius.circular(14) : null,
+                      ),
+                      child:
+                          numbered
+                              ? Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )
+                              : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Linkify(
+                        text: item,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.5,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w500,
+                        ),
+                        linkStyle: const TextStyle(
+                          color: Colors.blue,
+                          decoration: TextDecoration.underline,
+                        ),
+                        onOpen: _openLink,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildLinksSection(List<String> links) {
+    final cleanLinks =
+        links.map((link) => link.trim()).where((link) => link.isNotEmpty).toList();
+    if (cleanLinks.isEmpty) return const SizedBox.shrink();
+
+    return _buildSectionShell(
+      'Related Links',
+      Icons.link_outlined,
+      Column(
+        children:
+            cleanLinks.map((link) {
+              return InkWell(
+                onTap: () => _launchUrl(link),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.open_in_new, size: 16, color: primaryGreen),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          link,
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildContactSection(List<String> contacts) {
+    final cleanContacts =
+        contacts
+            .map((contact) => contact.trim())
+            .where((contact) => contact.isNotEmpty)
+            .toList();
+    if (cleanContacts.isEmpty) return const SizedBox.shrink();
+
+    return _buildSectionShell(
+      'Contact',
+      Icons.contact_phone_outlined,
+      Column(
+        children:
+            cleanContacts.map((contact) {
+              final isEmail = contact.toLowerCase().contains('email:');
+              final isPhone = contact.toLowerCase().contains('phone:');
+              final cleaned =
+                  contact
+                      .replaceAll(
+                        RegExp(r'^(Email|Phone)\s*:\s*', caseSensitive: false),
+                        '',
+                      )
+                      .trim();
+
+              return InkWell(
+                onTap: () async {
+                  if (isEmail) {
+                    await launchUrl(Uri(scheme: 'mailto', path: cleaned));
+                  } else if (isPhone) {
+                    await launchUrl(Uri(scheme: 'tel', path: cleaned));
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isEmail
+                            ? Icons.email_rounded
+                            : isPhone
+                                ? Icons.phone_rounded
+                                : Icons.contact_page_rounded,
+                        size: 18,
+                        color: primaryGreen,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          cleaned,
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildSectionShell(String title, IconData icon, Widget child) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Container(
-      margin: const EdgeInsets.only(top: 24),
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      margin: EdgeInsets.only(top: isMobile ? 12 : 16),
+      padding: EdgeInsets.all(isMobile ? 14 : 18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: accentGreen.withOpacity(0.3), width: 1),
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [primaryGreen.withOpacity(0.9), primaryGreen],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGreen.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.help_outline_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
+              Icon(icon, size: 20, color: primaryGreen),
+              const SizedBox(width: 10),
               Text(
-                'Need Help?',
+                title,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
                   color: Colors.grey[900],
-                  letterSpacing: -0.3,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBulletText(String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  accentGreen.withOpacity(0.1),
-                  accentGreen.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: accentGreen.withOpacity(0.2),
-                width: 1.5,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Contact Admissions Office',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey[900],
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...admission.contact!.map((contact) {
-                  bool isEmail = contact.toLowerCase().contains("email:");
-                  bool isPhone = contact.toLowerCase().contains("phone:");
-                  final cleaned =
-                      contact
-                          .replaceAll(
-                            RegExp(
-                              r'^(Email|Phone)\s*:\s*',
-                              caseSensitive: false,
-                            ),
-                            '',
-                          )
-                          .trim();
-
-                  final icon =
-                      isEmail
-                          ? Icons.email_rounded
-                          : isPhone
-                          ? Icons.phone_rounded
-                          : Icons.contact_page_rounded;
-
-                  return InkWell(
-                    onTap: () async {
-                      if (isEmail) {
-                        final uri = Uri(scheme: 'mailto', path: cleaned);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri);
-                        }
-                      } else if (isPhone) {
-                        final uri = Uri(scheme: 'tel', path: cleaned);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri);
-                        }
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(icon, size: 18, color: primaryGreen),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              cleaned,
-                              style: TextStyle(
-                                fontSize: 15,
-                                height: 1.5,
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.w500,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-              ],
+            width: 6,
+            height: 6,
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(color: primaryGreen, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 14, height: 1.5, color: Colors.grey[700]),
             ),
           ),
         ],
       ),
     );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.grey[300]!),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.06),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+  }
+
+  String _formatAcademicYear(Map<String, int>? academicYear) {
+    if (academicYear == null || academicYear.isEmpty) return 'Year not specified';
+
+    final start = academicYear['start'];
+    final end = academicYear['end'];
+    if (start != null && end != null) return '$start-$end';
+    if (start != null) return '$start';
+    return 'Year not specified';
+  }
+
+  Future<void> _openLink(LinkableElement link) async {
+    await _launchUrl(link.url);
+  }
+
+  Future<void> _launchUrl(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return;
+
+    final target =
+        uri.hasScheme ? uri : Uri.tryParse('https://$value');
+    if (target == null) return;
+
+    if (await canLaunchUrl(target)) {
+      await launchUrl(target, mode: LaunchMode.externalApplication);
+    }
   }
 }
