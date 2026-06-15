@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'green_snow_animation.dart';
 import 'onboarding_desktop.dart';
 import 'onboarding_tablet.dart';
 
@@ -15,6 +16,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
   late AnimationController _animationController;
+  late AnimationController _snowController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   int _currentPage = 0;
@@ -67,6 +69,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
@@ -83,6 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void dispose() {
     _pageController.dispose();
     _animationController.dispose();
+    _snowController.dispose();
     super.dispose();
   }
 
@@ -897,18 +904,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // Mobile Layout
   Widget _buildMobileLayout() {
-    return Container(
-      color: Colors.grey[50],
-      child: SafeArea(
-        child: _buildContent(
-          maxWidth: double.infinity,
-          horizontalPadding: 12,
-          iconSize: 80,
-          titleFontSize: 24,
-          descriptionFontSize: 14,
-          buttonHeight: 16,
+    return Stack(
+      children: [
+        GreenSnowAnimation(animation: _snowController, color: primaryColor),
+        SafeArea(
+          child: _buildContent(
+            maxWidth: double.infinity,
+            horizontalPadding: 12,
+            iconSize: 80,
+            titleFontSize: 24,
+            descriptionFontSize: 14,
+            buttonHeight: 16,
+          ),
         ),
-      ),
+      ],
     );
   }
 

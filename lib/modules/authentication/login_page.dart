@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'forgot_password_page.dart';
+import 'onboarding/green_snow_animation.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -18,7 +19,9 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _snowController;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isLoading = false;
@@ -780,6 +783,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
+          GreenSnowAnimation(animation: _snowController, color: primaryColor),
           child,
         ],
       ),
@@ -801,7 +805,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
   void dispose() {
+    _snowController.dispose();
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _generalErrorTimer?.cancel();

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../components/square_tile.dart';
 import '../../responsive/responsive_layout.dart';
+import 'onboarding/green_snow_animation.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -16,7 +17,9 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _snowController;
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
@@ -215,6 +218,10 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
     _fetchPrograms();
   }
 
@@ -1022,6 +1029,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           ),
+          GreenSnowAnimation(animation: _snowController, color: primaryColor),
           child,
         ],
       ),
@@ -1044,6 +1052,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    _snowController.dispose();
     _emailErrorTimer?.cancel();
     _passwordErrorTimer?.cancel();
     _confirmPasswordErrorTimer?.cancel();

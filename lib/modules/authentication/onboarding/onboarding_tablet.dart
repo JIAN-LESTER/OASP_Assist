@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'green_snow_animation.dart';
 
 class OnboardingTablet extends StatefulWidget {
   const OnboardingTablet({Key? key}) : super(key: key);
@@ -8,8 +9,10 @@ class OnboardingTablet extends StatefulWidget {
   State<OnboardingTablet> createState() => _OnboardingTabletState();
 }
 
-class _OnboardingTabletState extends State<OnboardingTablet> {
+class _OnboardingTabletState extends State<OnboardingTablet>
+    with SingleTickerProviderStateMixin {
   late PageController _pageController;
+  late AnimationController _snowController;
   int _currentPage = 0;
 
   static const Color primaryColor = Color.fromARGB(255, 8, 121, 11);
@@ -21,11 +24,16 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _snowController.dispose();
     super.dispose();
   }
 
@@ -76,26 +84,29 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 800),
-            margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-            padding: const EdgeInsets.all(40),
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade300, width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 24,
-                  offset: Offset(0, 6),
+      body: Stack(
+        children: [
+          GreenSnowAnimation(animation: _snowController, color: primaryColor),
+          SafeArea(
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                margin: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+                padding: const EdgeInsets.all(40),
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 24,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: Column(
-              children: [
+                child: Column(
+                  children: [
                 // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -254,6 +265,8 @@ class _OnboardingTabletState extends State<OnboardingTablet> {
             ),
           ),
         ),
+      ),
+        ], 
       ),
     );
   }

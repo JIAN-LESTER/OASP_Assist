@@ -7,6 +7,7 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'green_snow_animation.dart';
 
 class UserOnboardingScreen extends StatefulWidget {
   final String userId;
@@ -25,6 +26,7 @@ class UserOnboardingScreen extends StatefulWidget {
 class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
+  late AnimationController _snowController;
   int _currentPage = 0;
   bool _isEditingFromSummary = false;
 
@@ -91,6 +93,10 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   void initState() {
     super.initState();
     _pageController = PageController();
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
     // Initialize keys for each role
     for (var role in _roles) {
       _roleCardKeys[role] = GlobalKey();
@@ -152,6 +158,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
   @override
   void dispose() {
     _pageController.dispose();
+    _snowController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _studentIdController.dispose();
@@ -2688,70 +2695,81 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       body: SafeArea(
-        child: ResponsiveLayout(
-          mobileBody: _buildContent(
-            maxWidth: double.infinity,
-            horizontalPadding: 16,
-            iconSize: 80,
-            titleFontSize: 24,
-            descriptionFontSize: 14,
-            buttonHeight: 16,
-            cardPadding: 20,
-          ),
-          tabletBody: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 700),
-              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+        child: Stack(
+          children: [
+            GreenSnowAnimation(animation: _snowController, color: primaryColor),
+            ResponsiveLayout(
+              mobileBody: _buildContent(
+                maxWidth: double.infinity,
+                horizontalPadding: 16,
+                iconSize: 80,
+                titleFontSize: 24,
+                descriptionFontSize: 14,
+                buttonHeight: 16,
+                cardPadding: 20,
               ),
-              child: _buildContent(
-                maxWidth: 700,
-                horizontalPadding: 20,
-                iconSize: 100,
-                titleFontSize: 28,
-                descriptionFontSize: 15,
-                buttonHeight: 18,
-                cardPadding: 24,
+              tabletBody: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 700),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 24,
+                  ),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 24,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: _buildContent(
+                    maxWidth: 700,
+                    horizontalPadding: 20,
+                    iconSize: 100,
+                    titleFontSize: 28,
+                    descriptionFontSize: 15,
+                    buttonHeight: 18,
+                    cardPadding: 24,
+                  ),
+                ),
+              ),
+              desktopBody: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 40,
+                  ),
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 24,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: _buildContent(
+                    maxWidth: 800,
+                    horizontalPadding: 24,
+                    iconSize: 120,
+                    titleFontSize: 32,
+                    descriptionFontSize: 16,
+                    buttonHeight: 20,
+                    cardPadding: 32,
+                  ),
+                ),
               ),
             ),
-          ),
-          desktopBody: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 800),
-              margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: _buildContent(
-                maxWidth: 800,
-                horizontalPadding: 24,
-                iconSize: 120,
-                titleFontSize: 32,
-                descriptionFontSize: 16,
-                buttonHeight: 20,
-                cardPadding: 32,
-              ),
-            ),
-          ),
+          ],
         ),
       ),
     );
