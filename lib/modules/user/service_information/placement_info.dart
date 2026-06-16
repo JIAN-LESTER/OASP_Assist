@@ -23,11 +23,13 @@ class _PlacementInfoState extends State<PlacementInfo>
   late Animation<double> _fadeAnimation;
   bool isLoading = true;
   List<Placement> placements = [];
+  int _currentPage = 0;
 
   final Color primaryGreen = const Color(0xFF2E7D32);
   final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
   final Color successGreen = const Color(0xFF66BB6A);
+  final Color placementViolet = const Color(0xFF7C3AED);
 
   @override
   void initState() {
@@ -216,7 +218,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -229,7 +231,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                             const Text(
                               "Job Placements",
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
@@ -237,7 +239,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                             Text(
                               "Explore available job opportunities",
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w400,
                               ),
@@ -260,6 +262,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                             offset: const Offset(0, 50),
                             onSelected: (String value) {
                               setState(() {
+                                _currentPage = 0;
                                 if (value.startsWith('sort_')) {
                                   _sortBy = value.replaceFirst('sort_', '');
                                 } else {
@@ -410,7 +413,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                               ];
                             },
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2E7D32),
                                 borderRadius: BorderRadius.circular(8),
@@ -425,11 +428,11 @@ class _PlacementInfoState extends State<PlacementInfo>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
 
                     // Search Bar
                     Container(
-                      margin: const EdgeInsets.only(bottom: 24),
+                      margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
@@ -444,6 +447,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                         controller: _searchController,
                         onChanged: (value) {
                           setState(() {
+                            _currentPage = 0;
                             _searchQuery = value.toLowerCase().trim();
                           });
                         },
@@ -464,6 +468,7 @@ class _PlacementInfoState extends State<PlacementInfo>
                                     onPressed: () {
                                       _searchController.clear();
                                       setState(() {
+                                        _currentPage = 0;
                                         _searchQuery = '';
                                       });
                                     },
@@ -476,8 +481,8 @@ class _PlacementInfoState extends State<PlacementInfo>
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 18,
+                            horizontal: 16,
+                            vertical: 12,
                           ),
                         ),
                       ),
@@ -487,8 +492,6 @@ class _PlacementInfoState extends State<PlacementInfo>
               ),
             ),
 
-            // List
-            // Replace your Expanded widget (List section) with this:
             Expanded(
               child:
                   isLoading
@@ -564,177 +567,19 @@ class _PlacementInfoState extends State<PlacementInfo>
                             );
                           }
 
-                          return ListView.builder(
-                            padding: const EdgeInsets.all(24),
-                            itemCount: filteredPlacements.length,
-                            itemBuilder: (context, index) {
-                              final placement = filteredPlacements[index];
-                              final daysAgo =
-                                  DateTime.now()
-                                      .difference(placement.createdAt)
-                                      .inDays;
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border(
-                                    left: BorderSide(
-                                      color: _getStatusColor(daysAgo),
-                                      width: 4,
-                                    ),
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.07),
-                                      spreadRadius: 0,
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap:
-                                        () => _showPlacementDetails(placement),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(20),
-                                      child: Row(
-                                        children: [
-                                          // Status indicator
-                                          Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: _getStatusColor(
-                                                daysAgo,
-                                              ).withOpacity(0.12),
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              _getStatusIcon(daysAgo),
-                                              color: _getStatusColor(daysAgo),
-                                              size: 20,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 16),
-
-                                          // Content
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                // Company name
-                                                Text(
-                                                  placement.partnerCompany,
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF0F172A),
-                                                    height: 1.4,
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                const SizedBox(height: 12),
-
-                                                // Meta info
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 10,
-                                                            vertical: 4,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: _getStatusColor(
-                                                          daysAgo,
-                                                        ).withOpacity(0.15),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              8,
-                                                            ),
-                                                      ),
-                                                      child: Text(
-                                                        _formatDate(
-                                                          placement.createdAt,
-                                                        ).toUpperCase(),
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w700,
-                                                          color:
-                                                              _getStatusColor(
-                                                                daysAgo,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Icon(
-                                                      Icons.work_outline,
-                                                      size: 14,
-                                                      color: Colors.grey[500],
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Expanded(
-                                                      child: Text(
-                                                        '${placement.positions.length} position${placement.positions.length == 1 ? '' : 's'}',
-                                                        style: TextStyle(
-                                                          fontSize: 13,
-                                                          color:
-                                                              Colors.grey[600],
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow:
-                                                            TextOverflow
-                                                                .ellipsis,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-
-                                                if (placement
-                                                    .positions
-                                                    .isNotEmpty) ...[
-                                                  const SizedBox(height: 8),
-                                                  Text(
-                                                    placement.positions.first,
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.grey[600],
-                                                      height: 1.3,
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-
-                                          // Arrow
-                                          Icon(
-                                            Icons.arrow_forward_ios,
-                                            color: Colors.grey[400],
-                                            size: 16,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
+                          return ResponsiveLayout(
+                            mobileBody: _buildPlacementResults(
+                              filteredPlacements,
+                              isMobile: true,
+                            ),
+                            tabletBody: _buildPlacementResults(
+                              filteredPlacements,
+                              isMobile: false,
+                            ),
+                            desktopBody: _buildPlacementResults(
+                              filteredPlacements,
+                              isMobile: false,
+                            ),
                           );
                         },
                       ),
@@ -743,6 +588,382 @@ class _PlacementInfoState extends State<PlacementInfo>
         ),
       ),
     );
+  }
+
+  Widget _buildPlacementResults(
+    List<Placement> filteredPlacements, {
+    required bool isMobile,
+  }) {
+    final itemsPerPage = isMobile ? 6 : 8;
+    final totalPages = (filteredPlacements.length / itemsPerPage).ceil();
+    final effectivePage =
+        totalPages == 0
+            ? 0
+            : _currentPage.clamp(0, totalPages - 1).toInt();
+    final startIndex = effectivePage * itemsPerPage;
+    final endIndex =
+        (startIndex + itemsPerPage).clamp(0, filteredPlacements.length).toInt();
+    final pagePlacements = filteredPlacements.sublist(startIndex, endIndex);
+
+    if (isMobile) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: pagePlacements.length + 1,
+        itemBuilder: (context, index) {
+          if (index == pagePlacements.length) {
+            return _buildPaginationControls(effectivePage, totalPages);
+          }
+
+          return _buildMobilePlacementTile(pagePlacements[index]);
+        },
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildDesktopPlacementCard(
+                pagePlacements[index],
+              ),
+              childCount: pagePlacements.length,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _buildPaginationControls(effectivePage, totalPages),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopPlacementCard(Placement placement) {
+    final daysAgo = DateTime.now().difference(placement.createdAt).inDays;
+    final deadlineText = _formatDeadline(placement.deadline);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showPlacementDetails(placement),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: placementViolet, width: 1.4),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: placementViolet.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.business, color: placementViolet, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      placement.partnerCompany,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(daysAgo).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _formatDate(placement.createdAt).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: _getStatusColor(daysAgo),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(child: _buildPositionBadges(placement.positions)),
+              if (deadlineText != null) ...[
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: _buildDeadlineBadge(deadlineText),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobilePlacementTile(Placement placement) {
+    final daysAgo = DateTime.now().difference(placement.createdAt).inDays;
+    final deadlineText = _formatDeadline(placement.deadline);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _showPlacementDetails(placement),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 5,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [placementViolet, const Color(0xFFA78BFA)],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  placement.partnerCompany,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                    height: 1.25,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (deadlineText != null) ...[
+                                const SizedBox(width: 8),
+                                _buildDeadlineBadge(deadlineText),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getStatusColor(daysAgo).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _formatDate(placement.createdAt).toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _getStatusColor(daysAgo),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildPositionBadges(placement.positions),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPositionBadges(List<String> positions) {
+    if (positions.isEmpty) return const SizedBox.shrink();
+
+    final visible = positions.take(5).toList();
+    final hiddenCount = positions.length - visible.length;
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        ...visible.map(
+          (position) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3FF),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFDDD6FE)),
+            ),
+            child: Text(
+              position,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: placementViolet,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        if (hiddenCount > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              '+$hiddenCount more',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDeadlineBadge(String deadlineText) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Text(
+        deadlineText,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF475569),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationControls(int effectivePage, int totalPages) {
+    if (totalPages <= 1) return const SizedBox(height: 12);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 24, 12),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed:
+                    effectivePage == 0
+                        ? null
+                        : () =>
+                            setState(() => _currentPage = effectivePage - 1),
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Text(
+                'Page ${effectivePage + 1} of $totalPages',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              IconButton(
+                onPressed:
+                    effectivePage >= totalPages - 1
+                        ? null
+                        : () =>
+                            setState(() => _currentPage = effectivePage + 1),
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _formatDeadline(DateTime? deadline) {
+    if (deadline == null) return null;
+
+    final dateText = DateFormat('MMM d, yyyy').format(deadline);
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final deadlineOnly = DateTime(deadline.year, deadline.month, deadline.day);
+
+    if (deadlineOnly.isBefore(todayOnly)) {
+      return 'Expired $dateText';
+    }
+    return 'Deadline $dateText';
   }
 
   void _showPlacementDetails(Placement placement) {
