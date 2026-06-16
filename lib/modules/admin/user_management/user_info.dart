@@ -186,9 +186,10 @@ void showUserInfoModal(
 
                                 // CMU STUDENT - Show student fields
                                 if (data['affiliation']
-                                        ?.toString()
-                                        .toLowerCase() ==
-                                    'cmu student') ...[
+                                            ?.toString() ==
+                                        'CMU Undergraduate Student' ||
+                                    data['affiliation']?.toString() ==
+                                        'CMU Student – Graduate Level') ...[
                                   if (data['studentType'] != null) ...[
                                     const SizedBox(height: 16),
                                     _buildMetadataRow(
@@ -248,7 +249,9 @@ void showUserInfoModal(
                                   ],
 
                                   // GRADUATE
-                                  if (data['studentType'] == 'graduate') ...[
+                                  if (data['studentType'] == 'graduate' ||
+                                      data['affiliation']?.toString() ==
+                                          'CMU Student – Graduate Level') ...[
                                     if (data['graduateType'] != null) ...[
                                       const SizedBox(height: 16),
                                       _buildMetadataRow(
@@ -264,7 +267,8 @@ void showUserInfoModal(
                                     ],
 
                                     // MASTERAL GRADUATE
-                                    if (data['graduateType'] == 'masteral') ...[
+                                    if (data['graduateType'] == 'masteral' ||
+                                        data['mastersProgram'] != null) ...[
                                       if (data['college'] != null) ...[
                                         const SizedBox(height: 16),
                                         _buildMetadataRow(
@@ -278,6 +282,14 @@ void showUserInfoModal(
                                         _buildMetadataRow(
                                           'Masteral Program',
                                           data['program'],
+                                          Icons.book_outlined,
+                                        ),
+                                      ],
+                                      if (data['mastersProgram'] != null) ...[
+                                        const SizedBox(height: 16),
+                                        _buildMetadataRow(
+                                          'Masteral Program',
+                                          data['mastersProgram'],
                                           Icons.book_outlined,
                                         ),
                                       ],
@@ -308,9 +320,8 @@ void showUserInfoModal(
 
                                 // INCOMING FRESHMAN APPLICANT
                                 if (data['affiliation']
-                                        ?.toString()
-                                        .toLowerCase() ==
-                                    'incoming freshman applicant') ...[
+                                        ?.toString() ==
+                                    'Freshmen Applicant') ...[
                                   if (data['lrn'] != null) ...[
                                     const SizedBox(height: 16),
                                     _buildMetadataRow(
@@ -329,17 +340,44 @@ void showUserInfoModal(
                                   ],
                                 ],
 
-                                // MASTERAL (NOT CMU GRADUATE)
+                                // MASTER'S APPLICANT
                                 if (data['affiliation']
-                                        ?.toString()
-                                        .toLowerCase() ==
-                                    'masteral (not cmu graduate)') ...[
-                                  if (data['program'] != null) ...[
+                                        ?.toString() ==
+                                    'Master\'s Applicant') ...[
+                                  if (data['intendedMastersProgram'] !=
+                                      null) ...[
                                     const SizedBox(height: 16),
                                     _buildMetadataRow(
-                                      'Masteral Program',
+                                      'Intended Master\'s Program',
+                                      data['intendedMastersProgram'],
+                                      Icons.book_outlined,
+                                    ),
+                                  ] else if (data['program'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Intended Master\'s Program',
                                       data['program'],
                                       Icons.book_outlined,
+                                    ),
+                                  ],
+                                ],
+
+                                if (data['affiliation']?.toString() ==
+                                    'Other (Non-student)') ...[
+                                  if (data['otherAffiliation'] != null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Relationship with CMU',
+                                      data['otherAffiliation'],
+                                      Icons.business_outlined,
+                                    ),
+                                  ] else if (data['customAffiliation'] !=
+                                      null) ...[
+                                    const SizedBox(height: 16),
+                                    _buildMetadataRow(
+                                      'Relationship with CMU',
+                                      data['customAffiliation'],
+                                      Icons.business_outlined,
                                     ),
                                   ],
                                 ],

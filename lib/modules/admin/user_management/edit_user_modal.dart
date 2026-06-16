@@ -95,15 +95,11 @@ class _EditUserModalState extends State<EditUserModal> {
   final List<String> _programs = ['N/A'];
   final List<String> _affiliations = [
     'N/A',
-    'CMU Student',
-    'Incoming Freshman Applicant',
-    'Parent',
-    'Faculty',
-    'CMU Staff',
-    'Alumni',
-    'Visitor',
-    'Masteral (Not CMU Graduate)',
-    'Others', // Add this for custom affiliation input
+    'CMU Undergraduate Student',
+    'CMU Student – Graduate Level',
+    'Freshmen Applicant',
+    'Master\'s Applicant',
+    'Other (Non-student)',
   ];
 
   final _customAffiliationController = TextEditingController();
@@ -154,49 +150,50 @@ class _EditUserModalState extends State<EditUserModal> {
   }
 
   bool get shouldShowStudentFields {
-    return _selectedRole.toLowerCase() == 'user' &&
-        _selectedAffiliation.toLowerCase() == 'cmu student';
+    return shouldShowUndergraduateFields || shouldShowGraduateFields;
   }
 
   bool get shouldShowStudentTypeSelection {
-    return shouldShowStudentFields;
+    return false;
   }
 
   bool get shouldShowUndergraduateFields {
-    return shouldShowStudentFields && _selectedStudentType == 'undergraduate';
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation == 'CMU Undergraduate Student';
   }
 
   bool get shouldShowGraduateFields {
-    return shouldShowStudentFields && _selectedStudentType == 'graduate';
+    return _selectedRole.toLowerCase() == 'user' &&
+        _selectedAffiliation == 'CMU Student – Graduate Level';
   }
 
   bool get shouldShowGraduateTypeSelection {
-    return shouldShowGraduateFields;
+    return false;
   }
 
   bool get shouldShowMasteralGraduateFields {
-    return shouldShowGraduateFields && _selectedGraduateType == 'masteral';
+    return shouldShowGraduateFields;
   }
 
   bool get shouldShowNotMasteralGraduateFields {
-    return shouldShowGraduateFields && _selectedGraduateType == 'not_masteral';
+    return false;
   }
 
   bool get shouldShowLRNField {
     return _selectedRole.toLowerCase() == 'user' &&
-        _selectedAffiliation.toLowerCase() == 'incoming freshman applicant';
+        _selectedAffiliation == 'Freshmen Applicant';
   }
 
   // UPDATE the shouldShowMasteralNotCMUFields getter:
   bool get shouldShowMasteralNotCMUFields {
     return _selectedRole.toLowerCase() == 'user' &&
-        _selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)';
+        _selectedAffiliation == 'Master\'s Applicant';
   }
 
   // ADD a new getter for showing "Others" fields:
   bool get shouldShowOthersFields {
     return _selectedRole.toLowerCase() == 'user' &&
-        _selectedAffiliation == 'Others';
+        _selectedAffiliation == 'Other (Non-student)';
   }
 
   bool get shouldShowServiceUnit {
@@ -295,6 +292,25 @@ class _EditUserModalState extends State<EditUserModal> {
     _selectedYear = userData['year'] ?? 'N/A';
     _selectedProgram = userData['program'] ?? 'N/A';
     _selectedAffiliation = userData['affiliation'] ?? 'N/A';
+    if (_selectedAffiliation == 'CMU Student') {
+      _selectedAffiliation =
+          userData['studentType'] == 'graduate'
+              ? 'CMU Student – Graduate Level'
+              : 'CMU Undergraduate Student';
+    } else if (_selectedAffiliation == 'Incoming Freshman Applicant') {
+      _selectedAffiliation = 'Freshmen Applicant';
+    } else if (_selectedAffiliation == 'Masteral (Not CMU Graduate)') {
+      _selectedAffiliation = 'Master\'s Applicant';
+    } else if (_selectedAffiliation == 'Others') {
+      _selectedAffiliation = 'Other (Non-student)';
+    }
+    if (_selectedAffiliation == 'CMU Student – Graduate Level') {
+      _selectedProgram =
+          userData['mastersProgram'] ?? userData['program'] ?? 'N/A';
+    } else if (_selectedAffiliation == 'Master\'s Applicant') {
+      _selectedProgram =
+          userData['intendedMastersProgram'] ?? userData['program'] ?? 'N/A';
+    }
     _selectedScholarship = userData['scholarship'] ?? 'N/A';
     _selectedServiceUnit = userData['serviceUnit'] ?? 'N/A';
     isActive = userData['isActive'] ?? true;
@@ -310,11 +326,14 @@ class _EditUserModalState extends State<EditUserModal> {
     _graduatedProgram = userData['graduatedProgram'] ?? 'N/A';
     _selectedCollege = userData['college'] ?? 'N/A';
     _selectedCollegeId = userData['collegeId'] ?? '';
-    _customAffiliationController.text = userData['customAffiliation'] ?? '';
-    _customAffiliation = userData['customAffiliation'] ?? '';
+    _customAffiliationController.text =
+        userData['otherAffiliation'] ?? userData['customAffiliation'] ?? '';
+    _customAffiliation =
+        userData['otherAffiliation'] ?? userData['customAffiliation'] ?? '';
 
-    if (_customAffiliation.isNotEmpty && _selectedAffiliation != 'Others') {
-      _selectedAffiliation = 'Others';
+    if (_customAffiliation.isNotEmpty &&
+        _selectedAffiliation == 'Other (Non-student)') {
+      _customAffiliationController.text = _customAffiliation;
     }
 
     _fetchPrograms();
@@ -693,8 +712,7 @@ class _EditUserModalState extends State<EditUserModal> {
                               _customScholarship = '';
                               _customScholarshipController.clear();
 
-                              // Reset custom affiliation if not "Others"
-                              if (value != 'Others') {
+                              if (value != 'Other (Non-student)') {
                                 _customAffiliation = '';
                                 _customAffiliationController.clear();
                               }
@@ -703,7 +721,7 @@ class _EditUserModalState extends State<EditUserModal> {
                         ),
 
                         // ADD this right after the Affiliation dropdown (before the SizedBox(height: 16)):
-                        if (_selectedAffiliation == 'Others') ...[
+                        if (shouldShowOthersFields) ...[
                           const SizedBox(height: 16),
                           buildTextField(
                             controller: _customAffiliationController,
@@ -1319,81 +1337,49 @@ class _EditUserModalState extends State<EditUserModal> {
         return;
       }
 
-      if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-        if (_selectedStudentType == 'N/A') {
-          SnackbarUtil.showWarning(context, 'Please select student type');
+      if (_selectedAffiliation == 'CMU Undergraduate Student') {
+        if (_studentIdController.text.trim().isEmpty ||
+            _studentIdController.text.trim() == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please enter student ID');
           return;
         }
 
-        if (_selectedStudentType == 'undergraduate') {
-          if (_studentIdController.text.trim().isEmpty ||
-              _studentIdController.text.trim() == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please enter student ID');
-            return;
-          }
-
-          final isStudentIdUnique = await _isStudentIdUnique(
-            _studentIdController.text.trim(),
-            excludeUserId: widget.userDoc.id,
+        final isStudentIdUnique = await _isStudentIdUnique(
+          _studentIdController.text.trim(),
+          excludeUserId: widget.userDoc.id,
+        );
+        if (!isStudentIdUnique) {
+          SnackbarUtil.showWarning(
+            context,
+            'This Student ID is already registered',
           );
-          if (!isStudentIdUnique) {
-            SnackbarUtil.showWarning(
-              context,
-              'This Student ID is already registered',
-            );
-            return;
-          }
-
-          if (_selectedYear == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select year level');
-            return;
-          }
-
-          if (_selectedCollege == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select a college');
-            return;
-          }
-
-          if (_selectedProgram == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select a program');
-            return;
-          }
+          return;
         }
 
-        if (_selectedStudentType == 'graduate') {
-          if (_selectedGraduateType == 'N/A') {
-            SnackbarUtil.showWarning(context, 'Please select graduate type');
-            return;
-          }
+        if (_selectedYear == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select year level');
+          return;
+        }
 
-          if (_selectedGraduateType == 'masteral') {
-            if (_selectedProgram == 'N/A') {
-              SnackbarUtil.showWarning(
-                context,
-                'Please select a masteral program',
-              );
-              return;
-            }
-          } else if (_selectedGraduateType == 'not_masteral') {
-            if (_graduatedCollege == 'N/A') {
-              SnackbarUtil.showWarning(
-                context,
-                'Please select graduated college',
-              );
-              return;
-            }
-            if (_graduatedProgram == 'N/A') {
-              SnackbarUtil.showWarning(
-                context,
-                'Please select graduated program',
-              );
-              return;
-            }
-          }
+        if (_selectedCollege == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a college');
+          return;
+        }
+
+        if (_selectedProgram == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a program');
+          return;
         }
       }
 
-      if (_selectedAffiliation.toLowerCase() == 'incoming freshman applicant') {
+      if (_selectedAffiliation == 'CMU Student – Graduate Level') {
+        if (_selectedProgram == 'N/A') {
+          SnackbarUtil.showWarning(context, 'Please select a masteral program');
+          return;
+        }
+      }
+
+      if (_selectedAffiliation == 'Freshmen Applicant') {
         if (_lrnController.text.trim().isEmpty) {
           SnackbarUtil.showWarning(context, 'Please enter LRN');
           return;
@@ -1415,7 +1401,7 @@ class _EditUserModalState extends State<EditUserModal> {
         }
       }
 
-      if (_selectedAffiliation.toLowerCase() == 'masteral (not cmu graduate)') {
+      if (_selectedAffiliation == 'Master\'s Applicant') {
         if (_selectedProgram == 'N/A') {
           SnackbarUtil.showWarning(context, 'Please select a masteral program');
           return;
@@ -1423,7 +1409,7 @@ class _EditUserModalState extends State<EditUserModal> {
       }
     }
 
-    if (_selectedAffiliation == 'Others') {
+    if (_selectedAffiliation == 'Other (Non-student)') {
       if (_customAffiliation.trim().isEmpty) {
         SnackbarUtil.showWarning(context, 'Please specify your affiliation');
         return;
@@ -1482,55 +1468,52 @@ class _EditUserModalState extends State<EditUserModal> {
       if (_selectedRole.toLowerCase() == 'user') {
         updateData['affiliation'] = _selectedAffiliation;
         updateData['isEnrolled'] =
-            _selectedAffiliation.toLowerCase() == 'cmu student';
+            _selectedAffiliation == 'CMU Undergraduate Student' ||
+            _selectedAffiliation == 'CMU Student – Graduate Level';
 
-        if (_selectedAffiliation.toLowerCase() == 'cmu student') {
-          updateData['studentType'] = _selectedStudentType;
-
-          if (_selectedStudentType == 'undergraduate') {
-            updateData['studentId'] = _studentIdController.text.trim();
-            updateData['year'] = _selectedYear;
-            updateData['college'] = _selectedCollege;
-            updateData['collegeId'] = _selectedCollegeId;
-            updateData['program'] = _selectedProgram;
-            updateData['scholarship'] =
-                _selectedScholarship == 'Others'
-                    ? _customScholarship
-                    : (_selectedScholarship != 'N/A'
-                        ? _selectedScholarship
-                        : null);
-            updateData['graduateType'] = null;
-            updateData['graduatedCollege'] = null;
-            updateData['graduatedCollegeId'] = null;
-            updateData['graduatedProgram'] = null;
-            updateData['lrn'] = null;
-          } else if (_selectedStudentType == 'graduate') {
-            updateData['graduateType'] = _selectedGraduateType;
-            updateData['studentId'] = null;
-
-            if (_selectedGraduateType == 'masteral') {
-              updateData['program'] = _selectedProgram;
-              updateData['year'] = 'Graduate';
-              updateData['scholarship'] = null;
-              updateData['college'] = null;
-              updateData['collegeId'] = null;
-              updateData['graduatedCollege'] = null;
-              updateData['graduatedCollegeId'] = null;
-              updateData['graduatedProgram'] = null;
-            } else {
-              updateData['graduatedCollege'] = _graduatedCollege;
-              updateData['graduatedCollegeId'] = _graduatedCollegeId;
-              updateData['graduatedProgram'] = _graduatedProgram;
-              updateData['college'] = null;
-              updateData['collegeId'] = null;
-              updateData['program'] = null;
-              updateData['year'] = null;
-              updateData['scholarship'] = null;
-            }
-            updateData['lrn'] = null;
-          }
-        } else if (_selectedAffiliation.toLowerCase() ==
-            'incoming freshman applicant') {
+        if (_selectedAffiliation == 'CMU Undergraduate Student') {
+          updateData['studentType'] = 'undergraduate';
+          updateData['studentId'] = _studentIdController.text.trim();
+          updateData['year'] = _selectedYear;
+          updateData['college'] = _selectedCollege;
+          updateData['collegeId'] = _selectedCollegeId;
+          updateData['program'] = _selectedProgram;
+          updateData['scholarship'] =
+              _selectedScholarship == 'Others'
+                  ? _customScholarship
+                  : (_selectedScholarship != 'N/A'
+                      ? _selectedScholarship
+                      : null);
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
+          updateData['lrn'] = null;
+          updateData['intendedMastersProgram'] = null;
+          updateData['mastersProgram'] = null;
+          updateData['otherAffiliation'] = null;
+          updateData['customAffiliation'] = null;
+        } else if (_selectedAffiliation == 'CMU Student – Graduate Level') {
+          updateData['studentType'] = 'graduate';
+          updateData['studentId'] =
+              _studentIdController.text.trim().isEmpty
+                  ? null
+                  : _studentIdController.text.trim();
+          updateData['program'] = null;
+          updateData['mastersProgram'] = _selectedProgram;
+          updateData['year'] = 'Graduate';
+          updateData['scholarship'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
+          updateData['lrn'] = null;
+          updateData['intendedMastersProgram'] = null;
+          updateData['otherAffiliation'] = null;
+          updateData['customAffiliation'] = null;
+        } else if (_selectedAffiliation == 'Freshmen Applicant') {
           updateData['lrn'] = _lrnController.text.trim();
           updateData['scholarship'] =
               _selectedScholarship == 'Others'
@@ -1548,9 +1531,14 @@ class _EditUserModalState extends State<EditUserModal> {
           updateData['graduatedCollege'] = null;
           updateData['graduatedCollegeId'] = null;
           updateData['graduatedProgram'] = null;
-        } else if (_selectedAffiliation.toLowerCase() ==
-            'masteral (not cmu graduate)') {
-          updateData['program'] = _selectedProgram;
+          updateData['intendedMastersProgram'] = null;
+          updateData['mastersProgram'] = null;
+          updateData['otherAffiliation'] = null;
+          updateData['customAffiliation'] = null;
+        } else if (_selectedAffiliation == 'Master\'s Applicant') {
+          updateData['intendedMastersProgram'] = _selectedProgram;
+          updateData['mastersProgram'] = null;
+          updateData['program'] = null;
           updateData['lrn'] = null;
           updateData['scholarship'] = null;
           updateData['year'] = null;
@@ -1562,35 +1550,42 @@ class _EditUserModalState extends State<EditUserModal> {
           updateData['graduatedCollege'] = null;
           updateData['graduatedCollegeId'] = null;
           updateData['graduatedProgram'] = null;
-        } else if (_selectedAffiliation == 'Others') {
-          userData['customAffiliation'] = _customAffiliation;
-          userData['lrn'] = null;
-          userData['scholarship'] = null;
-          userData['year'] = null;
-          userData['college'] = null;
-          userData['collegeId'] = null;
-          userData['program'] = null;
-          userData['studentId'] = null;
-          userData['studentType'] = null;
-          userData['graduateType'] = null;
-          userData['graduatedCollege'] = null;
-          userData['graduatedCollegeId'] = null;
-          userData['graduatedProgram'] = null;
+          updateData['otherAffiliation'] = null;
+          updateData['customAffiliation'] = null;
+        } else if (_selectedAffiliation == 'Other (Non-student)') {
+          updateData['otherAffiliation'] = _customAffiliation;
+          updateData['customAffiliation'] = _customAffiliation;
+          updateData['lrn'] = null;
+          updateData['scholarship'] = null;
+          updateData['year'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
+          updateData['program'] = null;
+          updateData['studentId'] = null;
+          updateData['studentType'] = null;
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
+          updateData['intendedMastersProgram'] = null;
+          updateData['mastersProgram'] = null;
         } else {
-          // For Parent, Faculty, CMU Staff, Alumni, Visitor
-          userData['lrn'] = null;
-          userData['scholarship'] = null;
-          userData['year'] = null;
-          userData['college'] = null;
-          userData['collegeId'] = null;
-          userData['program'] = null;
-          userData['studentId'] = null;
-          userData['studentType'] = null;
-          userData['graduateType'] = null;
-          userData['graduatedCollege'] = null;
-          userData['graduatedCollegeId'] = null;
-          userData['graduatedProgram'] = null;
-          userData['customAffiliation'] = null;
+          updateData['lrn'] = null;
+          updateData['scholarship'] = null;
+          updateData['year'] = null;
+          updateData['college'] = null;
+          updateData['collegeId'] = null;
+          updateData['program'] = null;
+          updateData['studentId'] = null;
+          updateData['studentType'] = null;
+          updateData['graduateType'] = null;
+          updateData['graduatedCollege'] = null;
+          updateData['graduatedCollegeId'] = null;
+          updateData['graduatedProgram'] = null;
+          updateData['intendedMastersProgram'] = null;
+          updateData['mastersProgram'] = null;
+          updateData['otherAffiliation'] = null;
+          updateData['customAffiliation'] = null;
         }
       } else if (_selectedRole.toLowerCase() == 'staff') {
         updateData['serviceUnit'] = _selectedServiceUnit;
@@ -1600,6 +1595,10 @@ class _EditUserModalState extends State<EditUserModal> {
         updateData['program'] = FieldValue.delete();
         updateData['scholarship'] = FieldValue.delete();
         updateData['lrn'] = FieldValue.delete();
+        updateData['mastersProgram'] = FieldValue.delete();
+        updateData['intendedMastersProgram'] = FieldValue.delete();
+        updateData['otherAffiliation'] = FieldValue.delete();
+        updateData['customAffiliation'] = FieldValue.delete();
       } else if (_selectedRole.toLowerCase() == 'admin') {
         updateData['affiliation'] = FieldValue.delete();
         updateData['studentId'] = FieldValue.delete();
@@ -1608,6 +1607,10 @@ class _EditUserModalState extends State<EditUserModal> {
         updateData['scholarship'] = FieldValue.delete();
         updateData['lrn'] = FieldValue.delete();
         updateData['serviceUnit'] = FieldValue.delete();
+        updateData['mastersProgram'] = FieldValue.delete();
+        updateData['intendedMastersProgram'] = FieldValue.delete();
+        updateData['otherAffiliation'] = FieldValue.delete();
+        updateData['customAffiliation'] = FieldValue.delete();
       }
 
       await FirebaseFirestore.instance

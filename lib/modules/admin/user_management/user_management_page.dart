@@ -760,20 +760,7 @@ Widget _buildUserList({
                         email: data['email'] ?? 'N/A',
                         role:
                             data['role'] == 'user'
-                                ? data['affiliation'] ==
-                                        "Incoming Freshman Applicant"
-                                    ? 'Incoming Freshman Applicant'
-                                    : data['affiliation'] == 'Parent'
-                                    ? 'Parent'
-                                    : data['affiliation'] == 'Employer'
-                                    ? 'Employer'
-                                    : data['affiliation'] == 'Alumni'
-                                    ? 'Alumni'
-                                    : data['affiliation'] == 'Faculty'
-                                    ? 'Faculty'
-                                    : data['affiliation'] == 'CMU Staff'
-                                    ? 'CMU Staff'
-                                    : 'CMU Student'
+                                ? data['affiliation'] ?? 'N/A'
                                 : data['role'] == 'admin'
                                 ? 'OASP Admin'
                                 : data['role'] == 'staff'
