@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:capstone_project/modules/admin/information_bank/ib_format.dart';
@@ -1026,15 +1027,6 @@ Future<void> _handleSaveChanges(
   String? previousModal,
 ) async {
   try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
-    );
-
     final userData = userDoc.data() as Map<String, dynamic>;
     final source = userData['source'] ?? 'Unknown';
 
@@ -1047,89 +1039,103 @@ Future<void> _handleSaveChanges(
 
     // Compare formatted versions
     final contentChanged = newContent.trim() != originalContent.trim();
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-    if (contentChanged) {
-      print(' Content changed - updating Pinecone vectors...');
+    unawaited(() async {
+      try {
+        if (contentChanged) {
+          print(' Content changed - updating Pinecone vectors...');
 
-      final fileService = FileService();
-      await fileService.updateInformationBankContent(
-        documentId: userDoc.id,
-        newTitle: title,
-        newContent: content, // Save the user's edited version
-        newCategory: category,
-      );
+          final fileService = FileService();
+          await fileService.updateInformationBankContent(
+            documentId: userDoc.id,
+            newTitle: title,
+            newContent: content,
+            newCategory: category,
+          );
 
-      print(' Content and vectors updated successfully');
-    } else {
-      print(' Only metadata changed - updating Firestore only...');
+          print(' Content and vectors updated successfully');
+        } else {
+          print(' Only metadata changed - updating Firestore only...');
 
-      Map<String, dynamic> updateData = {
-        'ib_title': title,
-        'title': title,
-        'category': category,
-        'categoryID': category.toLowerCase(),
-        'categoryType': category.toLowerCase(),
-        'updatedAt': Timestamp.now(),
-      };
+          Map<String, dynamic> updateData = {
+            'ib_title': title,
+            'title': title,
+            'category': category,
+            'categoryID': category.toLowerCase(),
+            'categoryType': category.toLowerCase(),
+            'updatedAt': Timestamp.now(),
+          };
 
-      await FirebaseFirestore.instance
-          .collection('information_bank')
-          .doc(userDoc.id)
-          .update(updateData);
-    }
-
-    final updatedDocSnapshot =
-        await FirebaseFirestore.instance
-            .collection('information_bank')
-            .doc(userDoc.id)
-            .get();
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
-
-    if (currentUser != null) {
-      final doc =
           await FirebaseFirestore.instance
+              .collection('information_bank')
+              .doc(userDoc.id)
+              .update(updateData);
+        }
+
+        final updatedDocSnapshot =
+            await FirebaseFirestore.instance
+                .collection('information_bank')
+                .doc(userDoc.id)
+                .get();
+
+        final currentUser = FirebaseAuth.instance.currentUser;
+        String actorName = 'Unknown';
+
+        if (currentUser != null) {
+          final doc =
+              await FirebaseFirestore.instance
               .collection('users')
               .doc(currentUser.uid)
               .get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        actorName = data['name'] ?? currentUser.email ?? 'Unknown';
+          if (doc.exists) {
+            final data = doc.data() as Map<String, dynamic>;
+            actorName = data['name'] ?? currentUser.email ?? 'Unknown';
+          }
+        }
+
+        final logRef = FirebaseFirestore.instance.collection('logs').doc();
+        final logData = {
+          'logId': logRef.id,
+          'user': actorName,
+          'action':
+              'Updated document: $title (Category: $category)${contentChanged ? ' [Content Updated]' : ''}',
+          'time': Timestamp.now(),
+        };
+        await logRef.set(logData);
+
+        if (feedbackContext.mounted) {
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (previousModal == 'info') {
+              showIBInfoModal(feedbackContext, updatedDocSnapshot, fromEdit: true);
+            }
+          });
+
+          SnackbarUtil.showSuccess(
+            feedbackContext,
+            contentChanged
+                ? 'Document and embeddings updated successfully'
+                : 'Document updated successfully',
+          );
+        }
+      } catch (e) {
+        print('Error updating document: $e');
+        if (feedbackContext.mounted) {
+          SnackbarUtil.showError(
+            feedbackContext,
+            'Failed to update document: $e',
+          );
+        }
       }
-    }
+    }());
 
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    final logData = {
-      'logId': logRef.id,
-      'user': actorName,
-      'action':
-          'Updated document: $title (Category: $category)${contentChanged ? ' [Content Updated]' : ''}',
-      'time': Timestamp.now(),
-    };
-    await logRef.set(logData);
-
+    SnackbarUtil.showInfo(context, 'Document update is running in background');
     if (context.mounted) {
       Navigator.of(context).pop();
-      Navigator.of(context).pop();
-
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (previousModal == 'info') {
-          showIBInfoModal(context, updatedDocSnapshot, fromEdit: true);
-        }
-      });
-
-      SnackbarUtil.showSuccess(
-        context,
-        contentChanged
-            ? 'Document and embeddings updated successfully'
-            : 'Document updated successfully',
-      );
     }
   } catch (e) {
     print('Error updating document: $e');
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
       SnackbarUtil.showError(context, 'Failed to update document: $e');
     }
   }

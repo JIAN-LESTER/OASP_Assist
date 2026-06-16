@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -569,90 +570,95 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     try {
       final uuid = Uuid();
       final documentId = uuid.v4();
+      final title = _titleController.text.trim();
+      final extractedText = _extractedText!;
+      final category = _categoryController.text.trim();
+      final selectedFileName = _selectedFileName ?? 'Unknown';
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
       final informationBank = InformationBank(
         id: documentId,
-        title: _titleController.text.trim(),
-        content: _extractedText!,
+        title: title,
+        content: extractedText,
         embedding: [],
-        source: _selectedFileName ?? 'Unknown',
-        category: _categoryController.text.trim(),
+        source: selectedFileName,
+        category: category,
       );
 
-      await _fileService.saveToInformationBank(
-        informationBank,
-        isFromUpload: true,
-      );
-
-      Navigator.of(context).pop(true);
-
-      switch (_categoryController.text.trim()) {
-        case 'Admission':
-          print(" Analyzing admission document...");
-          final admissionCohere = await _cohereService.analyzeAdmission(
-            _extractedText!,
+      unawaited(() async {
+        try {
+          await _fileService.saveToInformationBank(
+            informationBank,
+            isFromUpload: true,
           );
 
-          print(" Admission analysis result: $admissionCohere");
+          switch (category) {
+            case 'Admission':
+              print(" Analyzing admission document...");
+              final admissionCohere = await _cohereService.analyzeAdmission(
+                extractedText,
+              );
 
-          List<String>? contactsList;
-          try {
-            if (admissionCohere['contacts'] is List<Map<String, dynamic>>) {
-              List<Map<String, dynamic>> contactsData =
-                  admissionCohere['contacts'] as List<Map<String, dynamic>>;
-              if (contactsData.isNotEmpty) {
-                contactsList =
-                    contactsData.map((contact) {
-                      String type = contact['type']?.toString() ?? '';
-                      String value = contact['value']?.toString() ?? '';
-                      return '$type: $value';
-                    }).toList();
+              print(" Admission analysis result: $admissionCohere");
+
+              List<String>? contactsList;
+              try {
+                if (admissionCohere['contacts'] is List<Map<String, dynamic>>) {
+                  List<Map<String, dynamic>> contactsData =
+                      admissionCohere['contacts'] as List<Map<String, dynamic>>;
+                  if (contactsData.isNotEmpty) {
+                    contactsList =
+                        contactsData.map((contact) {
+                          String type = contact['type']?.toString() ?? '';
+                          String value = contact['value']?.toString() ?? '';
+                          return '$type: $value';
+                        }).toList();
+                  }
+                }
+              } catch (e) {
+                print(" Error processing contacts: $e");
+                contactsList = null;
               }
-            }
-          } catch (e) {
-            print(" Error processing contacts: $e");
-            contactsList = null;
-          }
 
-          List<String> stepsList = <String>[];
-          try {
-            if (admissionCohere['steps'] is List<String>) {
-              stepsList = admissionCohere['steps'] as List<String>;
-            } else if (admissionCohere['steps'] is List) {
-              stepsList =
-                  (admissionCohere['steps'] as List)
-                      .map((e) => e.toString())
-                      .toList();
-            }
-          } catch (e) {
-            print(" Error processing steps: $e");
-            stepsList = <String>[];
-          }
+              List<String> stepsList = <String>[];
+              try {
+                if (admissionCohere['steps'] is List<String>) {
+                  stepsList = admissionCohere['steps'] as List<String>;
+                } else if (admissionCohere['steps'] is List) {
+                  stepsList =
+                      (admissionCohere['steps'] as List)
+                          .map((e) => e.toString())
+                          .toList();
+                }
+              } catch (e) {
+                print(" Error processing steps: $e");
+                stepsList = <String>[];
+              }
 
-          final admissions = Admissions(
-            id: documentId,
-            steps: stepsList,
-            requirements: admissionCohere['requirements'],
-            title: _titleController.text.trim(),
-            content: _extractedText!,
-            contact: contactsList,
-            academicYear: admissionCohere['academicYear'],
-            links: admissionCohere['links'],
-            source: _selectedFileName ?? 'Unknown',
-            createdAt: DateTime.now(),
-          );
+              final admissions = Admissions(
+                id: documentId,
+                steps: stepsList,
+                requirements: admissionCohere['requirements'],
+                title: title,
+                content: extractedText,
+                contact: contactsList,
+                academicYear: admissionCohere['academicYear'],
+                links: admissionCohere['links'],
+                source: selectedFileName,
+                createdAt: DateTime.now(),
+              );
 
-          await _fileService.saveToAdmission(
-            admissions,
-            sourceDocumentId: documentId,
-          );
-          break;
+              await _fileService.saveToAdmission(
+                admissions,
+                sourceDocumentId: documentId,
+              );
+              break;
 
-        case 'Scholarship':
-          print(" Analyzing scholarship document...");
-          final scholarshipCohere = await _cohereService.analyzeScholarship(
-            _extractedText!,
-          );
+            case 'Scholarship':
+              print(" Analyzing scholarship document...");
+              final scholarshipCohere = await _cohereService.analyzeScholarship(
+                extractedText,
+              );
 
           if (scholarshipCohere['scholarships'] is List &&
               scholarshipCohere['scholarships'].isNotEmpty) {
@@ -690,24 +696,28 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               sourceDocumentId: documentId,
             );
 
-            SnackbarUtil.showSuccess(
-              context,
-              'Found and saved ${scholarships.length} scholarship(s)!',
-            );
+            if (feedbackContext.mounted) {
+              SnackbarUtil.showSuccess(
+                feedbackContext,
+                'Found and saved ${scholarships.length} scholarship(s)!',
+              );
+            }
           } else {
             print(" No scholarships found in the document");
-            SnackbarUtil.showWarning(
-              context,
-              'No scholarships found in the document',
-            );
+            if (feedbackContext.mounted) {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'No scholarships found in the document',
+              );
+            }
           }
           break;
 
-        case 'Placement':
-          print(" Analyzing placement document...");
-          final placementCohere = await _cohereService.analyzePlacement(
-            _extractedText!,
-          );
+            case 'Placement':
+              print(" Analyzing placement document...");
+              final placementCohere = await _cohereService.analyzePlacement(
+                extractedText,
+              );
 
           if (placementCohere['placements'] is List &&
               placementCohere['placements'].isNotEmpty) {
@@ -748,41 +758,55 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
               sourceDocumentId: documentId,
             );
 
-            SnackbarUtil.showSuccess(
-              context,
-              'Found and saved ${placements.length} placement(s)!',
-            );
+            if (feedbackContext.mounted) {
+              SnackbarUtil.showSuccess(
+                feedbackContext,
+                'Found and saved ${placements.length} placement(s)!',
+              );
+            }
           } else {
             print(" No placements found in the document");
-            SnackbarUtil.showWarning(
-              context,
-              'No placements found in the document',
-            );
+            if (feedbackContext.mounted) {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'No placements found in the document',
+              );
+            }
           }
           break;
 
-        default:
+            default:
           print(
-            " Category '${_categoryController.text.trim()}' does not require special processing",
+            " Category '$category' does not require special processing",
           );
           break;
       }
 
-      await _logUploadAction();
+          await _logUploadAction(title);
 
-      SnackbarUtil.showSuccess(context, 'Document uploaded successfully!');
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Document uploaded successfully!',
+            );
+          }
+        } catch (e) {
+          print(" Upload error: $e");
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(feedbackContext, 'Upload failed: $e');
+          }
+        }
+      }());
+
+      SnackbarUtil.showInfo(context, 'Document upload is running in background');
       Navigator.of(context).pop(true);
     } catch (e) {
       print(" Upload error: $e");
       SnackbarUtil.showError(context, 'Upload failed: $e');
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
     }
   }
 
-  Future<void> _logUploadAction() async {
+  Future<void> _logUploadAction(String title) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
@@ -803,7 +827,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
       await logRef.set({
         'logId': logRef.id,
         'user': actorName,
-        'action': 'Uploaded document: ${_titleController.text.trim()}',
+        'action': 'Uploaded document: $title',
         'time': Timestamp.now(),
       });
     } catch (e) {
