@@ -929,18 +929,20 @@ class _AnnouncementCardState extends State<AnnouncementCard> {
                 ),
               ),
 
-              //  Only show Edit/Delete for admins
-              if (role == 'admin') ...[
+              //  Only show Edit/Delete for admins when actions are available
+              if (role == 'admin' &&
+                  widget.onEdit != null &&
+                  widget.onDelete != null) ...[
                 const SizedBox(width: 8),
                 _buildIconButton(
                   icon: Icons.edit_rounded,
-                  onTap: () => widget.onEdit!(widget.announcement),
+                  onTap: () => widget.onEdit?.call(widget.announcement),
                   color: Colors.blue,
                 ),
                 const SizedBox(width: 8),
                 _buildIconButton(
                   icon: Icons.delete_rounded,
-                  onTap: () => widget.onDelete!(widget.announcement),
+                  onTap: () => widget.onDelete?.call(widget.announcement),
                   color: Colors.red,
                 ),
               ],
