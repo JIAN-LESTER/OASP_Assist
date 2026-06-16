@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
@@ -872,29 +873,57 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
         createdAt: DateTime.now(),
       );
 
-      await _fileService.saveToAdmission(admission);
+      final content = _contentController.text.trim();
+      final informationBank =
+          content.isNotEmpty
+              ? InformationBank(
+                id: docId,
+                title: admission.title,
+                content: content,
+                embedding: [],
+                source: _sourceController.text.trim(),
+                category: 'Admission',
+              )
+              : null;
+      final action = widget.isEdit ? 'Updated' : 'Added';
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      if (_contentController.text.trim().isNotEmpty) {
-        final informationBank = InformationBank(
-          id: docId,
-          title: _titleController.text.trim(),
-          content: _contentController.text.trim(),
-          embedding: [],
-          source: _sourceController.text.trim(),
-          category: 'Admission',
-        );
-        await _fileService.saveToInformationBank(informationBank);
-      }
+      unawaited(() async {
+        try {
+          await _fileService.saveToAdmission(admission);
 
-      await _logCreateAction(widget.isEdit ? 'Updated' : 'Added');
+          if (informationBank != null) {
+            await _fileService.saveToInformationBank(informationBank);
+          }
 
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'Admission ${widget.isEdit ? 'updated' : 'added'} successfully with ${schedulesList.length} schedule(s)!',
-        );
-        Navigator.of(context).pop(true);
-      }
+          await _logCreateAction(action, admission.title);
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Admission ${widget.isEdit ? 'updated' : 'added'} successfully with ${schedulesList.length} schedule(s)!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            final message = e.toString();
+            if (message.contains('Duplicate admission already exists')) {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'Duplicate admission already exists',
+              );
+            } else {
+              SnackbarUtil.showError(feedbackContext, 'Error: $e');
+            }
+          }
+        }
+      }());
+
+      SnackbarUtil.showInfo(
+        context,
+        'Admission ${widget.isEdit ? 'update' : 'creation'} is running in background',
+      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         final message = e.toString();
@@ -907,14 +936,10 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
           SnackbarUtil.showError(context, 'Error: $e');
         }
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
   }
 
-  Future<void> _logCreateAction(String action) async {
+  Future<void> _logCreateAction(String action, String title) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
@@ -935,7 +960,7 @@ class _AdmissionFormDialogState extends State<AdmissionFormDialog> {
       await logRef.set({
         'logId': logRef.id,
         'user': actorName,
-        'action': '$action admission: ${_titleController.text.trim()}',
+        'action': '$action admission: $title',
         'time': Timestamp.now(),
       });
     } catch (e) {
