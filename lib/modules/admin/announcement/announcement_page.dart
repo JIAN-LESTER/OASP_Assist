@@ -400,10 +400,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               children: [
                 _buildSearchField(),
                 const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _buildActionButtons(isDesktop: false),
-                ),
+                _buildActionButtons(isDesktop: false),
                 const SizedBox(height: 12),
                 CategoryDropdownButton(
                   initialValue: selectedCategory,
@@ -446,11 +443,18 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   Widget _buildActionButtons({required bool isDesktop}) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      alignment: WrapAlignment.end,
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = !isDesktop && constraints.maxWidth < 240;
+        final buttonPadding = isDesktop ? 14.0 : (isCompact ? 10.0 : 12.0);
+        final iconSize = isDesktop ? 24.0 : (isCompact ? 20.0 : 22.0);
+
+        return Wrap(
+          spacing: isCompact ? 8 : 12,
+          runSpacing: isCompact ? 8 : 12,
+          alignment:
+              isDesktop ? WrapAlignment.end : WrapAlignment.spaceBetween,
+          children: [
         // App Credentials Button
         Stack(
           clipBehavior: Clip.none,
@@ -484,11 +488,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                           () => setState(() {}),
                         ),
                     child: Padding(
-                      padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                      padding: EdgeInsets.all(buttonPadding),
                       child: Icon(
                         Icons.apps_rounded,
                         color: Colors.white,
-                        size: isDesktop ? 24 : 22,
+                        size: iconSize,
                       ),
                     ),
                   ),
@@ -573,11 +577,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                       }
                     },
                     child: Padding(
-                      padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                      padding: EdgeInsets.all(buttonPadding),
                       child: Icon(
                         Icons.vpn_key_rounded,
                         color: Colors.white,
-                        size: isDesktop ? 24 : 22,
+                        size: iconSize,
                       ),
                     ),
                   ),
@@ -646,11 +650,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 borderRadius: BorderRadius.circular(12),
                 onTap: () => _showSyncSettingsDialog(context),
                 child: Padding(
-                  padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                  padding: EdgeInsets.all(buttonPadding),
                   child: Icon(
                     Icons.settings_suggest_rounded,
                     color: Colors.white,
-                    size: isDesktop ? 24 : 22,
+                    size: iconSize,
                   ),
                 ),
               ),
@@ -688,12 +692,12 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 borderRadius: BorderRadius.circular(12),
                 onTap: isRefreshing ? null : _refreshFromFacebook,
                 child: Padding(
-                  padding: EdgeInsets.all(isDesktop ? 14 : 12),
+                  padding: EdgeInsets.all(buttonPadding),
                   child:
                       isRefreshing
                           ? SizedBox(
-                            width: isDesktop ? 24 : 22,
-                            height: isDesktop ? 24 : 22,
+                            width: iconSize,
+                            height: iconSize,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor: AlwaysStoppedAnimation<Color>(
@@ -704,14 +708,16 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                           : Icon(
                             Icons.sync_rounded,
                             color: Colors.white,
-                            size: isDesktop ? 24 : 22,
+                            size: iconSize,
                           ),
                 ),
               ),
             ),
           ),
         ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -1037,7 +1043,143 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   }
 
   Future<void> _editAnnouncement(DocumentSnapshot announcement) async {
-    // Your existing edit implementation
+    final data = announcement.data() as Map<String, dynamic>;
+    final messageController = TextEditingController(
+      text: data['message']?.toString() ?? '',
+    );
+    final categoryController = TextEditingController(
+      text: data['category']?.toString() ?? 'General',
+    );
+    final deadlineController = TextEditingController(
+      text:
+          data['deadline'] is Timestamp
+              ? DateFormat('yyyy-MM-dd').format(
+                (data['deadline'] as Timestamp).toDate(),
+              )
+              : '',
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Edit Announcement'),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: messageController,
+                      minLines: 5,
+                      maxLines: 10,
+                      decoration: const InputDecoration(
+                        labelText: 'Message',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: categoryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: deadlineController,
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        labelText: 'Deadline',
+                        hintText: 'No deadline',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.event_busy_outlined),
+                              onPressed: () => deadlineController.clear(),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.calendar_month_outlined),
+                              onPressed: () async {
+                                final initialDate =
+                                    data['deadline'] is Timestamp
+                                        ? (data['deadline'] as Timestamp)
+                                            .toDate()
+                                        : DateTime.now();
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: initialDate,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null) {
+                                  deadlineController.text = DateFormat(
+                                    'yyyy-MM-dd',
+                                  ).format(picked);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+    );
+
+    if (saved != true) {
+      messageController.dispose();
+      categoryController.dispose();
+      deadlineController.dispose();
+      return;
+    }
+
+    try {
+      final deadlineText = deadlineController.text.trim();
+      await FirebaseFirestore.instance
+          .collection('announcements')
+          .doc(announcement.id)
+          .update({
+            'message': messageController.text.trim(),
+            'category': categoryController.text.trim().isEmpty
+                ? 'General'
+                : categoryController.text.trim(),
+            'deadline':
+                deadlineText.isEmpty
+                    ? null
+                    : Timestamp.fromDate(DateTime.parse(deadlineText)),
+            'updated_at': FieldValue.serverTimestamp(),
+          });
+
+      if (mounted) {
+        _showSuccessSnackBar('Announcement updated successfully');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Error updating announcement: $e');
+      }
+    } finally {
+      messageController.dispose();
+      categoryController.dispose();
+      deadlineController.dispose();
+    }
   }
 
   Future<void> _deleteAnnouncement(DocumentSnapshot announcement) async {

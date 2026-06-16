@@ -893,6 +893,7 @@ class _UserMainPageState extends State<UserMainPage>
       ),
       bottomNavigationBar: Container(
         key: _bottomNavKey,
+        color: Colors.white,
         child: _buildBottomNavigationBar(),
       ),
     );
@@ -1661,8 +1662,10 @@ class _UserMainPageState extends State<UserMainPage>
   // Replace the _buildBottomNavigationBar method with this:
 
   Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.white,
+      child: Container(
+        decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
@@ -1672,7 +1675,9 @@ class _UserMainPageState extends State<UserMainPage>
           ),
         ],
       ),
-      child: SafeArea(
+        child: SafeArea(
+          top: false,
+          bottom: true,
         child: LayoutBuilder(
           builder: (context, constraints) {
             // Calculate if we need to use smaller sizes
@@ -1730,6 +1735,7 @@ class _UserMainPageState extends State<UserMainPage>
               ),
             );
           },
+        ),
         ),
       ),
     );
