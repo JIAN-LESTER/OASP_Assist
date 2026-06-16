@@ -2361,6 +2361,27 @@ List<ChartData> _buildResponseTimeTrend(
       break;
 
     case 'daily':
+      var currentDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      final end = DateTime(endDate.year, endDate.month, endDate.day);
+
+      while (!currentDate.isAfter(end)) {
+        final dateKey = _dateKey(currentDate);
+        final dayName = _getDayName(currentDate.weekday);
+        final times = responseTimeByDate[dateKey] ?? [];
+        final avgTime =
+            times.isNotEmpty
+                ? (times.reduce((a, b) => a + b) / times.length) * 100
+                : 0.0;
+
+        trendData.add(ChartData(date: dayName, count: avgTime.round()));
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+      break;
+
     case 'This Week':
       // Map full date keys to day names
       final startOfWeek = _getStartOfWeek(endDate);
@@ -2384,6 +2405,20 @@ List<ChartData> _buildResponseTimeTrend(
       break;
 
     case 'weekly':
+      final weeksCount = _weekCountForRange(startDate, endDate);
+
+      for (int week = 1; week <= weeksCount; week++) {
+        final weekKey = "Week $week";
+        final times = responseTimeByDate[weekKey] ?? [];
+        final avgTime =
+            times.isNotEmpty
+                ? (times.reduce((a, b) => a + b) / times.length) * 100
+                : 0.0;
+
+        trendData.add(ChartData(date: weekKey, count: avgTime.round()));
+      }
+      break;
+
     case 'This Month':
       // Generate 5 weeks
       for (int week = 1; week <= 5; week++) {
@@ -2399,6 +2434,27 @@ List<ChartData> _buildResponseTimeTrend(
       break;
 
     case 'monthly':
+      var currentMonth = DateTime(startDate.year, startDate.month);
+      final endMonth = DateTime(endDate.year, endDate.month);
+
+      while (!currentMonth.isAfter(endMonth)) {
+        final monthKey = _monthKey(currentMonth);
+        final times = responseTimeByDate[monthKey] ?? [];
+        final avgTime =
+            times.isNotEmpty
+                ? (times.reduce((a, b) => a + b) / times.length) * 100
+                : 0.0;
+
+        trendData.add(
+          ChartData(
+            date: _formatMonthLabel(currentMonth, startDate, endDate),
+            count: avgTime.round(),
+          ),
+        );
+        currentMonth = _addMonths(currentMonth, 1);
+      }
+      break;
+
     case 'This Year':
       // Generate all 12 months
       final monthNames = [
@@ -2432,6 +2488,7 @@ List<ChartData> _buildResponseTimeTrend(
       break;
 
     case 'All':
+    case 'yearly':
       // Generate all years
       final startYear = startDate.year;
       final endYear = endDate.year;
@@ -2904,6 +2961,39 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'daily':
+      var currentDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      final end = DateTime(
+        actualEndDate.year,
+        actualEndDate.month,
+        actualEndDate.day,
+      );
+
+      while (!currentDate.isAfter(end)) {
+        final dateKey = _dateKey(currentDate);
+        final dayName = _getDayName(currentDate.weekday);
+
+        final categoryBreakdown =
+            timeCategoryCounts[dateKey] ?? <String, int>{};
+        final totalCount = categoryBreakdown.values.fold(
+          0,
+          (sum, count) => sum + count,
+        );
+
+        trendData.add(
+          ChartData(
+            date: dayName,
+            count: totalCount,
+            categoryBreakdown: categoryBreakdown,
+          ),
+        );
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+      break;
+
     case 'This Week':
       //  CRITICAL  Properly map dates to day names
       final startOfWeek = _getStartOfWeek(
@@ -2935,6 +3025,27 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'weekly':
+      final weeksCount = _weekCountForRange(startDate, actualEndDate);
+
+      for (int week = 1; week <= weeksCount; week++) {
+        final weekKey = "Week $week"; //  Correct format
+        final categoryBreakdown =
+            timeCategoryCounts[weekKey] ?? <String, int>{};
+        final totalCount = categoryBreakdown.values.fold(
+          0,
+          (sum, count) => sum + count,
+        );
+
+        trendData.add(
+          ChartData(
+            date: weekKey, //  Use the full "Week 1" format
+            count: totalCount,
+            categoryBreakdown: categoryBreakdown,
+          ),
+        );
+      }
+      break;
+
     case 'This Month':
       // Generate 5 weeks
       for (int week = 1; week <= 5; week++) {
@@ -2957,6 +3068,29 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'monthly':
+      var currentMonth = DateTime(startDate.year, startDate.month);
+      final endMonth = DateTime(actualEndDate.year, actualEndDate.month);
+
+      while (!currentMonth.isAfter(endMonth)) {
+        final monthKey = _monthKey(currentMonth);
+        final categoryBreakdown =
+            timeCategoryCounts[monthKey] ?? <String, int>{};
+        final totalCount = categoryBreakdown.values.fold(
+          0,
+          (sum, count) => sum + count,
+        );
+
+        trendData.add(
+          ChartData(
+            date: _formatMonthLabel(currentMonth, startDate, actualEndDate),
+            count: totalCount,
+            categoryBreakdown: categoryBreakdown,
+          ),
+        );
+        currentMonth = _addMonths(currentMonth, 1);
+      }
+      break;
+
     case 'This Year':
       //  CRITICAL  Generate all 12 months and map data correctly
       final monthNames = [
@@ -2997,6 +3131,7 @@ List<ChartData> _generateTrendData(
       break;
 
     case 'All':
+    case 'yearly':
       // Generate all years
       final startYear = startDate.year;
       final endYear = actualEndDate.year;
@@ -3045,6 +3180,27 @@ List<ChartData> _generateSimpleTrendData(
       break;
 
     case 'daily':
+      var currentDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      final end = DateTime(
+        actualEndDate.year,
+        actualEndDate.month,
+        actualEndDate.day,
+      );
+
+      while (!currentDate.isAfter(end)) {
+        final dateKey = _dateKey(currentDate);
+        final dayName = _getDayName(currentDate.weekday);
+
+        final count = timeCounts[dateKey] ?? 0;
+        trendData.add(ChartData(date: dayName, count: count));
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+      break;
+
     case 'This Week':
       final startOfWeek = _getStartOfWeek(actualEndDate);
       final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -3061,6 +3217,16 @@ List<ChartData> _generateSimpleTrendData(
       break;
 
     case 'weekly':
+      final weeksCount = _weekCountForRange(startDate, actualEndDate);
+
+      for (int week = 1; week <= weeksCount; week++) {
+        final weekKey = "Week $week";
+        trendData.add(
+          ChartData(date: weekKey, count: timeCounts[weekKey] ?? 0),
+        );
+      }
+      break;
+
     case 'This Month':
       for (int week = 1; week <= 5; week++) {
         final weekKey = "Week $week";
@@ -3071,6 +3237,23 @@ List<ChartData> _generateSimpleTrendData(
       break;
 
     case 'monthly':
+      var currentMonth = DateTime(startDate.year, startDate.month);
+      final endMonth = DateTime(actualEndDate.year, actualEndDate.month);
+
+      while (!currentMonth.isAfter(endMonth)) {
+        final monthKey = _monthKey(currentMonth);
+        final count = timeCounts[monthKey] ?? 0;
+
+        trendData.add(
+          ChartData(
+            date: _formatMonthLabel(currentMonth, startDate, actualEndDate),
+            count: count,
+          ),
+        );
+        currentMonth = _addMonths(currentMonth, 1);
+      }
+      break;
+
     case 'This Year':
       final monthNames = [
         'Jan',
@@ -3098,6 +3281,7 @@ List<ChartData> _generateSimpleTrendData(
       break;
 
     case 'All':
+    case 'yearly':
       final startYear = startDate.year;
       final endYear = actualEndDate.year;
 
@@ -3142,13 +3326,18 @@ DateTime _getStartOfWeek(DateTime date) {
 }
 
 String _getDataGroupingInterval(DateTime startDate, DateTime endDate) {
-  final daysDifference = endDate.difference(startDate).inDays;
+  final daysDifference = _inclusiveDays(startDate, endDate);
+  final oneMonthRange =
+      startDate.year == endDate.year &&
+      startDate.month == endDate.month &&
+      startDate.day == 1 &&
+      endDate.day == DateTime(endDate.year, endDate.month + 1, 0).day;
 
-  if (daysDifference == 0) {
+  if (daysDifference <= 1) {
     return 'hourly'; // Same day
   } else if (daysDifference <= 7) {
     return 'daily'; // Up to 7 days
-  } else if (daysDifference <= 31) {
+  } else if (daysDifference <= 35 || oneMonthRange) {
     return 'weekly'; // Up to 31 days
   } else if (daysDifference <= 365) {
     return 'monthly'; // Up to 1 year
@@ -3171,16 +3360,18 @@ String _getTimeKeyForInterval(
     case 'daily':
     case 'This Week':
       // Return full date key
-      return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
+      return _dateKey(dateTime);
 
     case 'weekly':
+      return "Week ${_getWeekInRange(dateTime, startDate)}";
+
     case 'This Month':
       final weekOfMonth = ((dateTime.day - 1) ~/ 7) + 1;
       return "Week $weekOfMonth"; //  This is correct
 
     case 'monthly':
     case 'This Year':
-      return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}";
+      return _monthKey(dateTime);
 
     case 'All':
       return "${dateTime.year}";
@@ -3207,14 +3398,33 @@ List<String> _generateAllTimeKeys(
       break;
 
     case 'daily':
+      var currentDate = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+      );
+      final endDateOnly = DateTime(end.year, end.month, end.day);
+
+      while (!currentDate.isAfter(endDateOnly)) {
+        keys.add(_dateKey(currentDate));
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+      break;
+
     case 'This Week':
-      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final startOfWeek = _getStartOfWeek(end);
       for (int i = 0; i < 7; i++) {
-        keys.add(dayNames[i]);
+        keys.add(_dateKey(startOfWeek.add(Duration(days: i))));
       }
       break;
 
     case 'weekly':
+      final weeksCount = _weekCountForRange(startDate, end);
+      for (int week = 1; week <= weeksCount; week++) {
+        keys.add("Week $week");
+      }
+      break;
+
     case 'This Month':
       for (int week = 1; week <= 5; week++) {
         keys.add("Week $week");
@@ -3222,28 +3432,24 @@ List<String> _generateAllTimeKeys(
       break;
 
     case 'monthly':
+      var currentMonth = DateTime(startDate.year, startDate.month);
+      final endMonth = DateTime(end.year, end.month);
+
+      while (!currentMonth.isAfter(endMonth)) {
+        keys.add(_monthKey(currentMonth));
+        currentMonth = _addMonths(currentMonth, 1);
+      }
+      break;
+
     case 'This Year':
-      final monthNames = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
       //   Always generate all 12 months for "This Year"
       for (int month = 1; month <= 12; month++) {
-        keys.add(monthNames[month - 1]);
+        keys.add("${end.year}-${month.toString().padLeft(2, '0')}");
       }
       break;
 
     case 'All':
+    case 'yearly':
       final startYear = startDate.year;
       final endYear = end.year;
       for (int year = startYear; year <= endYear; year++) {
@@ -3300,7 +3506,6 @@ List<ChartData> _generateCustomRangeTrend(
 
     case 'daily':
       // Generate all days in range
-      final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       var currentDate = DateTime(
         startDate.year,
         startDate.month,
@@ -3309,9 +3514,8 @@ List<ChartData> _generateCustomRangeTrend(
       final end = DateTime(endDate.year, endDate.month, endDate.day);
 
       while (currentDate.isBefore(end.add(const Duration(days: 1)))) {
-        final dateKey =
-            "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}";
-        final displayKey = dayNames[currentDate.weekday - 1];
+        final dateKey = _dateKey(currentDate);
+        final displayKey = _getDayName(currentDate.weekday);
         final categoryBreakdown =
             timeCategoryCounts[dateKey] ?? <String, int>{};
         final totalCount = categoryBreakdown.values.fold(
@@ -3333,8 +3537,7 @@ List<ChartData> _generateCustomRangeTrend(
 
     case 'weekly':
       // Generate all weeks
-      final daysDiff = endDate.difference(startDate).inDays;
-      final weeksCount = (daysDiff / 7).ceil();
+      final weeksCount = _weekCountForRange(startDate, endDate);
 
       for (int week = 1; week <= weeksCount; week++) {
         final weekKey = "Week $week";
@@ -3357,30 +3560,12 @@ List<ChartData> _generateCustomRangeTrend(
 
     case 'monthly':
       // Generate all months in range
-      final monthNames = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-
       var currentMonth = DateTime(startDate.year, startDate.month);
       final endMonth = DateTime(endDate.year, endDate.month);
 
-      while (currentMonth.isBefore(endMonth.add(const Duration(days: 32))) ||
-          (currentMonth.month == endMonth.month &&
-              currentMonth.year == endDate.year)) {
-        final monthKey =
-            "${currentMonth.year}-${currentMonth.month.toString().padLeft(2, '0')}";
-        final displayKey = monthNames[currentMonth.month - 1];
+      while (!currentMonth.isAfter(endMonth)) {
+        final monthKey = _monthKey(currentMonth);
+        final displayKey = _formatMonthLabel(currentMonth, startDate, endDate);
         final categoryBreakdown =
             timeCategoryCounts[monthKey] ?? <String, int>{};
         final totalCount = categoryBreakdown.values.fold(
@@ -3396,12 +3581,27 @@ List<ChartData> _generateCustomRangeTrend(
           ),
         );
 
-        // Move to next month
-        if (currentMonth.month == 12) {
-          currentMonth = DateTime(currentMonth.year + 1, 1);
-        } else {
-          currentMonth = DateTime(currentMonth.year, currentMonth.month + 1);
-        }
+        currentMonth = _addMonths(currentMonth, 1);
+      }
+      break;
+
+    case 'yearly':
+      for (int year = startDate.year; year <= endDate.year; year++) {
+        final yearKey = year.toString();
+        final categoryBreakdown =
+            timeCategoryCounts[yearKey] ?? <String, int>{};
+        final totalCount = categoryBreakdown.values.fold(
+          0,
+          (sum, count) => sum + count,
+        );
+
+        trend.add(
+          ChartData(
+            date: yearKey,
+            count: totalCount,
+            categoryBreakdown: categoryBreakdown,
+          ),
+        );
       }
       break;
   }
@@ -3602,6 +3802,43 @@ List<ChartData> _generateYearlyTrend(
 }
 
 // Utility functions
+int _inclusiveDays(DateTime startDate, DateTime endDate) {
+  final start = DateTime(startDate.year, startDate.month, startDate.day);
+  final end = DateTime(endDate.year, endDate.month, endDate.day);
+  return end.difference(start).inDays + 1;
+}
+
+int _weekCountForRange(DateTime startDate, DateTime endDate) {
+  final weeks = (_inclusiveDays(startDate, endDate) + 6) ~/ 7;
+  if (weeks < 1) return 1;
+  if (weeks > 5) return 5;
+  return weeks;
+}
+
+int _getWeekInRange(DateTime date, DateTime startDate) {
+  final start = DateTime(startDate.year, startDate.month, startDate.day);
+  final current = DateTime(date.year, date.month, date.day);
+  return (current.difference(start).inDays ~/ 7) + 1;
+}
+
+DateTime _addMonths(DateTime date, int months) {
+  return DateTime(date.year, date.month + months);
+}
+
+String _dateKey(DateTime dateTime) {
+  return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
+}
+
+String _monthKey(DateTime dateTime) {
+  return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}";
+}
+
+String _formatMonthLabel(DateTime month, DateTime startDate, DateTime endDate) {
+  final crossesYears = startDate.year != endDate.year;
+  final monthName = _getMonthName(month.month);
+  return crossesYears ? '$monthName ${month.year}' : monthName;
+}
+
 int _getWeekOfMonth(DateTime date) {
   final firstDay = DateTime(date.year, date.month, 1);
   return ((date.difference(firstDay).inDays) ~/ 7) + 1;
