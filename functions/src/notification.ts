@@ -382,10 +382,10 @@ export const checkFacebookTokenExpiry = onSchedule(
       const expiryDateKey = expiryLocal.toISOString().substring(0, 10); // e.g. "2026-05-01"
 
       // ─────────────────────────────────────────────────────────────
-      // CASE 1: EXPIRING SOON — fire ONCE at 5 days left, ONCE at 3 days left
-      // Key includes daysLeft (5 or 3) + expiryDate → never repeats
+      // CASE 1: EXPIRING SOON — fire once at 3 days left
+      // Key includes daysLeft + expiryDate → never repeats
       // ─────────────────────────────────────────────────────────────
-      if (daysLeft === 5 || daysLeft === 3) {
+      if (daysLeft === 3) {
         const reminderKey = `fb_token_expiring_${expiryDateKey}_${daysLeft}d`;
 
         // Check if this exact warning was already sent

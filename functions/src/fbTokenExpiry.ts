@@ -7,16 +7,11 @@ const db = admin.firestore();
 /**
  * Check Facebook token expiration and send notifications
  *
- * TESTING MODE: Runs every 3 days, notifies at 59-60 days
- * PRODUCTION MODE: Runs every 3 days, notifies at 14 days
- *
- * To switch to production:
- * 1. Change NOTIFICATION_THRESHOLD from 60 to 14
- * 2. Optionally change schedule to run more frequently (e.g., "0 9 * * *" for daily)
+ * Runs daily, but sends the expiring-soon warning only when 3 days remain.
  */
 export const checkFacebookTokenExpiration = onSchedule(
   {
-    schedule: "0 9 */3 * *", // Every 3 days at 9 AM Manila time
+    schedule: "0 9 * * *", // Daily at 9 AM Manila time
     timeZone: "Asia/Manila",
     region: "us-central1",
   },
@@ -55,12 +50,9 @@ export const checkFacebookTokenExpiration = onSchedule(
       console.log(`   Days until expiry: ${daysUntilExpiry}`);
       console.log(`   Hours until expiry: ${Math.ceil(msUntilExpiry / (1000 * 60 * 60))}`);
 
-      //  TESTING: 60 days threshold
-      //  PRODUCTION: Change to 14 days
-      const NOTIFICATION_THRESHOLD = 60; // Change to 14 for production
+      const EXPIRING_SOON_DAYS = 3;
 
-      console.log(` Current threshold: ${NOTIFICATION_THRESHOLD} days`);
-      console.log(` Mode: ${NOTIFICATION_THRESHOLD === 60 ? "TESTING" : "PRODUCTION"}`);
+      console.log(` Expiring-soon notification day: ${EXPIRING_SOON_DAYS} days before expiry`);
 
       // Determine notification action
       if (daysUntilExpiry <= 0) {
@@ -71,18 +63,18 @@ export const checkFacebookTokenExpiration = onSchedule(
           daysUntilExpiry,
           expiresAt
         );
-      } else if (daysUntilExpiry <= NOTIFICATION_THRESHOLD) {
+      } else if (daysUntilExpiry === EXPIRING_SOON_DAYS) {
         console.log(`\n Token expiring in ${daysUntilExpiry} days - sending notifications`);
         await sendExpirationNotifications(
           "expiring_soon",
-          `Your Facebook API token will expire in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}. Please renew it soon to avoid interruption.`,
+          `Your Facebook API token will expire in ${daysUntilExpiry} day ${daysUntilExpiry !== 3 ? "s" : ""}. Please renew it soon to avoid interruption.`,
           daysUntilExpiry,
           expiresAt
         );
       } else {
         console.log(`\n Token is still valid (${daysUntilExpiry} days remaining)`);
-        console.log("   Next check will be in 3 days");
-        console.log(`   Will notify when ≤ ${NOTIFICATION_THRESHOLD} days remain`);
+        console.log("   Next check will be tomorrow");
+        console.log(`   Will notify when ${EXPIRING_SOON_DAYS} days remain`);
       }
     } catch (error: any) {
       console.error("\n ========================================");
