@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -579,8 +580,6 @@ class _AddUserContentState extends State<AddUserContent> {
       final password = _passwordController.text.trim();
 
       final functionsService = FirebaseFunctionsService();
-      String uid;
-
       //   Don't include timestamps in userData - Cloud Function handles them
       Map<String, dynamic> userData = {
         'name': fullName.trim(),
@@ -718,35 +717,38 @@ class _AddUserContentState extends State<AddUserContent> {
         userData['serviceUnit'] = _selectedServiceUnit;
       }
 
-      //  Call Cloud Function with complete userData
-      try {
-        uid = await functionsService.createUserAuth(
-          email: email,
-          password: password,
-          displayName: fullName,
-          userData: userData,
-        );
-      } catch (e) {
-        SnackbarUtil.showError(
-          context,
-          'Failed to create user account: ${e.toString()}',
-        );
-        setState(() {
-          _isSubmitting = false;
-        });
-        return;
-      }
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      //  The Cloud Function already created the Firestore document
-      // No need to create it again here
+      unawaited(() async {
+        try {
+          await functionsService.createUserAuth(
+            email: email,
+            password: password,
+            displayName: fullName,
+            userData: userData,
+          );
+          await _logCreateAction(fullName);
 
-      await _logCreateAction(fullName);
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'User created successfully',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to create user account: ${e.toString()}',
+            );
+          }
+        }
+      }());
 
-      SnackbarUtil.showSuccess(context, 'User created successfully');
+      SnackbarUtil.showInfo(context, 'User creation is running in background');
       Navigator.of(context).pop(true);
     } catch (e) {
-      SnackbarUtil.showError(context, 'Failed to create user: $e');
-    } finally {
+      SnackbarUtil.showError(context, 'Failed to start user creation: $e');
       if (mounted) {
         setState(() {
           _isSubmitting = false;

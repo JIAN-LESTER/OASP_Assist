@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -1431,31 +1433,6 @@ class _EditUserModalState extends State<EditUserModal> {
       final newDisplayName =
           '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
 
-      // Update email and/or password in Firebase Authentication if changed
-      if (newEmail != originalEmail || _passwordController.text.isNotEmpty) {
-        try {
-          final functionsService = FirebaseFunctionsService();
-          await functionsService.updateUserAuth(
-            uid: widget.userDoc.id,
-            email: newEmail != originalEmail ? newEmail : null,
-            displayName: newDisplayName,
-            password:
-                _passwordController.text.isNotEmpty
-                    ? _passwordController.text.trim()
-                    : null,
-          );
-        } catch (e) {
-          setState(() {
-            _isSubmitting = false;
-          });
-          SnackbarUtil.showError(
-            context,
-            'Failed to update authentication: ${e.toString()}',
-          );
-          return;
-        }
-      }
-
       Map<String, dynamic> updateData = {
         'name': newDisplayName,
         'email': newEmail,
@@ -1613,49 +1590,71 @@ class _EditUserModalState extends State<EditUserModal> {
         updateData['customAffiliation'] = FieldValue.delete();
       }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userDoc.id)
-          .update(updateData);
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-
-      if (currentUser != null) {
-        final doc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (doc.exists) {
-          final data = doc.data() as Map<String, dynamic>;
-          actorName = data['name'] ?? currentUser.email ?? 'Unknown';
-        }
-      }
-
       final originalName = userData['name'] ?? 'Unknown';
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      final logData = {
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Updated User: $originalName to $newDisplayName',
-        'time': Timestamp.now(),
-      };
-      await logRef.set(logData);
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-
-        SnackbarUtil.showSuccess(context, 'User updated successfully');
-
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            Navigator.of(context).pop();
+      unawaited(() async {
+        try {
+          if (newEmail != originalEmail || _passwordController.text.isNotEmpty) {
+            final functionsService = FirebaseFunctionsService();
+            await functionsService.updateUserAuth(
+              uid: widget.userDoc.id,
+              email: newEmail != originalEmail ? newEmail : null,
+              displayName: newDisplayName,
+              password:
+                  _passwordController.text.isNotEmpty
+                      ? _passwordController.text.trim()
+                      : null,
+            );
           }
-        });
-      }
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.userDoc.id)
+              .update(updateData);
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+
+          if (currentUser != null) {
+            final doc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (doc.exists) {
+              final data = doc.data() as Map<String, dynamic>;
+              actorName = data['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          final logData = {
+            'logId': logRef.id,
+            'user': actorName,
+            'action': 'Updated User: $originalName to $newDisplayName',
+            'time': Timestamp.now(),
+          };
+          await logRef.set(logData);
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'User updated successfully',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to update: ${e.toString()}',
+            );
+          }
+        }
+      }());
+
+      SnackbarUtil.showInfo(context, 'User update is running in background');
+      Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() {

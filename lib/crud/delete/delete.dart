@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -506,6 +507,50 @@ Widget _buildActionButtons(
                           isDeleting.value = true;
 
                           try {
+                            if (collection == 'users') {
+                              final feedbackContext =
+                                  Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  ).context;
+
+                              unawaited(() async {
+                                try {
+                                  if (customDeleteHandler != null) {
+                                    await customDeleteHandler(context, doc);
+                                  } else {
+                                    await _performStandardDelete(
+                                      context,
+                                      doc,
+                                      config,
+                                      collection,
+                                      deletedItemsTracker:
+                                          deletedItemsTracker,
+                                    );
+                                  }
+                                } catch (error) {
+                                  print(" Delete operation failed: $error");
+
+                                  if (feedbackContext.mounted) {
+                                    SnackbarUtil.showError(
+                                      feedbackContext,
+                                      'Delete failed: ${error.toString()}',
+                                    );
+                                  }
+                                }
+                              }());
+
+                              SnackbarUtil.showInfo(
+                                context,
+                                'User deletion is running in background',
+                              );
+                              Navigator.of(
+                                context,
+                                rootNavigator: false,
+                              ).pop();
+                              return;
+                            }
+
                             // Use custom handler if provided
                             if (customDeleteHandler != null) {
                               await customDeleteHandler(context, doc);
