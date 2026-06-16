@@ -507,68 +507,46 @@ Widget _buildActionButtons(
                           isDeleting.value = true;
 
                           try {
-                            if (collection == 'users') {
-                              final feedbackContext =
-                                  Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  ).context;
+                            final feedbackContext =
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).context;
 
-                              unawaited(() async {
-                                try {
-                                  if (customDeleteHandler != null) {
-                                    await customDeleteHandler(context, doc);
-                                  } else {
-                                    await _performStandardDelete(
-                                      context,
-                                      doc,
-                                      config,
-                                      collection,
-                                      deletedItemsTracker:
-                                          deletedItemsTracker,
-                                    );
-                                  }
-                                } catch (error) {
-                                  print(" Delete operation failed: $error");
-
-                                  if (feedbackContext.mounted) {
-                                    SnackbarUtil.showError(
-                                      feedbackContext,
-                                      'Delete failed: ${error.toString()}',
-                                    );
-                                  }
+                            unawaited(() async {
+                              try {
+                                if (customDeleteHandler != null) {
+                                  await customDeleteHandler(
+                                    feedbackContext,
+                                    doc,
+                                  );
+                                } else {
+                                  await _performStandardDelete(
+                                    feedbackContext,
+                                    doc,
+                                    config,
+                                    collection,
+                                    deletedItemsTracker: deletedItemsTracker,
+                                  );
                                 }
-                              }());
+                              } catch (error) {
+                                print(" Delete operation failed: $error");
 
-                              SnackbarUtil.showInfo(
-                                context,
-                                'User deletion is running in background',
-                              );
-                              Navigator.of(
-                                context,
-                                rootNavigator: false,
-                              ).pop();
-                              return;
-                            }
+                                if (feedbackContext.mounted) {
+                                  SnackbarUtil.showError(
+                                    feedbackContext,
+                                    'Delete failed: ${error.toString()}',
+                                  );
+                                }
+                              }
+                            }());
 
-                            // Use custom handler if provided
-                            if (customDeleteHandler != null) {
-                              await customDeleteHandler(context, doc);
-                            } else {
-                              // Standard delete logic
-                              await _performStandardDelete(
-                                context,
-                                doc,
-                                config,
-                                collection,
-                                deletedItemsTracker: deletedItemsTracker,
-                              );
-                            }
-
-                            //  FIXED: Close dialog only if context is still valid and mounted
-                            if (context.mounted) {
-                              Navigator.of(context, rootNavigator: false).pop();
-                            }
+                            SnackbarUtil.showInfo(
+                              context,
+                              '${config.title.split(' ').last} deletion is running in background',
+                            );
+                            Navigator.of(context, rootNavigator: false).pop();
+                            return;
                           } catch (error) {
                             print(" Delete operation failed: $error");
 
