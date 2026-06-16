@@ -436,11 +436,14 @@ class UniversalUIComponents {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'lib/images/oasp.png',
-              width: 72,
-              height: 72,
-              // color: Colors.grey[300],
+            Transform.scale(
+              scale: 1.8,
+              child: Image.asset(
+                'lib/images/oasp.png',
+                width: 72,
+                height: 72,
+                // color: Colors.grey[300],
+              ),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -490,19 +493,25 @@ class UniversalUIComponents {
                 ),
       ),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 80, height: 80),
+        child: Transform.scale(
+          scale: 1.8,
+          child: Image.asset('lib/images/oasp.png', width: 80, height: 80),
+        ),
       ),
     );
   }
 
   static Widget _buildPersistentDrawerHeader() {
     return Container(
-      height: 80,
+      height: 96,
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
       decoration: BoxDecoration(color: Colors.white),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 90, height: 90),
+        child: Transform.scale(
+          scale: 1.8,
+          child: Image.asset('lib/images/oasp.png', width: 90, height: 90),
+        ),
       ),
     );
   }

@@ -692,16 +692,19 @@ class _LoginPageState extends State<LoginPage>
             SizedBox(
               width: iconSize,
               height: iconSize,
-              child: Image.asset(
-                'lib/images/oasp.png',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.smart_toy_outlined,
-                    color: primaryColor,
-                    size: iconSize * 0.8,
-                  );
-                },
+              child: Transform.scale(
+                scale: 1.8,
+                child: Image.asset(
+                  'lib/images/oasp.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.smart_toy_outlined,
+                      color: primaryColor,
+                      size: iconSize * 0.8,
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -795,7 +798,7 @@ class _LoginPageState extends State<LoginPage>
       child: _buildContent(
         maxWidth: double.infinity,
         horizontalPadding: 20,
-        iconSize: 108,
+        iconSize: 140,
         titleFontSize: 26,
         descriptionFontSize: 14,
         cardPadding: 20,
@@ -837,7 +840,7 @@ class _LoginPageState extends State<LoginPage>
               child: _buildContent(
                 maxWidth: 500,
                 horizontalPadding: 32,
-                iconSize: 110,
+                iconSize: 145,
                 titleFontSize: 28,
                 descriptionFontSize: 15,
                 cardPadding: 32,
@@ -850,7 +853,7 @@ class _LoginPageState extends State<LoginPage>
               child: _buildContent(
                 maxWidth: 480,
                 horizontalPadding: 40,
-                iconSize: 120,
+                iconSize: 155,
                 titleFontSize: 32,
                 descriptionFontSize: 16,
                 cardPadding: 40,

@@ -472,7 +472,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                               color:
                                   message.sender == 'staff'
                                       ? Colors.green.shade100
-                                      : Colors.green.shade100,
+                                      : Colors.white,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color:
@@ -490,20 +490,23 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                                         color: Colors.green.shade700,
                                         size: 18,
                                       )
-                                      : Image.asset(
-                                        'lib/images/oasp.png',
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
-                                          return Icon(
-                                            Icons.smart_toy_outlined,
-                                            color: Color(0xFF2E7D32),
-                                            size: 18,
-                                          );
-                                        },
+                                      : Transform.scale(
+                                        scale: 1.9,
+                                        child: Image.asset(
+                                          'lib/images/oasp.png',
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                            context,
+                                            error,
+                                            stackTrace,
+                                          ) {
+                                            return Icon(
+                                              Icons.smart_toy_outlined,
+                                              color: Color(0xFF2E7D32),
+                                              size: 18,
+                                            );
+                                          },
+                                        ),
                                       ),
                             ),
                           ),
@@ -3054,7 +3057,13 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
               ),
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
+                child: Transform.scale(
+                  scale: 1.8,
+                  child: Image.asset(
+                    'lib/images/oasp.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ),
             SizedBox(height: 20),
@@ -3099,7 +3108,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             height: 32,
             margin: EdgeInsets.only(right: 8, bottom: 4),
             decoration: BoxDecoration(
-              color: Colors.green.shade100,
+              color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(
                 color: Color(0xFF2E7D32).withOpacity(0.3),
@@ -3107,16 +3116,19 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
               ),
             ),
             child: ClipOval(
-              child: Image.asset(
-                'lib/images/oasp.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.smart_toy_outlined,
-                    color: Color(0xFF2E7D32),
-                    size: 18,
-                  );
-                },
+              child: Transform.scale(
+                scale: 1.9,
+                child: Image.asset(
+                  'lib/images/oasp.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(
+                      Icons.smart_toy_outlined,
+                      color: Color(0xFF2E7D32),
+                      size: 18,
+                    );
+                  },
+                ),
               ),
             ),
           ),
