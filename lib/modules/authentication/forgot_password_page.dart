@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
+import 'onboarding/green_snow_animation.dart';
+
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
 
@@ -10,7 +12,9 @@ class ForgotPasswordPage extends StatefulWidget {
   State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
+class _ForgotPasswordPageState extends State<ForgotPasswordPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _snowController;
   final emailController = TextEditingController();
   bool _isLoading = false;
 
@@ -524,13 +528,32 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _snowController = AnimationController(
+      duration: const Duration(seconds: 12),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
   void dispose() {
     // Cancel all timers
     _emailErrorTimer?.cancel();
     _generalErrorTimer?.cancel();
 
+    _snowController.dispose();
     emailController.dispose();
     super.dispose();
+  }
+
+  Widget _buildSnowBody({required Widget child}) {
+    return Stack(
+      children: [
+        GreenSnowAnimation(animation: _snowController, color: primaryColor),
+        child,
+      ],
+    );
   }
 
   Widget _buildForgotPasswordForm({
@@ -856,24 +879,26 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget _buildMobileLayout() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: _buildForgotPasswordForm(
-                    availableHeight: constraints.maxHeight,
-                    iconSize: constraints.maxHeight * 0.08,
-                    fontSizeMultiplier: 0.95,
-                    buttonPadding: 18,
-                    showSecurityTips: true,
+      body: _buildSnowBody(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: _buildForgotPasswordForm(
+                      availableHeight: constraints.maxHeight,
+                      iconSize: constraints.maxHeight * 0.08,
+                      fontSizeMultiplier: 0.95,
+                      buttonPadding: 18,
+                      showSecurityTips: true,
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -883,50 +908,52 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget _buildTabletLayout() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Center(
-              child: SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight * 0.9,
-                  ),
-                  child: Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(32.0),
-                      padding: const EdgeInsets.all(32.0),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.08),
-                            spreadRadius: 2,
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+      body: _buildSnowBody(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Center(
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight * 0.9,
+                    ),
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.all(32.0),
+                        padding: const EdgeInsets.all(32.0),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
                           ),
-                        ],
-                      ),
-                      child: _buildForgotPasswordForm(
-                        maxWidth: 480,
-                        horizontalPadding: 0,
-                        availableHeight: constraints.maxHeight * 0.8,
-                        iconSize: constraints.maxHeight * 0.1,
-                        fontSizeMultiplier: 1.0,
-                        buttonPadding: 20,
-                        showSecurityTips: true,
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.08),
+                              spreadRadius: 2,
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: _buildForgotPasswordForm(
+                          maxWidth: 480,
+                          horizontalPadding: 0,
+                          availableHeight: constraints.maxHeight * 0.8,
+                          iconSize: constraints.maxHeight * 0.1,
+                          fontSizeMultiplier: 1.0,
+                          buttonPadding: 20,
+                          showSecurityTips: true,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -936,55 +963,57 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget _buildDesktopLayout() {
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Center(
-              child: SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight * 0.9,
-                  ),
-                  child: Center(
-                    child: Container(
-                      margin: const EdgeInsets.all(40.0),
-                      padding: const EdgeInsets.only(
-                        left: 50.0,
-                        right: 50.0,
-                        bottom: 40,
-                        top: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
+      body: _buildSnowBody(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Center(
+                child: SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight * 0.9,
+                    ),
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.all(40.0),
+                        padding: const EdgeInsets.only(
+                          left: 50.0,
+                          right: 50.0,
+                          bottom: 40,
+                          top: 20,
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 3,
-                            blurRadius: 20,
-                            offset: const Offset(0, 6),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1,
                           ),
-                        ],
-                      ),
-                      child: _buildForgotPasswordForm(
-                        maxWidth: 420,
-                        horizontalPadding: 0,
-                        availableHeight: constraints.maxHeight * 0.8,
-                        iconSize: constraints.maxHeight * 0.12,
-                        fontSizeMultiplier: 1.0,
-                        buttonPadding: 22,
-                        showSecurityTips: true,
+                          borderRadius: BorderRadius.circular(16),
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              spreadRadius: 3,
+                              blurRadius: 20,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: _buildForgotPasswordForm(
+                          maxWidth: 420,
+                          horizontalPadding: 0,
+                          availableHeight: constraints.maxHeight * 0.8,
+                          iconSize: constraints.maxHeight * 0.12,
+                          fontSizeMultiplier: 1.0,
+                          buttonPadding: 22,
+                          showSecurityTips: true,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
