@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -1059,40 +1060,62 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
   Future<void> _deleteCollege(BuildContext dialogContext) async {
     setState(() => _isDeleting = true);
     final data = widget.collegeDoc.data() as Map<String, dynamic>;
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('colleges')
-          .doc(widget.collegeDoc.id)
-          .delete();
+      unawaited(() async {
+        try {
+          await FirebaseFirestore.instance
+              .collection('colleges')
+              .doc(widget.collegeDoc.id)
+              .delete();
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-      if (currentUser != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action': 'Deleted college: ${data['name']}',
+            'time': Timestamp.now(),
+          });
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'College deleted successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to delete college: $e',
+            );
+          }
         }
-      }
-
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Deleted college: ${data['name']}',
-        'time': Timestamp.now(),
-      });
+      }());
 
       if (mounted) {
         Navigator.of(
           dialogContext,
         ).pop(true); // Return true to indicate success
-        SnackbarUtil.showSuccess(context, 'College deleted successfully!');
+        SnackbarUtil.showInfo(
+          context,
+          'College deletion is running in background',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1383,50 +1406,66 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
         'updatedAt': Timestamp.now(),
       };
 
-      if (isEditing) {
-        await FirebaseFirestore.instance
-            .collection('colleges')
-            .doc(widget.collegeDoc!.id)
-            .update(collegeData);
-      } else {
-        collegeData['createdAt'] = Timestamp.now();
-        await FirebaseFirestore.instance
-            .collection('colleges')
-            .add(collegeData);
-      }
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+      final collegeName = _nameController.text.trim();
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-      if (currentUser != null) {
-        final userDoc =
+      unawaited(() async {
+        try {
+          if (isEditing) {
             await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+                .collection('colleges')
+                .doc(widget.collegeDoc!.id)
+                .update(collegeData);
+          } else {
+            collegeData['createdAt'] = Timestamp.now();
+            await FirebaseFirestore.instance
+                .collection('colleges')
+                .add(collegeData);
+          }
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action': '${isEditing ? 'Updated' : 'Created'} college: $collegeName',
+            'time': Timestamp.now(),
+          });
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'College ${isEditing ? 'updated' : 'created'} successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to ${isEditing ? 'update' : 'create'} college: $e',
+            );
+          }
         }
-      }
+      }());
 
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action':
-            '${isEditing ? 'Updated' : 'Created'} college: ${_nameController.text.trim()}',
-        'time': Timestamp.now(),
-      });
-
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'College ${isEditing ? 'updated' : 'created'} successfully!',
-        );
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) Navigator.of(context).pop();
-        });
-      }
+      SnackbarUtil.showInfo(
+        context,
+        'College ${isEditing ? 'update' : 'creation'} is running in background',
+      );
+      Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
