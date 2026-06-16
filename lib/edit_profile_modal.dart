@@ -1,4 +1,3 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +58,8 @@ class EditProfileModal extends StatefulWidget {
 }
 
 class _EditProfileModalState extends State<EditProfileModal> {
+  static const double _profileFieldHeight = 52;
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -260,7 +261,7 @@ class _EditProfileModalState extends State<EditProfileModal> {
         }
       }
 
-      // ✅ ADD MASTERAL PROGRAMS TO THE MAP
+      //  ADD MASTERAL PROGRAMS TO THE MAP
       if (masteralProgramsList.isNotEmpty) {
         programsByCollegeMap['Masteral'] = masteralProgramsList;
       }
@@ -282,61 +283,66 @@ class _EditProfileModalState extends State<EditProfileModal> {
     }
   }
 
-  Future<bool> _isStudentIdUnique(String studentId, {String? excludeUserId}) async {
-  try {
-    final query = await FirebaseFirestore.instance
-        .collection('users')
-        .where('studentId', isEqualTo: studentId.trim())
-        .get();
+  Future<bool> _isStudentIdUnique(
+    String studentId, {
+    String? excludeUserId,
+  }) async {
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('studentId', isEqualTo: studentId.trim())
+              .get();
 
-    if (query.docs.isEmpty) return true;
-    
-    // If excluding a user (for edit), check if the only match is that user
-    if (excludeUserId != null) {
-      return query.docs.every((doc) => doc.id == excludeUserId);
+      if (query.docs.isEmpty) return true;
+
+      // If excluding a user (for edit), check if the only match is that user
+      if (excludeUserId != null) {
+        return query.docs.every((doc) => doc.id == excludeUserId);
+      }
+
+      return false;
+    } catch (e) {
+      print('Error checking student ID uniqueness: $e');
+      return false;
     }
-    
-    return false;
-  } catch (e) {
-    print('Error checking student ID uniqueness: $e');
-    return false;
   }
-}
 
-Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
-  try {
-    final query = await FirebaseFirestore.instance
-        .collection('users')
-        .where('lrn', isEqualTo: lrn.trim())
-        .get();
+  Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('lrn', isEqualTo: lrn.trim())
+              .get();
 
-    if (query.docs.isEmpty) return true;
-    
-    // If excluding a user (for edit), check if the only match is that user
-    if (excludeUserId != null) {
-      return query.docs.every((doc) => doc.id == excludeUserId);
+      if (query.docs.isEmpty) return true;
+
+      // If excluding a user (for edit), check if the only match is that user
+      if (excludeUserId != null) {
+        return query.docs.every((doc) => doc.id == excludeUserId);
+      }
+
+      return false;
+    } catch (e) {
+      print('Error checking LRN uniqueness: $e');
+      return false;
     }
-    
-    return false;
-  } catch (e) {
-    print('Error checking LRN uniqueness: $e');
-    return false;
   }
-}
 
   Future<List<String>> _getDropdownItems(String collection) async {
     try {
       final snapshot =
           await FirebaseFirestore.instance.collection(collection).get();
 
-      // ✅ Filter out empty/null values and remove duplicates
+      //  Filter out empty/null values and remove duplicates
       return snapshot.docs
           .map((doc) {
             final name = doc.data()['name'];
             return name?.toString().trim() ?? '';
           })
           .where((name) => name.isNotEmpty)
-          .toSet() // ✅ Convert to Set to remove duplicates
+          .toSet() //  Convert to Set to remove duplicates
           .toList();
     } catch (e) {
       print('Error getting dropdown items from $collection: $e');
@@ -347,120 +353,136 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-  if (_role == 'user') {
-    // Validate CMU student selection
-    if (_isCMUStudent == null) {
-      SnackbarUtil.showError(context, 'Please indicate if you are/were a CMU student');
-      return;
-    }
-
-    // CMU Student validations
-    if (_isCMUStudent == 'yes') {
-      if (_studentType == null) {
-        SnackbarUtil.showError(context, 'Please select your student type');
+    if (_role == 'user') {
+      // Validate CMU student selection
+      if (_isCMUStudent == null) {
+        SnackbarUtil.showError(
+          context,
+          'Please indicate if you are/were a CMU student',
+        );
         return;
       }
 
-      if (_studentType == 'undergraduate') {
-        if (_studentId == null || _studentId!.trim().isEmpty) {
-          SnackbarUtil.showError(context, 'Please enter your Student ID');
+      // CMU Student validations
+      if (_isCMUStudent == 'yes') {
+        if (_studentType == null) {
+          SnackbarUtil.showError(context, 'Please select your student type');
           return;
         }
 
-        // ✅ CHECK STUDENT ID UNIQUENESS (excluding current user)
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final isStudentIdUnique = await _isStudentIdUnique(
-            _studentId!.trim(),
-            excludeUserId: user.uid,
-          );
-          if (!isStudentIdUnique) {
+        if (_studentType == 'undergraduate') {
+          if (_studentId == null || _studentId!.trim().isEmpty) {
+            SnackbarUtil.showError(context, 'Please enter your Student ID');
+            return;
+          }
+
+          //  CHECK STUDENT ID UNIQUENESS (excluding current user)
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            final isStudentIdUnique = await _isStudentIdUnique(
+              _studentId!.trim(),
+              excludeUserId: user.uid,
+            );
+            if (!isStudentIdUnique) {
+              SnackbarUtil.showError(
+                context,
+                'This Student ID is already registered',
+              );
+              return;
+            }
+          }
+
+          if (_selectedYear == null) {
+            SnackbarUtil.showError(context, 'Please select your year level');
+            return;
+          }
+          if (_selectedCollege == null) {
+            SnackbarUtil.showError(context, 'Please select your college');
+            return;
+          }
+          if (_selectedProgram == null) {
+            SnackbarUtil.showError(context, 'Please select your program');
+            return;
+          }
+        } else if (_studentType == 'graduate') {
+          if (_graduateType == null) {
+            SnackbarUtil.showError(context, 'Please select your graduate type');
+            return;
+          }
+          if (_graduateType == 'masteral' && _selectedProgram == null) {
             SnackbarUtil.showError(
               context,
-              'This Student ID is already registered',
+              'Please select your masteral program',
             );
             return;
           }
+          if (_graduateType == 'not_masteral') {
+            if (_graduatedCollege == null) {
+              SnackbarUtil.showError(
+                context,
+                'Please select your graduated college',
+              );
+              return;
+            }
+            if (_graduatedProgram == null) {
+              SnackbarUtil.showError(
+                context,
+                'Please select your graduated program',
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      // Non-CMU Student validations
+      if (_isCMUStudent == 'no') {
+        if (_associationType == null) {
+          SnackbarUtil.showError(
+            context,
+            'Please select how you are associated with CMU',
+          );
+          return;
         }
 
-        if (_selectedYear == null) {
-          SnackbarUtil.showError(context, 'Please select your year level');
-          return;
-        }
-        if (_selectedCollege == null) {
-          SnackbarUtil.showError(context, 'Please select your college');
-          return;
-        }
-        if (_selectedProgram == null) {
-          SnackbarUtil.showError(context, 'Please select your program');
-          return;
-        }
-      } else if (_studentType == 'graduate') {
-        if (_graduateType == null) {
-          SnackbarUtil.showError(context, 'Please select your graduate type');
-          return;
-        }
-        if (_graduateType == 'masteral' && _selectedProgram == null) {
-          SnackbarUtil.showError(context, 'Please select your masteral program');
-          return;
-        }
-        if (_graduateType == 'not_masteral') {
-          if (_graduatedCollege == null) {
-            SnackbarUtil.showError(context, 'Please select your graduated college');
+        if (_associationType == 'incoming_freshman') {
+          if (_lrn == null || _lrn!.trim().isEmpty) {
+            SnackbarUtil.showError(context, 'Please enter your LRN');
             return;
           }
-          if (_graduatedProgram == null) {
-            SnackbarUtil.showError(context, 'Please select your graduated program');
+
+          //  CHECK LRN UNIQUENESS (excluding current user)
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            final isLrnUnique = await _isLRNUnique(
+              _lrn!.trim(),
+              excludeUserId: user.uid,
+            );
+            if (!isLrnUnique) {
+              SnackbarUtil.showError(context, 'This LRN is already registered');
+              return;
+            }
+          }
+        } else if (_associationType == 'masteral') {
+          if (_selectedProgram == null) {
+            SnackbarUtil.showError(
+              context,
+              'Please select your masteral program',
+            );
+            return;
+          }
+        } else if (_associationType == 'others') {
+          if (_customAffiliation == null ||
+              _customAffiliation!.trim().isEmpty) {
+            SnackbarUtil.showError(context, 'Please specify your affiliation');
             return;
           }
         }
       }
     }
 
-    // Non-CMU Student validations
-    if (_isCMUStudent == 'no') {
-      if (_associationType == null) {
-        SnackbarUtil.showError(context, 'Please select how you are associated with CMU');
-        return;
-      }
-
-      if (_associationType == 'incoming_freshman') {
-        if (_lrn == null || _lrn!.trim().isEmpty) {
-          SnackbarUtil.showError(context, 'Please enter your LRN');
-          return;
-        }
-
-        // ✅ CHECK LRN UNIQUENESS (excluding current user)
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final isLrnUnique = await _isLRNUnique(
-            _lrn!.trim(),
-            excludeUserId: user.uid,
-          );
-          if (!isLrnUnique) {
-            SnackbarUtil.showError(
-              context,
-              'This LRN is already registered',
-            );
-            return;
-          }
-        }
-      } else if (_associationType == 'masteral') {
-        if (_selectedProgram == null) {
-          SnackbarUtil.showError(context, 'Please select your masteral program');
-          return;
-        }
-      } else if (_associationType == 'others') {
-        if (_customAffiliation == null || _customAffiliation!.trim().isEmpty) {
-          SnackbarUtil.showError(context, 'Please specify your affiliation');
-          return;
-        }
-      }
-    }
-  }
-
-  setState(() => _isSaving = true);
-  HapticFeedback.mediumImpact();
+    setState(() => _isSaving = true);
+    HapticFeedback.mediumImpact();
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -820,47 +842,51 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
     bool enabled = true,
     ValueChanged<String>? onChanged, // added ni
   }) {
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-        prefixIcon: Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(right: 12),
-          child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+    return SizedBox(
+      height: _profileFieldHeight,
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        keyboardType: keyboardType,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(right: 12),
+            child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          filled: true,
+          fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
+        validator: validator,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF111827),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        filled: true,
-        fillColor: enabled ? Colors.grey.shade50 : Colors.grey.shade100,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      validator: validator,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: Color(0xFF111827),
       ),
     );
   }
@@ -872,55 +898,59 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
     required VoidCallback onToggleVisibility,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        hintText: hintText,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-        prefixIcon: Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(right: 12),
-          child: Icon(
-            Icons.lock_outline,
-            size: 18,
-            color: const Color(0xFF2E7D32),
+    return SizedBox(
+      height: _profileFieldHeight,
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(right: 12),
+            child: Icon(
+              Icons.lock_outline,
+              size: 18,
+              color: const Color(0xFF2E7D32),
+            ),
+          ),
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscureText
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: const Color(0xFF6B7280),
+              size: 20,
+            ),
+            onPressed: onToggleVisibility,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
           ),
         ),
-        suffixIcon: IconButton(
-          icon: Icon(
-            obscureText
-                ? Icons.visibility_off_outlined
-                : Icons.visibility_outlined,
-            color: const Color(0xFF6B7280),
-            size: 20,
-          ),
-          onPressed: onToggleVisibility,
+        validator: validator,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF111827),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      validator: validator,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: Color(0xFF111827),
       ),
     );
   }
@@ -932,11 +962,11 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
     required String hint,
     required IconData icon,
   }) {
-    // ✅ FIX: Remove duplicates and empty values
+    //   Remove duplicates and empty values
     final uniqueItems =
         items.where((item) => item.trim().isNotEmpty).toSet().toList();
 
-    // ✅ FIX: Validate the current value
+    //   Validate the current value
     final validValue =
         (value != null &&
                 value.trim().isNotEmpty &&
@@ -944,60 +974,63 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
             ? value
             : null;
 
-    return DropdownButtonFormField<String>(
-      isExpanded: true,
-      value: validValue,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
-        prefixIcon: Container(
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(right: 12),
-          child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+    return SizedBox(
+      height: _profileFieldHeight,
+      child: DropdownButtonFormField<String>(
+        isExpanded: true,
+        value: validValue,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          prefixIcon: Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(right: 12),
+            child: Icon(icon, size: 18, color: const Color(0xFF2E7D32)),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+          ),
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade50,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      items:
-          uniqueItems.map((item) {
-            return DropdownMenuItem<String>(
-              value: item,
-              child: Text(
-                item,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF111827),
+        items:
+            uniqueItems.map((item) {
+              return DropdownMenuItem<String>(
+                value: item,
+                child: Text(
+                  item,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF111827),
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
-      onChanged: onChanged,
-      dropdownColor: Colors.white,
-      icon: const Icon(
-        Icons.keyboard_arrow_down_rounded,
-        color: Color(0xFF6B7280),
+              );
+            }).toList(),
+        onChanged: onChanged,
+        dropdownColor: Colors.white,
+        icon: const Icon(
+          Icons.keyboard_arrow_down_rounded,
+          color: Color(0xFF6B7280),
+        ),
+        menuMaxHeight: 250,
+        isDense: true,
       ),
-      // ✅ ADD THESE PROPERTIES FOR SCROLLABLE DROPDOWN
-      menuMaxHeight: 250, // Shows approximately 5 items (50px each)
-      isDense: false,
     );
   }
 
@@ -1899,7 +1932,7 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                                                   isMobile: isMobile,
                                                   child: Builder(
                                                     builder: (context) {
-                                                      // ✅ GET MASTERAL PROGRAMS FROM THE MAP
+                                                      //  GET MASTERAL PROGRAMS FROM THE MAP
                                                       final masteralPrograms =
                                                           _programsByCollege['Masteral'] ??
                                                           [];
@@ -2173,7 +2206,7 @@ Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
                                                 isMobile: isMobile,
                                                 child: Builder(
                                                   builder: (context) {
-                                                    // ✅ GET MASTERAL PROGRAMS FROM THE MAP
+                                                    //  GET MASTERAL PROGRAMS FROM THE MAP
                                                     final masteralPrograms =
                                                         _programsByCollege['Masteral'] ??
                                                         [];
@@ -2758,13 +2791,13 @@ class _AddEditDialogState extends State<AddEditDialog> {
       widget.onSaved();
       Navigator.of(context).pop();
 
-      // ✅ Use SnackbarUtil
+      //  Use SnackbarUtil
       SnackbarUtil.showSuccess(
         context,
         '$displayName ${isEditing ? 'updated' : 'created'} successfully!',
       );
     } catch (e) {
-      // ✅ Use SnackbarUtil
+      //  Use SnackbarUtil
       SnackbarUtil.showError(
         context,
         'Failed to ${isEditing ? 'update' : 'create'} $displayName: $e',

@@ -2,15 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Notifications {
   final String notificationId;
-  final String? userId;       // null for staff notifications
+  final String? userId; // null for staff notifications
   final String title;
   final String body;
-  final String type;          // e.g., 'escalation', 'message'
-  final String relatedId;     // links to escalation or other entity
-  final String targetRole;    // 'user' or 'staff'
+  final String type; // e.g., 'escalation', 'message'
+  final String relatedId; // links to escalation or other entity
+  final String targetRole; // 'user' or 'staff'
   final bool read;
   final Timestamp createdAt;
-  final Map<String, dynamic>? data; // ✅ New field for additional data
+  final Map<String, dynamic>? data; //  New field for additional data
 
   Notifications({
     required this.notificationId,
@@ -37,7 +37,7 @@ class Notifications {
       targetRole: map['targetRole'] ?? 'user',
       read: map['read'] ?? false,
       createdAt: map['createdAt'] ?? Timestamp.now(),
-      data: Map<String, dynamic>.from(map['data'] ?? {}), // ✅ Safely handle null
+      data: Map<String, dynamic>.from(map['data'] ?? {}), //  Safely handle null
     );
   }
 
@@ -53,7 +53,7 @@ class Notifications {
       'targetRole': targetRole,
       'read': read,
       'createdAt': createdAt,
-      'data': data, // ✅ Include in Firestore document
+      'data': data, //  Include in Firestore document
     };
   }
 }

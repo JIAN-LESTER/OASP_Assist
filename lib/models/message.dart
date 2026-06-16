@@ -14,8 +14,9 @@ class Message {
   final bool? isAnswered;
   final String? rating; // 'like', 'dislike', null
   final int? count;
-  
-  // ✅ NEW: Escalation fields
+  final int? similarityCount;
+
+  //   Escalation fields
   final bool? escalationResolved;
   final String? escalationResponse;
   final String? escalationRespondedBy;
@@ -36,7 +37,8 @@ class Message {
     this.isAnswered,
     this.rating,
     this.count,
-    // ✅ NEW: Escalation parameters
+    this.similarityCount,
+    //   Escalation parameters
     this.escalationResolved,
     this.escalationResponse,
     this.escalationRespondedBy,
@@ -60,11 +62,13 @@ class Message {
       isAnswered: json['isAnswered'] as bool?,
       rating: json['rating'] as String?,
       count: json['count'] as int?,
-      // ✅ NEW: Parse escalation fields
+      similarityCount: json['similarityCount'] as int?,
+      //   Parse escalation fields
       escalationResolved: json['escalationResolved'] as bool?,
       escalationResponse: json['escalationResponse'] as String?,
       escalationRespondedBy: json['escalationRespondedBy'] as String?,
-      escalationRespondedAt: (json['escalationRespondedAt'] as Timestamp?)?.toDate(),
+      escalationRespondedAt:
+          (json['escalationRespondedAt'] as Timestamp?)?.toDate(),
       escalationId: json['escalationId'] as String?,
     );
   }
@@ -81,17 +85,20 @@ class Message {
       'message_type': type,
       'category': category,
       'sent_at': Timestamp.fromDate(sentAt),
-      'responded_at': respondedAt != null ? Timestamp.fromDate(respondedAt!) : null,
+      'responded_at':
+          respondedAt != null ? Timestamp.fromDate(respondedAt!) : null,
       'isAnswered': isAnswered ?? false,
       'rating': rating,
       'count': count,
-      // ✅ NEW: Include escalation fields
+      'similarityCount': similarityCount ?? 0,
+      //   Include escalation fields
       'escalationResolved': escalationResolved,
       'escalationResponse': escalationResponse,
       'escalationRespondedBy': escalationRespondedBy,
-      'escalationRespondedAt': escalationRespondedAt != null 
-          ? Timestamp.fromDate(escalationRespondedAt!) 
-          : null,
+      'escalationRespondedAt':
+          escalationRespondedAt != null
+              ? Timestamp.fromDate(escalationRespondedAt!)
+              : null,
       'escalationId': escalationId,
     };
   }
@@ -111,6 +118,7 @@ class Message {
     bool? isAnswered,
     String? rating,
     int? count,
+    int? similarityCount,
     bool? escalationResolved,
     String? escalationResponse,
     String? escalationRespondedBy,
@@ -131,10 +139,13 @@ class Message {
       isAnswered: isAnswered ?? this.isAnswered,
       rating: rating ?? this.rating,
       count: count ?? this.count,
+      similarityCount: similarityCount ?? this.similarityCount,
       escalationResolved: escalationResolved ?? this.escalationResolved,
       escalationResponse: escalationResponse ?? this.escalationResponse,
-      escalationRespondedBy: escalationRespondedBy ?? this.escalationRespondedBy,
-      escalationRespondedAt: escalationRespondedAt ?? this.escalationRespondedAt,
+      escalationRespondedBy:
+          escalationRespondedBy ?? this.escalationRespondedBy,
+      escalationRespondedAt:
+          escalationRespondedAt ?? this.escalationRespondedAt,
       escalationId: escalationId ?? this.escalationId,
     );
   }

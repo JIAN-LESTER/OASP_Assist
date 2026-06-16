@@ -1,7 +1,10 @@
+import 'dart:async';
+
+import 'package:capstone_project/modules/admin/service_information/scholarship/scholarship_info.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
-import 'package:capstone_project/modules/admin_module/services_module/scholarship_module/scholarship_info.dart';
+
 
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
@@ -1023,32 +1026,54 @@ Future<void> _handleSaveChanges(
       'deadline': deadlineDate != null ? Timestamp.fromDate(deadlineDate) : null,
     };
 
-    await FirebaseFirestore.instance
-        .collection('scholarships')
-        .doc(userDoc.id)
-        .update(updateData);
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+
+    unawaited(() async {
+      try {
+        await FirebaseFirestore.instance
+            .collection('scholarships')
+            .doc(userDoc.id)
+            .update(updateData);
+
+        if (feedbackContext.mounted) {
+          ScaffoldMessenger.of(feedbackContext).showSnackBar(
+            const SnackBar(
+              content: Text('Scholarship updated successfully!'),
+              backgroundColor: Color(0xFF2E7D32),
+            ),
+          );
+
+          if (previousModal != null) {
+            Future.delayed(
+              const Duration(milliseconds: 300),
+              () {
+                if (previousModal == 'info') {
+                  showSCInfoModal(feedbackContext, userDoc);
+                }
+              },
+            );
+          }
+        }
+      } catch (e) {
+        if (feedbackContext.mounted) {
+          ScaffoldMessenger.of(feedbackContext).showSnackBar(
+            SnackBar(
+              content: Text('Error updating scholarship: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }());
 
     if (context.mounted) {
       Navigator.of(context).pop();
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Scholarship updated successfully!'),
+          content: Text('Scholarship update is running in background'),
           backgroundColor: Color(0xFF2E7D32),
         ),
       );
-
-      // Navigate back to previous modal if specified
-      if (previousModal != null) {
-        Future.delayed(
-          const Duration(milliseconds: 300),
-          () {
-            if (previousModal == 'info') {
-              showSCInfoModal(context, userDoc);
-            }
-          },
-        );
-      }
     }
   } catch (e) {
     if (context.mounted) {

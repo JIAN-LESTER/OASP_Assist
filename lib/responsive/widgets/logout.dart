@@ -11,7 +11,7 @@ class LogoutDialogContent extends StatefulWidget {
   final bool isMobile;
 
   const LogoutDialogContent({Key? key, required this.isMobile})
-      : super(key: key);
+    : super(key: key);
 
   @override
   State<LogoutDialogContent> createState() => LogoutDialogContentState();
@@ -32,10 +32,10 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
       if (mounted) {
         // Close logout dialog first
         Navigator.of(context).pop();
-        
+
         // Small delay to ensure dialog is closed
         await Future.delayed(const Duration(milliseconds: 100));
-        
+
         // Navigate to root and clear all routes
         // This ensures clean navigation after onboarding
         if (mounted) {
@@ -46,8 +46,8 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
         }
       }
     } catch (error) {
-      print('❌ Logout error: $error');
-      
+      print(' Logout error: $error');
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -59,9 +59,7 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
               children: [
                 const Icon(Icons.error, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text('Logout failed: ${error.toString()}'),
-                ),
+                Expanded(child: Text('Logout failed: ${error.toString()}')),
               ],
             ),
             backgroundColor: const Color(0xFFEF4444),
@@ -264,50 +262,50 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
                             child:
                                 _isLoading
                                     ? Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                Colors.white.withOpacity(0.8),
-                                              ),
-                                            ),
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white.withOpacity(0.8),
+                                                ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Logging out...',
-                                            style: TextStyle(
-                                              fontSize: widget.isMobile ? 14 : 15,
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Logging out...',
+                                          style: TextStyle(
+                                            fontSize: widget.isMobile ? 14 : 15,
+                                            fontWeight: FontWeight.w600,
                                           ),
-                                        ],
-                                      )
+                                        ),
+                                      ],
+                                    )
                                     : Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.logout_rounded,
-                                            size: 18,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.logout_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Logout',
+                                          style: TextStyle(
+                                            fontSize: widget.isMobile ? 14 : 15,
+                                            fontWeight: FontWeight.w600,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Logout',
-                                            style: TextStyle(
-                                              fontSize: widget.isMobile ? 14 : 15,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
+                                    ),
                           ),
                         ),
                       ),
@@ -328,10 +326,11 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
       String name = 'Unknown';
 
       if (user != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
 
         if (userDoc.exists) {
           final userData = userDoc.data() as Map<String, dynamic>;
@@ -349,9 +348,9 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
             };
 
             await logRef.set(logData);
-            print('✅ Logout logged successfully');
+            print(' Logout logged successfully');
           } catch (e) {
-            print('⚠️ Failed to log logout event: $e');
+            print(' Failed to log logout event: $e');
             // Continue with logout even if logging fails
           }
         }
@@ -360,32 +359,29 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
       // Sign out from Google if not on Windows
       try {
         if (!Platform.isWindows) {
-          final GoogleSignIn googleSignIn = GoogleSignIn();
-          if (await googleSignIn.isSignedIn()) {
-            await googleSignIn.signOut();
-            print('✅ Google sign-out successful');
-          }
+          final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+          await googleSignIn.signOut();
+          print('Google sign-out successful');
         } else {
-          print('ℹ️ Skipping Google sign-out on Windows');
+          print(' Skipping Google sign-out on Windows');
         }
       } catch (e) {
-        print('⚠️ Google sign-out error (non-critical): $e');
+        print(' Google sign-out error (non-critical): $e');
         // Continue with Firebase logout even if Google logout fails
       }
 
       // Always sign out from Firebase Auth - THIS IS THE CRITICAL PART
       await FirebaseAuth.instance.signOut();
-      print('✅ Firebase sign-out successful');
-      
+      print(' Firebase sign-out successful');
     } catch (e) {
-      print('❌ Error during logout: $e');
-      
+      print(' Error during logout: $e');
+
       // Force Firebase signout even on error
       try {
         await FirebaseAuth.instance.signOut();
-        print('✅ Forced Firebase sign-out successful');
+        print(' Forced Firebase sign-out successful');
       } catch (inner) {
-        print('❌ Critical: Failed to force Firebase signout: $inner');
+        print(' Critical: Failed to force Firebase signout: $inner');
         rethrow; // Rethrow to show error to user
       }
     }

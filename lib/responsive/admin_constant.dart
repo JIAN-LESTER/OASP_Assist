@@ -49,10 +49,8 @@ class AdminConstant {
 
       // Sign out from Google if not on Windows
       if (!Platform.isWindows) {
-        final GoogleSignIn googleSignIn = GoogleSignIn();
-        if (await googleSignIn.isSignedIn()) {
-          await googleSignIn.signOut();
-        }
+        final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+        await googleSignIn.signOut();
       } else {
         print("DEBUG: Skipping Google sign-out on Windows.");
       }
@@ -339,11 +337,14 @@ class AdminConstant {
                       border: null,
                     ),
                     child: Center(
-                      child: Image.asset(
-                        'lib/images/oasp.png',
-                        width: 28,
-                        height: 28,
-                        fit: BoxFit.contain,
+                      child: Transform.scale(
+                        scale: 2.2,
+                        child: Image.asset(
+                          'lib/images/oasp.png',
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   ),
@@ -524,7 +525,7 @@ class AdminConstant {
                                 PersistentDrawerState.isServicesExpanded,
                             onExpansionChanged: (expanded) {
                               setDrawerState(() {
-                                // ✅ ALWAYS close ALL groups first
+                                //  ALWAYS close ALL groups first
                                 PersistentDrawerState.setServicesExpanded(
                                   false,
                                 );
@@ -736,7 +737,7 @@ class AdminConstant {
                                 PersistentDrawerState.isUserManagementExpanded,
                             onExpansionChanged: (expanded) {
                               setDrawerState(() {
-                                // ✅ ALWAYS close ALL groups first
+                                //  ALWAYS close ALL groups first
                                 PersistentDrawerState.setServicesExpanded(
                                   false,
                                 );
@@ -904,7 +905,7 @@ class AdminConstant {
                                 PersistentDrawerState.isLogsExpanded,
                             onExpansionChanged: (expanded) {
                               setDrawerState(() {
-                                // ✅ ALWAYS close ALL groups first
+                                //  ALWAYS close ALL groups first
                                 PersistentDrawerState.setServicesExpanded(
                                   false,
                                 );
@@ -1038,11 +1039,14 @@ class AdminConstant {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, border: null),
             child: Center(
-              child: Image.asset(
-                'lib/images/oasp.png',
-                width: 28,
-                height: 28,
-                fit: BoxFit.contain,
+              child: Transform.scale(
+                scale: 2.2,
+                child: Image.asset(
+                  'lib/images/oasp.png',
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
@@ -1100,7 +1104,7 @@ class AdminConstant {
                     isExpanded: isExpanded,
                   ),
 
-                  // ✅ USER MANAGEMENT AS A GROUP (groupIndex: -3)
+                  //  USER MANAGEMENT AS A GROUP (groupIndex: -3)
                   _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.person_outline,
@@ -1143,7 +1147,7 @@ class AdminConstant {
                     ],
                   ),
 
-                  // ✅ SERVICES GROUP (groupIndex: -1)
+                  //  SERVICES GROUP (groupIndex: -1)
                   _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.miscellaneous_services_outlined,
@@ -1186,7 +1190,7 @@ class AdminConstant {
                     ],
                   ),
 
-                  // ✅ LOGS GROUP (groupIndex: -2)
+                  //  LOGS GROUP (groupIndex: -2)
                   _buildPersistentDrawerGroup(
                     context: context,
                     icon: Icons.list_alt_outlined,
@@ -1237,7 +1241,7 @@ class AdminConstant {
     required bool isExpanded,
     required List<Widget> children,
   }) {
-    // ✅ Handle all 3 groups with correct index ranges
+    //  Handle all 3 groups with correct index ranges
     final bool isGroupSelected =
         groupIndex == -3
             ? (selectedIndex == 6 ||
@@ -1326,7 +1330,7 @@ class AdminConstant {
                       initiallyExpanded: isGroupExpanded,
                       onExpansionChanged: (expanded) {
                         if (expanded) {
-                          // ✅ Close ALL OTHER groups
+                          //  Close ALL OTHER groups
                           if (groupIndex != -3)
                             PersistentDrawerState.setUserManagementExpanded(
                               false,

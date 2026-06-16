@@ -216,7 +216,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
         }
       }
     } catch (e) {
-      print('❌ Error sending response: $e');
+      print(' Error sending response: $e');
       if (mounted) {
         SnackbarUtil.showError(
           context,
@@ -598,14 +598,14 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                               const SizedBox(height: 24),
                               _buildSection(
                                 title:
-                                    'Response', // ✅ Changed from 'Staff Response' to 'Response'
+                                    'Response', //  Changed from 'Staff Response' to 'Response'
                                 icon: Icons.admin_panel_settings,
                                 iconColor: const Color(0xFF2E7D32),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     MarkdownBody(
-                                      // ✅ Add markdown rendering for staff response
+                                      //  Add markdown rendering for staff response
                                       data: data['staffResponse'],
                                       styleSheet: MarkdownStyleSheet(
                                         p: const TextStyle(

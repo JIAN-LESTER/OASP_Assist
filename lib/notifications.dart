@@ -395,7 +395,7 @@ class _NotificationModalState extends State<NotificationModal>
       });
     });
     print(
-      '📱 NotificationModal opened for role: ${widget.role}, userId: $currentUserId',
+      ' NotificationModal opened for role: ${widget.role}, userId: $currentUserId',
     );
   }
 
@@ -421,9 +421,9 @@ class _NotificationModalState extends State<NotificationModal>
       await _firestore.collection('notifications').doc(notificationId).update({
         'readBy': FieldValue.arrayUnion([currentUserId]),
       });
-      print('✅ Marked notification as read: $notificationId');
+      print(' Marked notification as read: $notificationId');
     } catch (e) {
-      print('❌ Error marking notification as read: $e');
+      print(' Error marking notification as read: $e');
     }
   }
 
@@ -446,7 +446,7 @@ class _NotificationModalState extends State<NotificationModal>
 
       // Delete the notification
       await _firestore.collection('notifications').doc(notificationId).delete();
-      print('✅ Deleted notification: $notificationId');
+      print(' Deleted notification: $notificationId');
 
       // Store for undo
       _lastDeletedNotification = notificationData;
@@ -456,7 +456,7 @@ class _NotificationModalState extends State<NotificationModal>
         _showUndoSnackbar('Notification deleted', _undoDelete);
       }
     } catch (e) {
-      print('❌ Error deleting notification: $e');
+      print(' Error deleting notification: $e');
       if (mounted) {
         _showErrorSnackbar('Failed to delete notification');
       }
@@ -480,7 +480,7 @@ class _NotificationModalState extends State<NotificationModal>
           .doc(notificationId)
           .set(notificationData);
 
-      print('✅ Restored notification: $notificationId');
+      print(' Restored notification: $notificationId');
 
       _lastDeletedNotification = null;
 
@@ -488,7 +488,7 @@ class _NotificationModalState extends State<NotificationModal>
         _showSuccessSnackbar('Notification restored');
       }
     } catch (e) {
-      print('❌ Error restoring notification: $e');
+      print(' Error restoring notification: $e');
       if (mounted) {
         _showErrorSnackbar('Failed to restore notification');
       }
@@ -517,7 +517,7 @@ class _NotificationModalState extends State<NotificationModal>
 
       await batch.commit();
 
-      print('✅ Restored ${_lastClearedNotifications!.length} notifications');
+      print(' Restored ${_lastClearedNotifications!.length} notifications');
 
       final count = _lastClearedNotifications!.length;
       _lastClearedNotifications = null;
@@ -526,7 +526,7 @@ class _NotificationModalState extends State<NotificationModal>
         _showSuccessSnackbar('$count notifications restored');
       }
     } catch (e) {
-      print('❌ Error restoring notifications: $e');
+      print(' Error restoring notifications: $e');
       if (mounted) {
         _showErrorSnackbar('Failed to restore notifications');
       }
@@ -547,7 +547,7 @@ class _NotificationModalState extends State<NotificationModal>
             'readBy': FieldValue.arrayRemove([currentUserId]),
           },
         );
-        print('✅ Marked notification as unread: $notificationId');
+        print(' Marked notification as unread: $notificationId');
       } else {
         // Mark as read - add to readBy array
         await _firestore.collection('notifications').doc(notificationId).update(
@@ -555,10 +555,10 @@ class _NotificationModalState extends State<NotificationModal>
             'readBy': FieldValue.arrayUnion([currentUserId]),
           },
         );
-        print('✅ Marked notification as read: $notificationId');
+        print(' Marked notification as read: $notificationId');
       }
     } catch (e) {
-      print('❌ Error toggling read status: $e');
+      print(' Error toggling read status: $e');
       if (mounted) {
         _showErrorSnackbar('Failed to update notification');
       }
@@ -834,7 +834,7 @@ class _NotificationModalState extends State<NotificationModal>
         _showSuccessSnackbar('All notifications marked as read');
       }
     } catch (e) {
-      print('❌ Error marking all as read: $e');
+      print(' Error marking all as read: $e');
     }
   }
 
@@ -992,85 +992,88 @@ class _NotificationModalState extends State<NotificationModal>
     return readBy?.contains(currentUserId) ?? false;
   }
 
-Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
-  final type = data['type'] as String?;
-  final escalationId =
-      data['escalationId'] as String? ??
-      data['data']?['escalationId'] as String?;
-  final conversationId =
-      data['conversationId'] as String? ??
-      data['data']?['conversationId'] as String?;
-  final announcementId =
-      data['announcementId'] as String? ??
-      data['data']?['announcementId'] as String?;
+  Future<void> _handleNotificationTap(Map<String, dynamic> data) async {
+    final type = data['type'] as String?;
+    final escalationId =
+        data['escalationId'] as String? ??
+        data['data']?['escalationId'] as String?;
+    final conversationId =
+        data['conversationId'] as String? ??
+        data['data']?['conversationId'] as String?;
+    final announcementId =
+        data['announcementId'] as String? ??
+        data['data']?['announcementId'] as String?;
 
-  if (type == null) return;
+    if (type == null) return;
 
-  // Mark notification as read
-  final notificationId = data['notificationId'];
-  if (notificationId != null) {
-    await _markAsRead(notificationId);
+    // Mark notification as read
+    final notificationId = data['notificationId'];
+    if (notificationId != null) {
+      await _markAsRead(notificationId);
+    }
+
+    switch (type) {
+      case 'escalation_reply':
+        if (widget.role == 'user') {
+          if (escalationId == null || escalationId.isEmpty) {
+            _showError('Cannot open escalation: Missing escalation ID');
+            return;
+          }
+          await _showEscalationResponseInline(escalationId, conversationId);
+        }
+        break;
+
+      case 'new_escalation':
+        if (widget.role == 'staff' || widget.role == 'admin') {
+          if (escalationId == null || escalationId.isEmpty) {
+            _showError('Cannot open escalation: Missing escalation ID');
+            return;
+          }
+          await _showEscalationDetailInline(escalationId, conversationId);
+        }
+        break;
+
+      case 'announcement':
+      case 'deadline_reminder':
+        _navigateToAnnouncements(announcementId);
+        break;
+
+      //   Handle Facebook token expiration
+      case 'fb_token_expiration':
+        _handleFacebookTokenExpiration(data);
+        break;
+
+      default:
+        print(' Unhandled notification type: $type');
+    }
   }
 
-  switch (type) {
-    case 'escalation_reply':
-      if (widget.role == 'user') {
-        if (escalationId == null || escalationId.isEmpty) {
-          _showError('Cannot open escalation: Missing escalation ID');
-          return;
-        }
-        await _showEscalationResponseInline(escalationId, conversationId);
-      }
-      break;
+  void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
+    final status =
+        data['status'] as String? ?? data['data']?['status'] as String?;
+    final daysLeft =
+        int.tryParse(
+          (data['daysLeft'] ?? data['data']?['daysLeft'] ?? '0').toString(),
+        ) ??
+        0;
 
-    case 'new_escalation':
-      if (widget.role == 'staff' || widget.role == 'admin') {
-        if (escalationId == null || escalationId.isEmpty) {
-          _showError('Cannot open escalation: Missing escalation ID');
-          return;
-        }
-        await _showEscalationDetailInline(escalationId, conversationId);
-      }
-      break;
+    print(' Facebook token notification tapped');
+    print('   Status: $status');
+    print('   Days left: $daysLeft');
 
-    case 'announcement':
-    case 'deadline_reminder':
-      _navigateToAnnouncements(announcementId);
-      break;
+    // Close notification modal
+    Navigator.of(context).pop();
 
-    // ✅ NEW: Handle Facebook token expiration
-    case 'fb_token_expiration':
-      _handleFacebookTokenExpiration(data);
-      break;
+    // Navigate to announcements page where the banner will be visible
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
 
-    default:
-      print('⚠️ Unhandled notification type: $type');
+      Navigator.of(context).pushReplacementNamed(
+        '/admin/home',
+        arguments: {'initialTab': 4}, // Announcements tab
+      );
+    });
   }
-}
-
-void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
-  final status = data['status'] as String? ?? data['data']?['status'] as String?;
-  final daysLeft = int.tryParse(
-    (data['daysLeft'] ?? data['data']?['daysLeft'] ?? '0').toString()
-  ) ?? 0;
-  
-  print('⚠️ Facebook token notification tapped');
-  print('   Status: $status');
-  print('   Days left: $daysLeft');
-  
-  // Close notification modal
-  Navigator.of(context).pop();
-  
-  // Navigate to announcements page where the banner will be visible
-  Future.delayed(const Duration(milliseconds: 200), () {
-    if (!mounted) return;
-    
-    Navigator.of(context).pushReplacementNamed(
-      '/admin/home',
-      arguments: {'initialTab': 4}, // Announcements tab
-    );
-  });
-}
 
   void _navigateToAnnouncements(String? announcementId) {
     Future.delayed(const Duration(milliseconds: 200), () {
@@ -1225,147 +1228,335 @@ void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
   }
 
   Widget _buildUserEscalationResponse() {
-  final escalation = _viewingEscalationData!;
-  final staffResponse = escalation['staffResponse'] ?? 'No response yet';
-  final respondedBy = escalation['respondedBy'] ?? 'Staff';
-  final respondedAt = escalation['respondedAt'] as Timestamp?;
-  final userQuestion = escalation['question'] ?? 'No question available';
-  final conversationId =
-      _viewingConversationId ?? escalation['conversationId'] as String?;
+    final escalation = _viewingEscalationData!;
+    final staffResponse = escalation['staffResponse'] ?? 'No response yet';
+    final respondedBy = escalation['respondedBy'] ?? 'Staff';
+    final respondedAt = escalation['respondedAt'] as Timestamp?;
+    final userQuestion = escalation['question'] ?? 'No question available';
+    final conversationId =
+        _viewingConversationId ?? escalation['conversationId'] as String?;
 
-  return Container(
-    height: MediaQuery.of(context).size.height * 0.8,
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _backToNotificationList,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  "Staff Response",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-        ),
-
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+            ),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Your Question',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        userQuestion,
-                        style: const TextStyle(fontSize: 15, height: 1.4),
-                      ),
-                    ],
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _backToNotificationList,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2E7D32).withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color(0xFF2E7D32).withOpacity(0.2),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Staff Response",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Response from $respondedBy',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ),
-                          const Spacer(),
-                          if (respondedAt != null)
-                            Text(
-                              formatTime(respondedAt),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Use MarkdownBody for rendering markdown
-                      MarkdownBody(
-                        data: staffResponse,
-                        styleSheet: MarkdownStyleSheet(
-                          p: const TextStyle(fontSize: 15, height: 1.4),
-                          strong: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1B5E20),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
           ),
-        ),
 
-        if (conversationId != null &&
-            conversationId.isNotEmpty &&
-            conversationId != 'null')
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your Question',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          userQuestion,
+                          style: const TextStyle(fontSize: 15, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32).withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF2E7D32).withOpacity(0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Response from $respondedBy',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (respondedAt != null)
+                              Text(
+                                formatTime(respondedAt),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Use MarkdownBody for rendering markdown
+                        MarkdownBody(
+                          data: staffResponse,
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(fontSize: 15, height: 1.4),
+                            strong: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (conversationId != null &&
+              conversationId.isNotEmpty &&
+              conversationId != 'null')
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              ),
+              child: SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      print(' Continue in Chat pressed');
+                      print('   - conversationId: $conversationId');
+
+                      if (conversationId == null ||
+                          conversationId.isEmpty ||
+                          conversationId == 'null') {
+                        _showErrorSnackbar('No conversation available');
+                        return;
+                      }
+
+                      await Future.delayed(const Duration(milliseconds: 200));
+
+                      if (!mounted) return;
+
+                      Navigator.of(context).pushReplacementNamed(
+                        '/home',
+                        arguments: {
+                          'initialTab': 1,
+                          'conversationId': conversationId,
+                          'loadExisting': true,
+                        },
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Continue in Chat',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaffEscalationDetail() {
+    final escalation = _viewingEscalationData!;
+    final question = escalation['question'] ?? 'No question';
+    final botAnswer = escalation['botAnswer'] ?? 'No bot answer';
+    final reason = escalation['reason'] ?? 'No reason provided';
+    final status = escalation['status'] ?? 'pending';
+    final createdAt = escalation['createdAt'] as Timestamp?;
+    final staffResponse = escalation['staffResponse'];
+    final conversationId =
+        _viewingConversationId ?? escalation['conversationId'] as String?;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _backToNotificationList,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Escalation Detail",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: getNotificationColor(status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: getNotificationColor(status).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: getNotificationColor(status),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoCard(
+                    title: 'User Question',
+                    content: question,
+                    icon: Icons.help_rounded,
+                    color: Colors.blue,
+                    useMarkdown: false,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoCard(
+                    title: 'Bot Response',
+                    content: botAnswer,
+                    icon: Icons.smart_toy_rounded,
+                    color: Colors.purple,
+                    useMarkdown: true,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoCard(
+                    title: 'Escalation Reason',
+                    content: reason,
+                    icon: Icons.report_problem_rounded,
+                    color: Colors.orange,
+                    useMarkdown: false,
+                  ),
+                  if (createdAt != null) ...[
+                    const SizedBox(height: 12),
+                    _buildInfoCard(
+                      title: 'Created',
+                      content: formatTime(createdAt),
+                      icon: Icons.access_time_rounded,
+                      color: Colors.grey,
+                      useMarkdown: false,
+                    ),
+                  ],
+                  if (staffResponse != null) ...[
+                    const SizedBox(height: 12),
+                    _buildInfoCard(
+                      title: 'Your Response',
+                      content: staffResponse,
+                      icon: Icons.support_agent_rounded,
+                      color: const Color(0xFF2E7D32),
+                      useMarkdown: true,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -1377,13 +1568,14 @@ void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () async {
-                    print('🔄 Continue in Chat pressed');
+                    final escalationId = _viewingEscalationId;
+
+                    print(' Respond to Escalation pressed');
+                    print('   - escalationId: $escalationId');
                     print('   - conversationId: $conversationId');
 
-                    if (conversationId == null ||
-                        conversationId.isEmpty ||
-                        conversationId == 'null') {
-                      _showErrorSnackbar('No conversation available');
+                    if (escalationId == null || escalationId.isEmpty) {
+                      _showErrorSnackbar('Error: No escalation ID');
                       return;
                     }
 
@@ -1391,12 +1583,19 @@ void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
 
                     if (!mounted) return;
 
+                    final route =
+                        widget.role == 'admin' ? '/admin/home' : '/staff/home';
+                    final tabIndex = widget.role == 'admin' ? 5 : 2;
+
+                    print(' Navigating to: $route (tab $tabIndex)');
+
                     Navigator.of(context).pushReplacementNamed(
-                      '/home',
+                      route,
                       arguments: {
-                        'initialTab': 1,
+                        'initialTab': tabIndex,
+                        'escalationId': escalationId,
                         'conversationId': conversationId,
-                        'loadExisting': true,
+                        'autoOpen': true,
                       },
                     );
                   },
@@ -1409,9 +1608,11 @@ void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Continue in Chat',
-                    style: TextStyle(
+                  child: Text(
+                    status == 'resolved'
+                        ? 'View Full Details'
+                        : 'Respond to Escalation',
+                    style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
@@ -1420,243 +1621,45 @@ void _handleFacebookTokenExpiration(Map<String, dynamic> data) {
               ),
             ),
           ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
-  Widget _buildStaffEscalationDetail() {
-  final escalation = _viewingEscalationData!;
-  final question = escalation['question'] ?? 'No question';
-  final botAnswer = escalation['botAnswer'] ?? 'No bot answer';
-  final reason = escalation['reason'] ?? 'No reason provided';
-  final status = escalation['status'] ?? 'pending';
-  final createdAt = escalation['createdAt'] as Timestamp?;
-  final staffResponse = escalation['staffResponse'];
-  final conversationId =
-      _viewingConversationId ?? escalation['conversationId'] as String?;
-
-  return Container(
-    height: MediaQuery.of(context).size.height * 0.8,
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-          ),
-          child: Row(
+  Widget _buildInfoCard({
+    required String title,
+    required String content,
+    required IconData icon,
+    required Color color,
+    bool useMarkdown = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _backToNotificationList,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  "Escalation Detail",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: getNotificationColor(status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: getNotificationColor(status).withOpacity(0.3),
-                  ),
-                ),
-                child: Text(
-                  status.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: getNotificationColor(status),
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
               ),
             ],
           ),
-        ),
-
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoCard(
-                  title: 'User Question',
-                  content: question,
-                  icon: Icons.help_rounded,
-                  color: Colors.blue,
-                  useMarkdown: false,
-                ),
-                const SizedBox(height: 12),
-                _buildInfoCard(
-                  title: 'Bot Response',
-                  content: botAnswer,
-                  icon: Icons.smart_toy_rounded,
-                  color: Colors.purple,
-                  useMarkdown: true,
-                ),
-                const SizedBox(height: 12),
-                _buildInfoCard(
-                  title: 'Escalation Reason',
-                  content: reason,
-                  icon: Icons.report_problem_rounded,
-                  color: Colors.orange,
-                  useMarkdown: false,
-                ),
-                if (createdAt != null) ...[
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    title: 'Created',
-                    content: formatTime(createdAt),
-                    icon: Icons.access_time_rounded,
-                    color: Colors.grey,
-                    useMarkdown: false,
-                  ),
-                ],
-                if (staffResponse != null) ...[
-                  const SizedBox(height: 12),
-                  _buildInfoCard(
-                    title: 'Your Response',
-                    content: staffResponse,
-                    icon: Icons.support_agent_rounded,
-                    color: const Color(0xFF2E7D32),
-                    useMarkdown: true,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Colors.grey[200]!)),
-          ),
-          child: SafeArea(
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () async {
-                  final escalationId = _viewingEscalationId;
-
-                  print('🔧 Respond to Escalation pressed');
-                  print('   - escalationId: $escalationId');
-                  print('   - conversationId: $conversationId');
-
-                  if (escalationId == null || escalationId.isEmpty) {
-                    _showErrorSnackbar('Error: No escalation ID');
-                    return;
-                  }
-
-                  await Future.delayed(const Duration(milliseconds: 200));
-
-                  if (!mounted) return;
-
-                  final route =
-                      widget.role == 'admin' ? '/admin/home' : '/staff/home';
-                  final tabIndex = widget.role == 'admin' ? 5 : 2;
-
-                  print('📍 Navigating to: $route (tab $tabIndex)');
-
-                  Navigator.of(context).pushReplacementNamed(
-                    route,
-                    arguments: {
-                      'initialTab': tabIndex,
-                      'escalationId': escalationId,
-                      'conversationId': conversationId,
-                      'autoOpen': true,
-                    },
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E7D32),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  status == 'resolved'
-                      ? 'View Full Details'
-                      : 'Respond to Escalation',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildInfoCard({
-  required String title,
-  required String content,
-  required IconData icon,
-  required Color color,
-  bool useMarkdown = false,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.05),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: color.withOpacity(0.2)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        useMarkdown
-            ? MarkdownBody(
+          const SizedBox(height: 8),
+          useMarkdown
+              ? MarkdownBody(
                 data: content,
                 styleSheet: MarkdownStyleSheet(
                   p: const TextStyle(fontSize: 14, height: 1.4),
@@ -1681,15 +1684,14 @@ Widget _buildInfoCard({
                   listBullet: const TextStyle(fontSize: 14),
                 ),
               )
-            : Text(
+              : Text(
                 content,
                 style: const TextStyle(fontSize: 14, height: 1.4),
               ),
-      ],
-    ),
-  );
-}
-
+        ],
+      ),
+    );
+  }
 
   void _showError(String message) {
     if (!mounted) return;
@@ -2153,170 +2155,172 @@ Widget _buildInfoCard({
     }
 
     return ListView.separated(
-    padding: const EdgeInsets.all(16),
-    itemCount: notifications.length,
-    separatorBuilder: (context, index) => const SizedBox(height: 8),
-    itemBuilder: (context, index) {
-      final doc = notifications[index];
-      final data = doc.data() as Map<String, dynamic>;
-      final isRead = _isRead(data);
-      final notificationType = data['type'] as String?;
+      padding: const EdgeInsets.all(16),
+      itemCount: notifications.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final doc = notifications[index];
+        final data = doc.data() as Map<String, dynamic>;
+        final isRead = _isRead(data);
+        final notificationType = data['type'] as String?;
 
-      // ✅ NEW: Special styling for FB token notifications
-      final isFbTokenNotification = notificationType == 'fb_token_expiration';
-      final isExpired = data['status'] == 'expired' || 
-                        (data['data']?['status'] == 'expired');
+        //   Special styling for FB token notifications
+        final isFbTokenNotification = notificationType == 'fb_token_expiration';
+        final isExpired =
+            data['status'] == 'expired' ||
+            (data['data']?['status'] == 'expired');
 
-      return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (!isRead) {
-              _markAsRead(doc.id);
-            }
-            _handleNotificationTap(data);
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              // ✅ Special background for FB token notifications
-              color: isFbTokenNotification
-                  ? (isExpired 
-                      ? const Color(0xFFDC2626).withOpacity(0.05)
-                      : const Color(0xFFF59E0B).withOpacity(0.05))
-                  : (isRead ? Colors.grey[50] : Colors.white),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                // ✅ Special border for FB token notifications
-                color: isFbTokenNotification
-                    ? (isExpired
-                        ? const Color(0xFFDC2626).withOpacity(0.3)
-                        : const Color(0xFFF59E0B).withOpacity(0.3))
-                    : (isRead ? Colors.grey[200]! : Colors.grey[300]!),
-                width: isFbTokenNotification ? 2 : 1,
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (!isRead) {
+                _markAsRead(doc.id);
+              }
+              _handleNotificationTap(data);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                //  Special background for FB token notifications
+                color:
+                    isFbTokenNotification
+                        ? (isExpired
+                            ? const Color(0xFFDC2626).withOpacity(0.05)
+                            : const Color(0xFFF59E0B).withOpacity(0.05))
+                        : (isRead ? Colors.grey[50] : Colors.white),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  //  Special border for FB token notifications
+                  color:
+                      isFbTokenNotification
+                          ? (isExpired
+                              ? const Color(0xFFDC2626).withOpacity(0.3)
+                              : const Color(0xFFF59E0B).withOpacity(0.3))
+                          : (isRead ? Colors.grey[200]! : Colors.grey[300]!),
+                  width: isFbTokenNotification ? 2 : 1,
+                ),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile Picture Placeholder
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: getNotificationColor(
-                      notificationType,
-                    ).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    getNotificationIcon(notificationType),
-                    color: getNotificationColor(notificationType),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              data['title'] ?? 'No title',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight:
-                                    isRead
-                                        ? FontWeight.w500
-                                        : FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (data['body'] != null &&
-                          data['body'].isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          data['body'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[700],
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      Text(
-                        formatTime(data['createdAt'] as Timestamp?),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Three-dot menu button
-                Builder(
-                  builder: (context) {
-                    return IconButton(
-                      icon: Icon(
-                        Icons.more_vert,
-                        color: Colors.grey[600],
-                        size: 20,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        final RenderBox renderBox =
-                            context.findRenderObject() as RenderBox;
-                        final buttonPosition = renderBox.localToGlobal(
-                          Offset.zero,
-                        );
-                        final buttonSize = renderBox.size;
-
-                        _showNotificationMenu(
-                          context,
-                          doc.id,
-                          isRead,
-                          buttonPosition,
-                          buttonSize,
-                        );
-                      },
-                    );
-                  },
-                ),
-
-                // Unread Indicator
-                if (!isRead)
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile Picture Placeholder
                   Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(left: 4, right: 4),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF2E7D32),
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: getNotificationColor(
+                        notificationType,
+                      ).withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
+                    child: Icon(
+                      getNotificationIcon(notificationType),
+                      color: getNotificationColor(notificationType),
+                      size: 20,
+                    ),
                   ),
-              ],
+                  const SizedBox(width: 12),
+
+                  // Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                data['title'] ?? 'No title',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight:
+                                      isRead
+                                          ? FontWeight.w500
+                                          : FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (data['body'] != null &&
+                            data['body'].isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            data['body'],
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[700],
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Text(
+                          formatTime(data['createdAt'] as Timestamp?),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Three-dot menu button
+                  Builder(
+                    builder: (context) {
+                      return IconButton(
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          final RenderBox renderBox =
+                              context.findRenderObject() as RenderBox;
+                          final buttonPosition = renderBox.localToGlobal(
+                            Offset.zero,
+                          );
+                          final buttonSize = renderBox.size;
+
+                          _showNotificationMenu(
+                            context,
+                            doc.id,
+                            isRead,
+                            buttonPosition,
+                            buttonSize,
+                          );
+                        },
+                      );
+                    },
+                  ),
+
+                  // Unread Indicator
+                  if (!isRead)
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsets.only(left: 4, right: 4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
-
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

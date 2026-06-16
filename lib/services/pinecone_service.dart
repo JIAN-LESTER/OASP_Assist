@@ -9,36 +9,36 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class PineconeCloudService {
   final FirebaseFunctions functions;
   final bool _isDesktop;
-  
+
   // Desktop-only fields
   late final String _baseUrl;
   late final String _apiKey;
 
-  PineconeCloudService() 
+  PineconeCloudService()
     : functions = FirebaseFunctions.instance,
       _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
       // Load from environment variables for desktop
       _baseUrl = dotenv.env['PINECONE_HOST'] ?? '';
       _apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
-      
+
       if (_baseUrl.isEmpty || _apiKey.isEmpty) {
         throw Exception('Pinecone credentials not found in .env file');
       }
-      
+
       if (kDebugMode) {
         print('🖥️ Using desktop Pinecone implementation');
       }
     } else {
       if (kDebugMode) {
-        print('📱 Using Cloud Functions Pinecone implementation');
+        print(' Using Cloud Functions Pinecone implementation');
       }
     }
   }
 
   static bool _checkIfDesktop() {
     if (kIsWeb) return false;
-    
+
     try {
       return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     } catch (e) {
@@ -56,7 +56,7 @@ class PineconeCloudService {
   // =========================================================================
   // Health Check
   // =========================================================================
-  
+
   Future<bool> isHealthy() async {
     if (_isDesktop) {
       return _isHealthyDesktop();
@@ -75,16 +75,16 @@ class PineconeCloudService {
           .timeout(const Duration(seconds: 10));
 
       final isHealthy = response.statusCode == 200;
-      print(isHealthy ? '✅ Pinecone is healthy' : '❌ Pinecone is not healthy');
+      print(isHealthy ? ' Pinecone is healthy' : ' Pinecone is not healthy');
 
       if (isHealthy) {
         final data = jsonDecode(response.body);
-        print('📊 Index stats: ${data['totalVectorCount']} vectors');
+        print(' Index stats: ${data['totalVectorCount']} vectors');
       }
 
       return isHealthy;
     } catch (e) {
-      print('❌ Pinecone health check failed: $e');
+      print(' Pinecone health check failed: $e');
       return false;
     }
   }
@@ -94,7 +94,7 @@ class PineconeCloudService {
       print('🏥 Checking Pinecone health (Cloud Function)...');
 
       final callable = functions.httpsCallable('checkPineconeHealth');
-      
+
       final result = await callable.call().timeout(
         const Duration(seconds: 15),
         onTimeout: () {
@@ -104,11 +104,11 @@ class PineconeCloudService {
       );
 
       final isHealthy = result.data['healthy'] == true;
-      
+
       if (isHealthy) {
-        print('✅ Pinecone is healthy');
+        print(' Pinecone is healthy');
       } else {
-        print('❌ Pinecone is not healthy');
+        print(' Pinecone is not healthy');
         if (result.data['error'] != null) {
           print('   Error: ${result.data['error']}');
         }
@@ -116,7 +116,7 @@ class PineconeCloudService {
 
       return isHealthy;
     } catch (e) {
-      print('❌ Pinecone health check failed: $e');
+      print(' Pinecone health check failed: $e');
       return false;
     }
   }
@@ -166,7 +166,7 @@ class PineconeCloudService {
     };
 
     try {
-      print('🔍 Querying Pinecone with ${embedding.length} dimensions...');
+      print(' Querying Pinecone with ${embedding.length} dimensions...');
 
       final response = await _client
           .post(url, headers: _headers, body: jsonEncode(payload))
@@ -177,22 +177,22 @@ class PineconeCloudService {
             },
           );
 
-      print('📡 Response status: ${response.statusCode}');
+      print(' Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
         if (data['matches'] == null) {
-          print('⚠️ No results found in response');
+          print(' No results found in response');
           return [];
         }
 
         final matches = data['matches'] as List;
-        print('✅ Found ${matches.length} similar documents');
+        print(' Found ${matches.length} similar documents');
 
         return matches.map<Map<String, dynamic>>((match) {
           final result = Map<String, dynamic>.from(match);
-          
+
           if (result['metadata'] != null) {
             final metadata = result['metadata'] as Map<String, dynamic>;
             result.addAll(metadata);
@@ -204,12 +204,12 @@ class PineconeCloudService {
           return result;
         }).toList();
       } else {
-        print('❌ Pinecone query error: ${response.statusCode}');
+        print(' Pinecone query error: ${response.statusCode}');
         print('Response body: ${response.body}');
         return [];
       }
     } catch (e) {
-      print('❌ Error querying Pinecone: $e');
+      print(' Error querying Pinecone: $e');
       return [];
     }
   }
@@ -221,34 +221,36 @@ class PineconeCloudService {
     Map<String, dynamic>? filter,
   }) async {
     try {
-      print('🔍 Querying Pinecone with ${embedding.length} dimensions...');
+      print(' Querying Pinecone with ${embedding.length} dimensions...');
 
       final callable = functions.httpsCallable('queryPinecone');
-      final result = await callable.call({
-        'embedding': embedding,
-        'topK': topK,
-        if (namespace != null) 'namespace': namespace,
-        if (filter != null) 'filter': filter,
-      }).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Query timed out');
-        },
-      );
+      final result = await callable
+          .call({
+            'embedding': embedding,
+            'topK': topK,
+            if (namespace != null) 'namespace': namespace,
+            if (filter != null) 'filter': filter,
+          })
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Query timed out');
+            },
+          );
 
       if (result.data['success'] == false) {
-        print('⚠️ No results found');
+        print(' No results found');
         return [];
       }
 
       final matches = result.data['matches'] as List;
-      print('✅ Found ${matches.length} similar documents');
+      print(' Found ${matches.length} similar documents');
 
       return matches.map<Map<String, dynamic>>((match) {
         return Map<String, dynamic>.from(match);
       }).toList();
     } catch (e) {
-      print('❌ Error querying Pinecone: $e');
+      print(' Error querying Pinecone: $e');
       return [];
     }
   }
@@ -314,17 +316,13 @@ class PineconeCloudService {
 
     final payload = {
       'vectors': [
-        {
-          'id': id,
-          'values': embedding,
-          'metadata': vectorMetadata,
-        }
+        {'id': id, 'values': embedding, 'metadata': vectorMetadata},
       ],
       if (namespace != null) 'namespace': namespace,
     };
 
     try {
-      print('📤 Inserting document: $title (ID: $id)');
+      print(' Inserting document: $title (ID: $id)');
 
       final response = await _client
           .post(url, headers: _headers, body: jsonEncode(payload))
@@ -333,14 +331,18 @@ class PineconeCloudService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         final upsertedCount = responseData['upsertedCount'] ?? 0;
-        print("✅ Document inserted into Pinecone with ID: $id (upserted: $upsertedCount)");
+        print(
+          " Document inserted into Pinecone with ID: $id (upserted: $upsertedCount)",
+        );
       } else {
-        print("❌ Pinecone insert failed: ${response.statusCode}");
+        print(" Pinecone insert failed: ${response.statusCode}");
         print("Response body: ${response.body}");
-        throw Exception('Failed to insert document into Pinecone: ${response.statusCode}');
+        throw Exception(
+          'Failed to insert document into Pinecone: ${response.statusCode}',
+        );
       }
     } catch (e) {
-      print('❌ Error inserting document into Pinecone: $e');
+      print(' Error inserting document into Pinecone: $e');
       rethrow;
     }
   }
@@ -356,30 +358,32 @@ class PineconeCloudService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('📤 Inserting document: $title (ID: $id)');
+      print(' Inserting document: $title (ID: $id)');
 
       final callable = functions.httpsCallable('insertPineconeDocument');
-      await callable.call({
-        'id': id,
-        'embedding': embedding,
-        'metadata': {
-          'title': title,
-          'content': content,
-          'source': source,
-          if (category != null) 'category': category,
-          if (metadata != null) ...metadata,
-        },
-        if (namespace != null) 'namespace': namespace,
-      }).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Insert timed out');
-        },
-      );
+      await callable
+          .call({
+            'id': id,
+            'embedding': embedding,
+            'metadata': {
+              'title': title,
+              'content': content,
+              'source': source,
+              if (category != null) 'category': category,
+              if (metadata != null) ...metadata,
+            },
+            if (namespace != null) 'namespace': namespace,
+          })
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Insert timed out');
+            },
+          );
 
-      print("✅ Document inserted into Pinecone with ID: $id");
+      print(" Document inserted into Pinecone with ID: $id");
     } catch (e) {
-      print('❌ Error inserting document: $e');
+      print(' Error inserting document: $e');
       rethrow;
     }
   }
@@ -410,7 +414,7 @@ class PineconeCloudService {
     String? namespace,
   }) async {
     const int batchSize = 100;
-    
+
     for (int i = 0; i < documents.length; i += batchSize) {
       final batch = documents.skip(i).take(batchSize).toList();
       await _insertBatchDesktop(batch, namespace);
@@ -423,11 +427,16 @@ class PineconeCloudService {
   ) async {
     final url = Uri.parse('$_baseUrl/vectors/upsert');
 
-    final vectors = batch.map((doc) => {
-      'id': doc['id'],
-      'values': doc['embedding'],
-      'metadata': doc['metadata'],
-    }).toList();
+    final vectors =
+        batch
+            .map(
+              (doc) => {
+                'id': doc['id'],
+                'values': doc['embedding'],
+                'metadata': doc['metadata'],
+              },
+            )
+            .toList();
 
     final payload = {
       'vectors': vectors,
@@ -435,7 +444,7 @@ class PineconeCloudService {
     };
 
     try {
-      print('📤 Inserting batch of ${batch.length} documents');
+      print(' Inserting batch of ${batch.length} documents');
 
       final response = await _client
           .post(url, headers: _headers, body: jsonEncode(payload))
@@ -444,14 +453,16 @@ class PineconeCloudService {
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         final upsertedCount = responseData['upsertedCount'] ?? 0;
-        print("✅ Batch inserted into Pinecone: $upsertedCount documents");
+        print(" Batch inserted into Pinecone: $upsertedCount documents");
       } else {
-        print("❌ Pinecone batch insert failed: ${response.statusCode}");
+        print(" Pinecone batch insert failed: ${response.statusCode}");
         print("Response body: ${response.body}");
-        throw Exception('Failed to insert batch into Pinecone: ${response.statusCode}');
+        throw Exception(
+          'Failed to insert batch into Pinecone: ${response.statusCode}',
+        );
       }
     } catch (e) {
-      print('❌ Error inserting batch into Pinecone: $e');
+      print(' Error inserting batch into Pinecone: $e');
       rethrow;
     }
   }
@@ -461,29 +472,33 @@ class PineconeCloudService {
     String? namespace,
   }) async {
     try {
-      print('📤 Batch inserting ${documents.length} documents...');
+      print(' Batch inserting ${documents.length} documents...');
 
       const batchSize = 100;
       for (int i = 0; i < documents.length; i += batchSize) {
         final batch = documents.skip(i).take(batchSize).toList();
-        
-        final callable = functions.httpsCallable('insertPineconeDocumentBatch');
-        await callable.call({
-          'documents': batch,
-          if (namespace != null) 'namespace': namespace,
-        }).timeout(
-          const Duration(seconds: 120),
-          onTimeout: () {
-            throw TimeoutException('Batch insert timed out');
-          },
-        );
 
-        print('✅ Inserted batch ${(i / batchSize).floor() + 1}/${(documents.length / batchSize).ceil()}');
+        final callable = functions.httpsCallable('insertPineconeDocumentBatch');
+        await callable
+            .call({
+              'documents': batch,
+              if (namespace != null) 'namespace': namespace,
+            })
+            .timeout(
+              const Duration(seconds: 120),
+              onTimeout: () {
+                throw TimeoutException('Batch insert timed out');
+              },
+            );
+
+        print(
+          ' Inserted batch ${(i / batchSize).floor() + 1}/${(documents.length / batchSize).ceil()}',
+        );
       }
 
-      print("✅ All documents inserted into Pinecone");
+      print(" All documents inserted into Pinecone");
     } catch (e) {
-      print('❌ Error batch inserting documents: $e');
+      print(' Error batch inserting documents: $e');
       rethrow;
     }
   }
@@ -506,26 +521,23 @@ class PineconeCloudService {
   }) async {
     final url = Uri.parse('$_baseUrl/vectors/delete');
 
-    final payload = {
-      'ids': ids,
-      if (namespace != null) 'namespace': namespace,
-    };
+    final payload = {'ids': ids, if (namespace != null) 'namespace': namespace};
 
     try {
-      print('🗑️ Deleting ${ids.length} documents from Pinecone');
+      print(' Deleting ${ids.length} documents from Pinecone');
 
       final response = await _client
           .post(url, headers: _headers, body: jsonEncode(payload))
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        print("✅ ${ids.length} documents deleted from Pinecone");
+        print(" ${ids.length} documents deleted from Pinecone");
       } else {
-        print("❌ Pinecone batch delete failed: ${response.statusCode}");
+        print(" Pinecone batch delete failed: ${response.statusCode}");
         print("Response body: ${response.body}");
       }
     } catch (e) {
-      print('❌ Error deleting documents from Pinecone: $e');
+      print(' Error deleting documents from Pinecone: $e');
       rethrow;
     }
   }
@@ -536,30 +548,29 @@ class PineconeCloudService {
   }) async {
     try {
       if (ids.isEmpty) {
-        print('⚠️ No documents to delete');
+        print(' No documents to delete');
         return;
       }
 
-      print('🗑️ Deleting ${ids.length} documents from Pinecone...');
+      print(' Deleting ${ids.length} documents from Pinecone...');
 
       final callable = functions.httpsCallable('deletePineconeDocuments');
-      final result = await callable.call({
-        'ids': ids,
-        if (namespace != null) 'namespace': namespace,
-      }).timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          throw TimeoutException('Delete timed out');
-        },
-      );
+      final result = await callable
+          .call({'ids': ids, if (namespace != null) 'namespace': namespace})
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () {
+              throw TimeoutException('Delete timed out');
+            },
+          );
 
       if (result.data['success'] == true) {
-        print("✅ ${result.data['deleted']} documents deleted from Pinecone");
+        print(" ${result.data['deleted']} documents deleted from Pinecone");
       } else {
-        print("⚠️ Delete operation completed but status unknown");
+        print(" Delete operation completed but status unknown");
       }
     } catch (e) {
-      print('❌ Error deleting documents: $e');
+      print(' Error deleting documents: $e');
       rethrow;
     }
   }
@@ -576,9 +587,11 @@ class PineconeCloudService {
     }
   }
 
-  Future<Map<String, dynamic>?> _getIndexStatsDesktop({String? namespace}) async {
+  Future<Map<String, dynamic>?> _getIndexStatsDesktop({
+    String? namespace,
+  }) async {
     try {
-      print('📊 Getting Pinecone index statistics...');
+      print(' Getting Pinecone index statistics...');
 
       final url = Uri.parse('$_baseUrl/describe_index_stats');
       final payload = <String, dynamic>{};
@@ -592,40 +605,42 @@ class PineconeCloudService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Retrieved index statistics');
+        print(' Retrieved index statistics');
         return data;
       } else {
-        print("❌ Failed to get index stats: ${response.statusCode}");
+        print(" Failed to get index stats: ${response.statusCode}");
         return null;
       }
     } catch (e) {
-      print('❌ Error getting index stats: $e');
+      print(' Error getting index stats: $e');
       return null;
     }
   }
 
-  Future<Map<String, dynamic>?> _getIndexStatsCloudFunction({String? namespace}) async {
+  Future<Map<String, dynamic>?> _getIndexStatsCloudFunction({
+    String? namespace,
+  }) async {
     try {
-      print('📊 Getting Pinecone index statistics...');
+      print(' Getting Pinecone index statistics...');
 
       final callable = functions.httpsCallable('getPineconeStats');
-      final result = await callable.call({
-        if (namespace != null) 'namespace': namespace,
-      }).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Stats query timed out');
-        },
-      );
+      final result = await callable
+          .call({if (namespace != null) 'namespace': namespace})
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Stats query timed out');
+            },
+          );
 
       if (result.data['success'] == true) {
-        print('✅ Retrieved index statistics');
+        print(' Retrieved index statistics');
         return Map<String, dynamic>.from(result.data['stats']);
       }
 
       return null;
     } catch (e) {
-      print('❌ Error getting index stats: $e');
+      print(' Error getting index stats: $e');
       return null;
     }
   }
@@ -651,13 +666,10 @@ class PineconeCloudService {
   }) async {
     final url = Uri.parse('$_baseUrl/vectors/fetch');
 
-    final payload = {
-      'ids': ids,
-      if (namespace != null) 'namespace': namespace,
-    };
+    final payload = {'ids': ids, if (namespace != null) 'namespace': namespace};
 
     try {
-      print('📋 Fetching ${ids.length} vectors from Pinecone...');
+      print(' Fetching ${ids.length} vectors from Pinecone...');
 
       final response = await _client
           .post(url, headers: _headers, body: jsonEncode(payload))
@@ -665,14 +677,14 @@ class PineconeCloudService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Retrieved ${ids.length} vectors');
+        print(' Retrieved ${ids.length} vectors');
         return data;
       } else {
-        print("❌ Fetch vectors failed: ${response.statusCode}");
+        print(" Fetch vectors failed: ${response.statusCode}");
         return null;
       }
     } catch (e) {
-      print('❌ Error fetching vectors: $e');
+      print(' Error fetching vectors: $e');
       return null;
     }
   }
@@ -682,27 +694,26 @@ class PineconeCloudService {
     String? namespace,
   }) async {
     try {
-      print('📋 Fetching ${ids.length} vectors from Pinecone...');
+      print(' Fetching ${ids.length} vectors from Pinecone...');
 
       final callable = functions.httpsCallable('fetchPineconeVectors');
-      final result = await callable.call({
-        'ids': ids,
-        if (namespace != null) 'namespace': namespace,
-      }).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Fetch timed out');
-        },
-      );
+      final result = await callable
+          .call({'ids': ids, if (namespace != null) 'namespace': namespace})
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Fetch timed out');
+            },
+          );
 
       if (result.data['success'] == true) {
-        print('✅ Retrieved ${ids.length} vectors');
+        print(' Retrieved ${ids.length} vectors');
         return Map<String, dynamic>.from(result.data['vectors']);
       }
 
       return null;
     } catch (e) {
-      print('❌ Error fetching vectors: $e');
+      print(' Error fetching vectors: $e');
       return null;
     }
   }
@@ -715,10 +726,10 @@ class PineconeCloudService {
     final clean = <String, dynamic>{};
     metadata.forEach((key, value) {
       if (value != null &&
-          (value is String || 
-           value is num || 
-           value is bool || 
-           (value is List && value.every((e) => e is String)))) {
+          (value is String ||
+              value is num ||
+              value is bool ||
+              (value is List && value.every((e) => e is String)))) {
         clean[key] = value;
       }
     });
@@ -726,6 +737,6 @@ class PineconeCloudService {
   }
 
   bool get isSupported => true; // Both platforms are now supported
-  
+
   String get unsupportedPlatformMessage => ''; // No longer needed
 }

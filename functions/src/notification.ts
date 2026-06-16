@@ -7,34 +7,34 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-// ✅ Get FCM tokens grouped by userId
+//  Get FCM tokens grouped by userId
 async function getUserFCMTokens(
   userIds: string[]
 ): Promise<Map<string, string[]>> {
   try {
-    console.log(`🔍 Fetching FCM tokens for users: ${userIds.join(", ")}`);
+    console.log(` Fetching FCM tokens for users: ${userIds.join(", ")}`);
 
     const userTokensMap = new Map<string, string[]>();
     const allSeenTokens = new Set<string>();
 
     for (let i = 0; i < userIds.length; i += 10) {
       const batch = userIds.slice(i, i + 10);
-      console.log(`🔍 Fetching token batch: ${batch.join(", ")}`);
+      console.log(` Fetching token batch: ${batch.join(", ")}`);
 
       const tokensSnapshot = await db
         .collection("fcm_tokens")
         .where("userId", "in", batch)
         .get();
 
-      console.log(`📦 Found ${tokensSnapshot.size} token documents for this batch`);
+      console.log(` Found ${tokensSnapshot.size} token documents for this batch`);
 
       tokensSnapshot.forEach((doc) => {
         const data = doc.data();
         const userId = data.userId;
 
-        // ✅ CRITICAL: Verify this userId is in our requested list
+        //  CRITICAL: Verify this userId is in our requested list
         if (!userIds.includes(userId)) {
-          console.warn(`⚠️ WARNING: Token for user ${userId} found but NOT in requested list [${userIds.join(", ")}]!`);
+          console.warn(` WARNING: Token for user ${userId} found but NOT in requested list [${userIds.join(", ")}]!`);
           return; // Skip this token
         }
 
@@ -54,17 +54,17 @@ async function getUserFCMTokens(
         uniqueTokens.forEach((token) => allSeenTokens.add(token));
 
         if (uniqueTokens.length > 0) {
-          console.log(`✅ User ${userId}: ${uniqueTokens.length} mobile tokens`);
+          console.log(` User ${userId}: ${uniqueTokens.length} mobile tokens`);
           userTokensMap.set(userId, uniqueTokens);
         }
       });
     }
 
-    console.log(`📊 Total: ${userTokensMap.size} users with ${allSeenTokens.size} unique tokens`);
-    console.log(`📊 Users with tokens: ${Array.from(userTokensMap.keys()).join(", ")}`);
+    console.log(` Total: ${userTokensMap.size} users with ${allSeenTokens.size} unique tokens`);
+    console.log(` Users with tokens: ${Array.from(userTokensMap.keys()).join(", ")}`);
     return userTokensMap;
   } catch (error) {
-    console.error("❌ Error getting user FCM tokens:", error);
+    console.error(" Error getting user FCM tokens:", error);
     return new Map();
   }
 }
@@ -78,36 +78,36 @@ async function sendFCMNotifications(
   targetUserId?: string
 ): Promise<void> {
   try {
-    console.log("📤 ===== sendFCMNotifications CALLED =====");
+    console.log(" ===== sendFCMNotifications CALLED =====");
     console.log(`   Users: [${userIds.join(", ")}]`);
     console.log(`   Target Role: ${targetRole || "any"}`);
     console.log(`   Target User: ${targetUserId || "none"}`);
     console.log(`   Type: ${data.type}`);
     console.log(`   Title: ${title}`);
 
-    // ✅ FIX: Only get tokens for the SPECIFIC userIds provided
+    //   Only get tokens for the SPECIFIC userIds provided
     // This is the critical fix - we were getting tokens for all users before
     const userTokensMap = await getUserFCMTokens(userIds);
 
     if (userTokensMap.size === 0) {
-      console.log("⚠️ No mobile FCM tokens found for any user");
+      console.log(" No mobile FCM tokens found for any user");
       console.log(`   Searched for users: [${userIds.join(", ")}]`);
       return;
     }
 
-    console.log(`✅ Found tokens for ${userTokensMap.size} users`);
+    console.log(` Found tokens for ${userTokensMap.size} users`);
     userTokensMap.forEach((tokens, userId) => {
       console.log(`   User ${userId}: ${tokens.length} tokens`);
     });
 
-    // ✅ ADDITIONAL FIX: Verify tokens belong to intended users
+    //  ADDITIONAL  Verify tokens belong to intended users
     const allTokens: string[] = [];
     const seenTokens = new Set<string>();
 
     userTokensMap.forEach((tokens, userId) => {
       // Double-check this userId is in our intended list
       if (!userIds.includes(userId)) {
-        console.warn(`⚠️ WARNING: Skipping tokens for user ${userId} - not in intended list`);
+        console.warn(` WARNING: Skipping tokens for user ${userId} - not in intended list`);
         return;
       }
 
@@ -120,12 +120,12 @@ async function sendFCMNotifications(
     });
 
     if (allTokens.length === 0) {
-      console.log("ℹ️ No valid mobile FCM tokens");
+      console.log(" No valid mobile FCM tokens");
       return;
     }
 
     console.log(
-      `📱 Sending FCM to ${allTokens.length} unique mobile devices for ${userIds.length} specific users`
+      ` Sending FCM to ${allTokens.length} unique mobile devices for ${userIds.length} specific users`
     );
 
     const notificationData: { [key: string]: string } = {
@@ -136,7 +136,7 @@ async function sendFCMNotifications(
 
     if (targetUserId) {
       notificationData.targetUserId = targetUserId;
-      console.log(`✅ Added targetUserId to notification data: ${targetUserId}`);
+      console.log(` Added targetUserId to notification data: ${targetUserId}`);
     }
 
     const message = {
@@ -178,7 +178,7 @@ async function sendFCMNotifications(
 
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(
-      `✅ FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
+      ` FCM sent: ${response.successCount} successful, ${response.failureCount} failed`
     );
     console.log(`   Intended for ${userIds.length} specific users`);
 
@@ -189,7 +189,7 @@ async function sendFCMNotifications(
         if (!resp.success) {
           const error = resp.error;
           console.error(
-            `❌ Failed to send to token ${idx}:`,
+            ` Failed to send to token ${idx}:`,
             error?.code,
             error?.message
           );
@@ -214,7 +214,7 @@ async function sendFCMNotifications(
 
       if (tokensToRemove.size > 0) {
         console.log(
-          `🗑️ Removing invalid tokens from ${tokensToRemove.size} users`
+          ` Removing invalid tokens from ${tokensToRemove.size} users`
         );
         const batch = db.batch();
 
@@ -229,7 +229,7 @@ async function sendFCMNotifications(
       }
     }
   } catch (error) {
-    console.error("❌ Error sending FCM notifications:", error);
+    console.error(" Error sending FCM notifications:", error);
   }
 }
 
@@ -243,7 +243,7 @@ async function createNotificationsForUsers(
 ): Promise<number> {
   try {
     console.log(
-      `📝 Creating notifications for ${userIds.length} ${targetRole} users`
+      `Creating notifications for ${userIds.length} ${targetRole} users`
     );
 
     let uniqueKey = `${type}`;
@@ -266,7 +266,7 @@ async function createNotificationsForUsers(
       uniqueKey += `-${data.eventId}`;
     }
 
-    console.log(`🔑 Using unique key: ${uniqueKey}`);
+    console.log(` Using unique key: ${uniqueKey}`);
 
     let batch = db.batch();
     let batchCount = 0;
@@ -302,7 +302,7 @@ async function createNotificationsForUsers(
 
       if (batchCount >= 500) {
         await batch.commit();
-        console.log(`✅ Committed batch of ${batchCount} notifications`);
+        console.log(` Committed batch of ${batchCount} notifications`);
         batch = db.batch();
         batchCount = 0;
       }
@@ -310,18 +310,207 @@ async function createNotificationsForUsers(
 
     if (batchCount > 0) {
       await batch.commit();
-      console.log(`✅ Committed final batch of ${batchCount} notifications`);
+      console.log(` Committed final batch of ${batchCount} notifications`);
     }
 
     console.log(
-      `✅ Processed ${totalCreated} notifications`
+      ` Processed ${totalCreated} notifications`
     );
     return totalCreated;
   } catch (error) {
-    console.error("❌ Error creating Firestore notifications:", error);
+    console.error(" Error creating Firestore notifications:", error);
     return 0;
   }
 }
+
+export const checkFacebookTokenExpiry = onSchedule(
+  {
+    schedule: "0 8 * * *", // runs daily at 8am Manila time
+    timeZone: "Asia/Manila",
+    region: "us-central1",
+  },
+  async (event) => {
+    console.log(" Checking Facebook token expiry...");
+
+    try {
+      // Get the Facebook token config from Firestore
+      const configDoc = await db.collection("config").doc("facebook").get();
+
+      if (!configDoc.exists) {
+        console.log(" No Facebook config found, skipping");
+        return;
+      }
+
+      const configData = configDoc.data();
+      const tokenExpiresAt = configData?.tokenExpiresAt; // Firestore Timestamp
+
+      if (!tokenExpiresAt || typeof tokenExpiresAt.toDate !== "function") {
+        console.log(" No token expiry date found, skipping");
+        return;
+      }
+
+      const now = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Manila" })
+      );
+      now.setHours(0, 0, 0, 0);
+
+      const expiryDate = tokenExpiresAt.toDate();
+      const expiryLocal = new Date(
+        expiryDate.toLocaleString("en-US", { timeZone: "Asia/Manila" })
+      );
+      expiryLocal.setHours(0, 0, 0, 0);
+
+      const diffMs = expiryLocal.getTime() - now.getTime();
+      const daysLeft = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      console.log(` Facebook token expires in: ${daysLeft} days`);
+
+      // Get all admin users (only admins manage the token)
+      const adminSnapshot = await db
+        .collection("users")
+        .where("role", "==", "admin")
+        .where("isActive", "==", true)
+        .get();
+
+      const adminIds = adminSnapshot.docs.map((doc) => doc.id);
+
+      if (adminIds.length === 0) {
+        console.log(" No active admins found, skipping");
+        return;
+      }
+
+      const expiryDateKey = expiryLocal.toISOString().substring(0, 10); // e.g. "2026-05-01"
+
+      // ─────────────────────────────────────────────────────────────
+      // CASE 1: EXPIRING SOON — fire once at 3 days left
+      // Key includes daysLeft + expiryDate → never repeats
+      // ─────────────────────────────────────────────────────────────
+      if (daysLeft === 3) {
+        const reminderKey = `fb_token_expiring_${expiryDateKey}_${daysLeft}d`;
+
+        // Check if this exact warning was already sent
+        const alreadySentDoc = await db
+          .collection("scheduled_runs")
+          .doc(reminderKey)
+          .get();
+
+        if (alreadySentDoc.exists) {
+          console.log(` FB token ${daysLeft}-day warning already sent, skipping`);
+          return;
+        }
+
+        // Lock it immediately
+        await db.collection("scheduled_runs").doc(reminderKey).set({
+          type: "fb_token_expiry_warning",
+          daysLeft: daysLeft,
+          expiryDate: expiryDateKey,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const title = " Facebook Token Expiring Soon";
+        const body = `Your Facebook API token will expire in ${daysLeft} days. Please renew it soon to avoid interruption.`;
+
+        await createNotificationsForUsers(
+          adminIds,
+          "admin",
+          title,
+          body,
+          "fb_token_expiration",
+          {
+            status: "expiring",
+            daysLeft: String(daysLeft),
+            expiryDate: expiryDateKey,
+            reminderDate: reminderKey, // unique key → fires only once
+          }
+        );
+
+        await sendFCMNotifications(
+          adminIds,
+          title,
+          body,
+          {
+            type: "fb_token_expiration",
+            status: "expiring",
+            daysLeft: String(daysLeft),
+          },
+          "admin"
+        );
+
+        console.log(` Sent FB token ${daysLeft}-day expiry warning to ${adminIds.length} admins`);
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // CASE 2: EXPIRED — fire every 3 days
+      // Key includes a rolling 3-day bucket → repeats every 3 days
+      // ─────────────────────────────────────────────────────────────
+      if (daysLeft < 0) {
+        // Calculate how many days since expiry
+        const daysSinceExpiry = Math.abs(daysLeft);
+
+        // Only fire on day 0, 3, 6, 9... after expiry
+        if (daysSinceExpiry % 3 !== 0) {
+          console.log(` FB token expired ${daysSinceExpiry} days ago — not a 3-day interval, skipping`);
+          return;
+        }
+
+        const todayKey = now.toISOString().substring(0, 10);
+        const expiredReminderKey = `fb_token_expired_${todayKey}`;
+
+        // Idempotency: prevent double-firing on same calendar day
+        const alreadySentDoc = await db
+          .collection("scheduled_runs")
+          .doc(expiredReminderKey)
+          .get();
+
+        if (alreadySentDoc.exists) {
+          console.log(" FB token expired reminder already sent today, skipping");
+          return;
+        }
+
+        await db.collection("scheduled_runs").doc(expiredReminderKey).set({
+          type: "fb_token_expired_reminder",
+          daysSinceExpiry: daysSinceExpiry,
+          expiryDate: expiryDateKey,
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const title = " Facebook Token Expired";
+        const body = "Your Facebook API token has expired! Please renew it immediately to continue syncing posts.";
+
+        // Use today's date in reminderDate so each 3-day reminder is a NEW notification
+        await createNotificationsForUsers(
+          adminIds,
+          "admin",
+          title,
+          body,
+          "fb_token_expiration",
+          {
+            status: "expired",
+            daysLeft: String(daysLeft),
+            expiryDate: expiryDateKey,
+            reminderDate: todayKey, // changes every run → new notification each time
+          }
+        );
+
+        await sendFCMNotifications(
+          adminIds,
+          title,
+          body,
+          {
+            type: "fb_token_expiration",
+            status: "expired",
+            daysLeft: String(daysLeft),
+          },
+          "admin"
+        );
+
+        console.log(` Sent FB token expired reminder (day ${daysSinceExpiry} since expiry) to ${adminIds.length} admins`);
+      }
+    } catch (error) {
+      console.error(" Error checking Facebook token expiry:", error);
+    }
+  }
+);
 
 function formatDeadlineForNotification(deadline: admin.firestore.Timestamp | null): string {
   if (!deadline || typeof deadline.toDate !== "function") {
@@ -354,8 +543,8 @@ export const onAnnouncementCreated = onDocumentCreated(
   async (event) => {
     const announcementId = event.params.announcementId;
 
-    console.log(`📢 onAnnouncementCreated triggered for: ${announcementId}`);
-    console.log(`📢 Event ID: ${event.id}`);
+    console.log(` onAnnouncementCreated triggered for: ${announcementId}`);
+    console.log(` Event ID: ${event.id}`);
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -390,14 +579,14 @@ export const onAnnouncementCreated = onDocumentCreated(
           announcementData = data;
         });
 
-        console.log(`✅ Acquired lock for announcement ${announcementId}`);
+        console.log(` Acquired lock for announcement ${announcementId}`);
       } catch (error: any) {
         if (error.message === "Notification already sent") {
-          console.log(`⚠️ Notification already sent for ${announcementId}, skipping`);
+          console.log(` Notification already sent for ${announcementId}, skipping`);
           return {success: false, reason: "already_sent"};
         }
         if (error.message === "Announcement is deleted" || error.message === "Announcement does not exist") {
-          console.log(`⚠️ ${error.message}, skipping`);
+          console.log(` ${error.message}, skipping`);
           return {success: false, reason: "invalid_announcement"};
         }
         throw error;
@@ -426,7 +615,7 @@ export const onAnnouncementCreated = onDocumentCreated(
       const userIds = usersSnapshot.docs.map((doc) => doc.id);
 
       console.log(
-        `📤 Creating notifications for ${userIds.length} active users`
+        ` Creating notifications for ${userIds.length} active users`
       );
 
       const notificationsCreated = await createNotificationsForUsers(
@@ -444,7 +633,7 @@ export const onAnnouncementCreated = onDocumentCreated(
         }
       );
 
-      console.log(`✅ Created ${notificationsCreated} notifications`);
+      console.log(` Created ${notificationsCreated} notifications`);
 
       if (notificationsCreated > 0) {
         await sendFCMNotifications(
@@ -482,10 +671,10 @@ export const checkUpcomingDeadlines = onSchedule(
     now.setHours(0, 0, 0, 0);
     const reminderDateKey = now.toISOString().substring(0, 10);
 
-    console.log("🔍 Checking for upcoming deadlines...");
-    console.log(`📅 Reminder date key: ${reminderDateKey}`);
+    console.log(" Checking for upcoming deadlines...");
+    console.log(` Reminder date key: ${reminderDateKey}`);
 
-    // ✅ Idempotency check
+    //  Idempotency check
     const runLogRef = db.collection("scheduled_runs").doc(`deadlines_${reminderDateKey}`);
 
     try {
@@ -495,10 +684,10 @@ export const checkUpcomingDeadlines = onSchedule(
         status: "running",
         type: "deadline_check",
       });
-      console.log(`✅ Acquired lock for deadline check on ${reminderDateKey}`);
+      console.log(` Acquired lock for deadline check on ${reminderDateKey}`);
     } catch (error: any) {
       if (error.code === 6) {
-        console.log(`⚠️ Deadline check already ran today (${reminderDateKey})`);
+        console.log(` Deadline check already ran today (${reminderDateKey})`);
         return;
       }
       throw error;
@@ -509,7 +698,7 @@ export const checkUpcomingDeadlines = onSchedule(
 
     try {
       console.log(
-        `📅 Current time: ${new Date().toLocaleString("en-PH", {
+        ` Current time: ${new Date().toLocaleString("en-PH", {
           timeZone: "Asia/Manila",
         })}`
       );
@@ -518,8 +707,8 @@ export const checkUpcomingDeadlines = onSchedule(
       targetDate.setDate(targetDate.getDate() + 3);
       targetDate.setHours(23, 59, 59, 999);
 
-      console.log(`📅 Today (Manila): ${reminderDateKey}`);
-      console.log(`🎯 Target deadline date: ${targetDate.toISOString()}`);
+      console.log(` Today (Manila): ${reminderDateKey}`);
+      console.log(` Target deadline date: ${targetDate.toISOString()}`);
 
       const usersSnapshot = await db
         .collection("users")
@@ -528,7 +717,7 @@ export const checkUpcomingDeadlines = onSchedule(
       const allUserIds = usersSnapshot.docs.map((doc) => doc.id);
 
       if (allUserIds.length === 0) {
-        console.log("ℹ️ No active users found. Exiting.");
+        console.log(" No active users found. Exiting.");
         await runLogRef.update({
           status: "completed",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -537,9 +726,9 @@ export const checkUpcomingDeadlines = onSchedule(
         });
         return;
       }
-      console.log(`👤 Found ${allUserIds.length} active users.`);
+      console.log(` Found ${allUserIds.length} active users.`);
 
-      // ✅ Check Announcements
+      //  Check Announcements
       const announcementsSnapshot = await db
         .collection("announcements")
         .where("deleted", "==", false)
@@ -547,7 +736,7 @@ export const checkUpcomingDeadlines = onSchedule(
         .get();
 
       console.log(
-        `📋 Found ${announcementsSnapshot.size} announcements with deadlines`
+        ` Found ${announcementsSnapshot.size} announcements with deadlines`
       );
 
       for (const announcementDoc of announcementsSnapshot.docs) {
@@ -556,7 +745,7 @@ export const checkUpcomingDeadlines = onSchedule(
         const {deadline, message = "", category = "General"} = data;
 
         if (!deadline || typeof deadline.toDate !== "function") {
-          console.log(`⚠️ Skipping announcement ${announcementId}: invalid deadline`);
+          console.log(` Skipping announcement ${announcementId}: invalid deadline`);
           continue;
         }
 
@@ -569,10 +758,10 @@ export const checkUpcomingDeadlines = onSchedule(
         const diffMs = deadlineLocal.getTime() - now.getTime();
         const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        console.log(`📋 Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
+        console.log(` Announcement ${announcementId}: ${daysUntilDeadline} days until deadline`);
 
         if (daysUntilDeadline === 3) {
-          const title = `⏰ Deadline Reminder: ${category} Announcement`;
+          const title = ` Deadline Reminder: ${category} Announcement`;
           const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -607,7 +796,7 @@ export const checkUpcomingDeadlines = onSchedule(
             notificationsSent: notificationsCreated,
           });
 
-          // ✅ FIX: Don't pass targetUserId for deadline reminders (they're for all users)
+          //   Don't pass targetUserId for deadline reminders (they're for all users)
           if (notificationsCreated > 0) {
             await sendFCMNotifications(
               allUserIds,
@@ -620,20 +809,20 @@ export const checkUpcomingDeadlines = onSchedule(
                 daysUntilDeadline: "3",
               },
               "user"
-              // ✅ NO targetUserId parameter - this is for all users
+              //  NO targetUserId parameter - this is for all users
             );
           }
         }
       }
 
-      // ✅ Check Scholarships
+      //  Check Scholarships
       const scholarshipsSnapshot = await db
         .collection("scholarships")
         .where("deadline", "!=", null)
         .get();
 
       console.log(
-        `🎓 Found ${scholarshipsSnapshot.size} scholarships with deadlines`
+        ` Found ${scholarshipsSnapshot.size} scholarships with deadlines`
       );
 
       for (const scholarshipDoc of scholarshipsSnapshot.docs) {
@@ -642,7 +831,7 @@ export const checkUpcomingDeadlines = onSchedule(
         const {deadline, name = "", scholarshipProvider = ""} = data;
 
         if (!deadline || typeof deadline.toDate !== "function") {
-          console.log(`⚠️ Skipping scholarship ${scholarshipId}: invalid deadline`);
+          console.log(` Skipping scholarship ${scholarshipId}: invalid deadline`);
           continue;
         }
 
@@ -655,10 +844,10 @@ export const checkUpcomingDeadlines = onSchedule(
         const diffMs = deadlineLocal.getTime() - now.getTime();
         const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        console.log(`🎓 Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
+        console.log(` Scholarship ${scholarshipId} (${name}): ${daysUntilDeadline} days until deadline`);
 
         if (daysUntilDeadline === 3) {
-          const title = "⏰ Scholarship Deadline Reminder";
+          const title = " Scholarship Deadline Reminder";
           const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -703,13 +892,13 @@ export const checkUpcomingDeadlines = onSchedule(
                 daysUntilDeadline: "3",
               },
               "user"
-              // ✅ NO targetUserId parameter
+              //  NO targetUserId parameter
             );
           }
         }
       }
 
-      // ✅ Check Placements
+      //  Check Placements
       const placementsSnapshot = await db
         .collection("placements")
         .where("deadline", "!=", null)
@@ -717,7 +906,7 @@ export const checkUpcomingDeadlines = onSchedule(
         .get();
 
       console.log(
-        `💼 Found ${placementsSnapshot.size} placements with deadlines`
+        ` Found ${placementsSnapshot.size} placements with deadlines`
       );
 
       for (const placementDoc of placementsSnapshot.docs) {
@@ -726,7 +915,7 @@ export const checkUpcomingDeadlines = onSchedule(
         const {deadline, partnerCompany = ""} = data;
 
         if (!deadline || typeof deadline.toDate !== "function") {
-          console.log(`⚠️ Skipping placement ${placementId}: invalid deadline`);
+          console.log(` Skipping placement ${placementId}: invalid deadline`);
           continue;
         }
 
@@ -739,10 +928,10 @@ export const checkUpcomingDeadlines = onSchedule(
         const diffMs = deadlineLocal.getTime() - now.getTime();
         const daysUntilDeadline = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        console.log(`💼 Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
+        console.log(` Placement ${placementId} (${partnerCompany}): ${daysUntilDeadline} days until deadline`);
 
         if (daysUntilDeadline === 3) {
-          const title = "⏰ Placement Deadline Reminder";
+          const title = " Placement Deadline Reminder";
           const formattedDate = deadlineLocal.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -786,16 +975,16 @@ export const checkUpcomingDeadlines = onSchedule(
                 daysUntilDeadline: "3",
               },
               "user"
-              // ✅ NO targetUserId parameter
+              //  NO targetUserId parameter
             );
           }
         }
       }
 
       console.log(
-        `✅ Done. Created ${totalNotificationsCreated} notifications in total.`
+        ` Done. Created ${totalNotificationsCreated} notifications in total.`
       );
-      console.log("📊 Processed items:", JSON.stringify(processedItems, null, 2));
+      console.log(" Processed items:", JSON.stringify(processedItems, null, 2));
 
       await runLogRef.update({
         status: "completed",
@@ -806,7 +995,7 @@ export const checkUpcomingDeadlines = onSchedule(
 
       return;
     } catch (error) {
-      console.error("❌ Error checking deadlines:", error);
+      console.error(" Error checking deadlines:", error);
 
       await runLogRef.update({
         status: "failed",
@@ -828,7 +1017,7 @@ export const cleanupDuplicateNotifications = onSchedule(
   },
   async (event) => {
     try {
-      console.log("🧹 Checking for duplicate notifications...");
+      console.log(" Checking for duplicate notifications...");
 
       const notifications = await db
         .collection("notifications")
@@ -865,7 +1054,7 @@ export const cleanupDuplicateNotifications = onSchedule(
         if (seen.has(key)) {
           toDelete.push(doc.id);
           console.log(
-            `🗑️ Duplicate found: ${doc.id} (user: ${userId}, type: ${type})`
+            ` Duplicate found: ${doc.id} (user: ${userId}, type: ${type})`
           );
         } else {
           seen.set(key, doc.id);
@@ -873,7 +1062,7 @@ export const cleanupDuplicateNotifications = onSchedule(
       });
 
       if (toDelete.length > 0) {
-        console.log(`🗑️ Deleting ${toDelete.length} duplicate notifications`);
+        console.log(` Deleting ${toDelete.length} duplicate notifications`);
 
         let batch = db.batch();
         let batchCount = 0;
@@ -893,12 +1082,12 @@ export const cleanupDuplicateNotifications = onSchedule(
           await batch.commit();
         }
 
-        console.log(`✅ Deleted ${toDelete.length} duplicates`);
+        console.log(` Deleted ${toDelete.length} duplicates`);
       } else {
-        console.log("✅ No duplicates found");
+        console.log(" No duplicates found");
       }
     } catch (error) {
-      console.error("❌ Error cleaning up duplicates:", error);
+      console.error(" Error cleaning up duplicates:", error);
     }
   }
 );
@@ -911,7 +1100,7 @@ export const cleanupOldNotifications = onSchedule(
   },
   async (event) => {
     try {
-      console.log("🧹 Cleaning up old notifications and records...");
+      console.log(" Cleaning up old notifications and records...");
 
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -929,13 +1118,13 @@ export const cleanupOldNotifications = onSchedule(
         });
         await batch.commit();
         console.log(
-          `✅ Deleted ${oldNotificationsSnapshot.size} old notifications`
+          ` Deleted ${oldNotificationsSnapshot.size} old notifications`
         );
       } else {
-        console.log("ℹ️ No old notifications to delete");
+        console.log(" No old notifications to delete");
       }
 
-      // ✅ Cleanup old scheduled run logs (7 days)
+      //  Cleanup old scheduled run logs (7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -952,13 +1141,13 @@ export const cleanupOldNotifications = onSchedule(
         });
         await batch.commit();
         console.log(
-          `✅ Deleted ${oldRunLogsSnapshot.size} old scheduled run logs`
+          ` Deleted ${oldRunLogsSnapshot.size} old scheduled run logs`
         );
       } else {
-        console.log("ℹ️ No old scheduled run logs to delete");
+        console.log(" No old scheduled run logs to delete");
       }
 
-      // ✅ Cleanup old processing records (removed from original code)
+      //  Cleanup old processing records (removed from original code)
       const oldProcessingSnapshot = await db
         .collection("notification_processing")
         .where("processedAt", "<", sevenDaysAgo)
@@ -972,10 +1161,10 @@ export const cleanupOldNotifications = onSchedule(
         });
         await batch.commit();
         console.log(
-          `✅ Deleted ${oldProcessingSnapshot.size} old processing records`
+          ` Deleted ${oldProcessingSnapshot.size} old processing records`
         );
       } else {
-        console.log("ℹ️ No old processing records to delete");
+        console.log(" No old processing records to delete");
       }
     } catch (error) {
       console.error("Error cleaning up:", error);
@@ -987,7 +1176,7 @@ export const onEscalationCreated = onDocumentCreated(
   {
     document: "escalations/{escalationId}",
     region: "us-central1",
-    retry: false, // ✅ Already disabled retry
+    retry: false, //  Already disabled retry
   },
   async (event) => {
     try {
@@ -999,10 +1188,10 @@ export const onEscalationCreated = onDocumentCreated(
         return {success: false, reason: "no_data"};
       }
 
-      console.log(`🆕 New escalation: ${escalationId}`);
-      console.log(`🆕 Event ID: ${event.id}`);
+      console.log(` New escalation: ${escalationId}`);
+      console.log(` Event ID: ${event.id}`);
 
-      // ✅ CRITICAL: Idempotency check to prevent duplicate processing
+      //  CRITICAL: Idempotency check to prevent duplicate processing
       const idempotencyRef = db.collection("notification_processing")
         .doc(`escalation_created_${escalationId}_${event.id}`);
 
@@ -1014,10 +1203,10 @@ export const onEscalationCreated = onDocumentCreated(
           status: "processing",
           type: "escalation_created",
         });
-        console.log(`✅ Idempotency lock acquired for escalation ${escalationId}`);
+        console.log(` Idempotency lock acquired for escalation ${escalationId}`);
       } catch (error: any) {
         if (error.code === 6) { // ALREADY_EXISTS error
-          console.log(`⚠️ Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          console.log(` Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
           return {success: false, reason: "already_processing"};
         }
         throw error;
@@ -1028,10 +1217,10 @@ export const onEscalationCreated = onDocumentCreated(
       const conversationId = escalationData.conversationId || null;
 
       const category: string | null = escalationData.category || null;
-      console.log(`📂 Raw category from escalation: ${category}`);
+      console.log(` Raw category from escalation: ${category}`);
 
       const normalizedCategory = category ? normalizeCategory(category) : null;
-      console.log(`📂 Normalized category: ${normalizedCategory}`);
+      console.log(` Normalized category: ${normalizedCategory}`);
 
       let userName = "A user";
       if (userId) {
@@ -1055,13 +1244,13 @@ export const onEscalationCreated = onDocumentCreated(
       let staffIds: string[] = [];
       let adminIds: string[] = [];
 
-      console.log("📊 Routing escalation:");
+      console.log(" Routing escalation:");
       console.log(`   - Raw category: ${category}`);
       console.log(`   - Normalized category: ${normalizedCategory}`);
 
-      // ✅ Filter staff by serviceUnit for specific categories
+      //  Filter staff by serviceUnit for specific categories
       if (normalizedCategory && ["Admission", "Scholarship", "Placement"].includes(normalizedCategory)) {
-        console.log(`🔍 Looking for staff with serviceUnit: ${normalizedCategory}`);
+        console.log(` Looking for staff with serviceUnit: ${normalizedCategory}`);
 
         const staffSnapshot = await db
           .collection("users")
@@ -1072,8 +1261,8 @@ export const onEscalationCreated = onDocumentCreated(
 
         staffIds = staffSnapshot.docs.map((doc) => doc.id);
 
-        console.log(`📊 Found ${staffIds.length} staff with serviceUnit: ${normalizedCategory}`);
-        console.log(`📊 Staff IDs: ${staffIds.join(", ")}`);
+        console.log(` Found ${staffIds.length} staff with serviceUnit: ${normalizedCategory}`);
+        console.log(` Staff IDs: ${staffIds.join(", ")}`);
 
         for (const doc of staffSnapshot.docs) {
           const data = doc.data();
@@ -1081,14 +1270,14 @@ export const onEscalationCreated = onDocumentCreated(
         }
 
         if (staffIds.length === 0) {
-          console.log(`⚠️ No staff found for ${normalizedCategory}, falling back to all staff`);
+          console.log(` No staff found for ${normalizedCategory}, falling back to all staff`);
           const allStaffSnapshot = await db
             .collection("users")
             .where("role", "==", "staff")
             .where("isActive", "==", true)
             .get();
           staffIds = allStaffSnapshot.docs.map((doc) => doc.id);
-          console.log(`📊 Fallback: Found ${staffIds.length} total staff`);
+          console.log(` Fallback: Found ${staffIds.length} total staff`);
         }
       } else {
         const allStaffSnapshot = await db
@@ -1097,7 +1286,7 @@ export const onEscalationCreated = onDocumentCreated(
           .where("isActive", "==", true)
           .get();
         staffIds = allStaffSnapshot.docs.map((doc) => doc.id);
-        console.log(`📊 All staff (no category filter): ${staffIds.length}`);
+        console.log(` All staff (no category filter): ${staffIds.length}`);
       }
 
       // Admins ALWAYS get all escalations
@@ -1107,10 +1296,10 @@ export const onEscalationCreated = onDocumentCreated(
         .where("isActive", "==", true)
         .get();
       adminIds = adminSnapshot.docs.map((doc) => doc.id);
-      console.log(`📊 All admins: ${adminIds.length}`);
+      console.log(` All admins: ${adminIds.length}`);
 
       if (staffIds.length === 0 && adminIds.length === 0) {
-        console.log("⚠️ No staff or admin found");
+        console.log(" No staff or admin found");
         await idempotencyRef.update({
           status: "completed",
           reason: "no_recipients",
@@ -1126,7 +1315,7 @@ export const onEscalationCreated = onDocumentCreated(
 
       // Create notifications for staff
       if (staffIds.length > 0) {
-        console.log(`📤 Creating notifications for ${staffIds.length} staff members`);
+        console.log(` Creating notifications for ${staffIds.length} staff members`);
 
         staffNotifications = await createNotificationsForUsers(
           staffIds,
@@ -1145,11 +1334,11 @@ export const onEscalationCreated = onDocumentCreated(
           }
         );
 
-        console.log(`✅ Created ${staffNotifications} staff notifications`);
+        console.log(` Created ${staffNotifications} staff notifications`);
 
         if (staffNotifications > 0) {
-          console.log(`📱 Sending FCM to ONLY ${staffIds.length} filtered staff members`);
-          // ✅ FIX: Only send to the filtered staffIds
+          console.log(` Sending FCM to ONLY ${staffIds.length} filtered staff members`);
+          //   Only send to the filtered staffIds
           await sendFCMNotifications(
             staffIds, // This now contains ONLY filtered staff
             notificationTitle,
@@ -1162,13 +1351,13 @@ export const onEscalationCreated = onDocumentCreated(
             },
             "staff"
           );
-          console.log("✅ FCM sent to filtered staff only");
+          console.log(" FCM sent to filtered staff only");
         }
       }
 
       // Create notifications for admins
       if (adminIds.length > 0) {
-        console.log(`📤 Creating notifications for ${adminIds.length} admins`);
+        console.log(` Creating notifications for ${adminIds.length} admins`);
 
         adminNotifications = await createNotificationsForUsers(
           adminIds,
@@ -1187,10 +1376,10 @@ export const onEscalationCreated = onDocumentCreated(
           }
         );
 
-        console.log(`✅ Created ${adminNotifications} admin notifications`);
+        console.log(` Created ${adminNotifications} admin notifications`);
 
         if (adminNotifications > 0) {
-          console.log(`📱 Sending FCM to ${adminIds.length} admins`);
+          console.log(` Sending FCM to ${adminIds.length} admins`);
           await sendFCMNotifications(
             adminIds,
             notificationTitle,
@@ -1203,11 +1392,11 @@ export const onEscalationCreated = onDocumentCreated(
             },
             "admin"
           );
-          console.log("✅ FCM sent to admins");
+          console.log(" FCM sent to admins");
         }
       }
 
-      console.log(`✅ Total notifications: ${staffNotifications + adminNotifications}`);
+      console.log(` Total notifications: ${staffNotifications + adminNotifications}`);
       console.log(`   - Staff: ${staffNotifications}`);
       console.log(`   - Admin: ${adminNotifications}`);
 
@@ -1233,7 +1422,7 @@ export const onEscalationCreated = onDocumentCreated(
         adminCount: adminIds.length,
       };
     } catch (error) {
-      console.error("❌ Error creating escalation notification:", error);
+      console.error(" Error creating escalation notification:", error);
 
       try {
         const idempotencyRef = db.collection("notification_processing")
@@ -1281,8 +1470,8 @@ export const onEscalationReplied = onDocumentUpdated(
         return {success: false, reason: "no_new_reply"};
       }
 
-      console.log(`💬 Staff or Admin replied to escalation: ${escalationId}`);
-      console.log(`💬 Event ID: ${event.id}`);
+      console.log(` Staff or Admin replied to escalation: ${escalationId}`);
+      console.log(` Event ID: ${event.id}`);
 
       const idempotencyRef = db.collection("notification_processing")
         .doc(`escalation_reply_${escalationId}_${event.id}`);
@@ -1295,10 +1484,10 @@ export const onEscalationReplied = onDocumentUpdated(
           status: "processing",
           type: "escalation_reply",
         });
-        console.log(`✅ Idempotency lock acquired for escalation reply ${escalationId}`);
+        console.log(` Idempotency lock acquired for escalation reply ${escalationId}`);
       } catch (error: any) {
         if (error.code === 6) {
-          console.log(`⚠️ Reply notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          console.log(` Reply notification already being processed for escalation ${escalationId} (event: ${event.id})`);
           return {success: false, reason: "already_processing"};
         }
         throw error;
@@ -1321,10 +1510,10 @@ export const onEscalationReplied = onDocumentUpdated(
         return {success: false, reason: "no_user_id"};
       }
 
-      // ✅ Verify user exists and is active
+      //  Verify user exists and is active
       const userDoc = await db.collection("users").doc(userId).get();
       if (!userDoc.exists) {
-        console.log(`⚠️ User ${userId} not found, skipping notification`);
+        console.log(` User ${userId} not found, skipping notification`);
         await idempotencyRef.update({
           status: "completed",
           reason: "user_not_found",
@@ -1335,7 +1524,7 @@ export const onEscalationReplied = onDocumentUpdated(
 
       const userData = userDoc.data();
       if (!userData?.isActive) {
-        console.log(`⚠️ User ${userId} is not active, skipping notification`);
+        console.log(` User ${userId} is not active, skipping notification`);
         await idempotencyRef.update({
           status: "completed",
           reason: "user_not_active",
@@ -1344,7 +1533,7 @@ export const onEscalationReplied = onDocumentUpdated(
         return {success: false, reason: "user_not_active"};
       }
 
-      console.log(`✅ Verified user ${userId} exists and is active`);
+      console.log(` Verified user ${userId} exists and is active`);
 
       const notificationTitle =
         responderRole === "admin" ?
@@ -1372,14 +1561,14 @@ export const onEscalationReplied = onDocumentUpdated(
           adminResponse,
           conversationId,
           eventId: event.id,
-          targetUserId: userId, // ✅ Add for Firestore
+          targetUserId: userId, //  Add for Firestore
         }
       );
 
       if (notificationsCreated > 0) {
-        console.log(`📤 Sending FCM to ONLY user ${userId}`);
+        console.log(` Sending FCM to ONLY user ${userId}`);
 
-        // ✅ CRITICAL FIX: Pass targetUserId as 6th parameter
+        //  CRITICAL  Pass targetUserId as 6th parameter
         await sendFCMNotifications(
           [userId],
           notificationTitle,
@@ -1390,12 +1579,12 @@ export const onEscalationReplied = onDocumentUpdated(
             conversationId: conversationId || "",
           },
           "user",
-          userId // ✅ This is the critical fix - targetUserId parameter
+          userId //  This is the critical fix - targetUserId parameter
         );
       }
 
       console.log(
-        `✅ Reply notification sent (${responderRole}) to user ${userId}`
+        ` Reply notification sent (${responderRole}) to user ${userId}`
       );
 
       await idempotencyRef.update({
@@ -1426,39 +1615,6 @@ export const onEscalationReplied = onDocumentUpdated(
   }
 );
 
-// async function getUsersByRoleAndCategory(
-//   role: string,
-//   category?: string
-// ): Promise<string[]> {
-//   try {
-//     console.log(`👥 Fetching ${role} users${category ? ` with category: ${category}` : ''}`);
-
-//     let query = db
-//       .collection("users")
-//       .where("role", "==", role)
-//       .where("isActive", "==", true);
-
-//     // ✅ For staff, filter by serviceUnit matching the category
-//     if (role === "staff" && category) {
-//       // Normalize category to match serviceUnit field
-//       const serviceUnit = normalizeCategory(category);
-//       query = query.where("serviceUnit", "==", serviceUnit);
-//       console.log(`🔍 Filtering staff by serviceUnit: ${serviceUnit}`);
-//     }
-
-//     const usersSnapshot = await query.get();
-//     const userIds = usersSnapshot.docs.map((doc) => doc.id);
-
-//     console.log(`✅ Found ${userIds.length} active ${role} users${category ? ` in ${category}` : ''}`);
-
-//     return userIds;
-//   } catch (error) {
-//     console.error(`❌ Error fetching ${role} users:`, error);
-//     return [];
-//   }
-// }
-
-
 function normalizeCategory(category: string): string {
   const normalized = category.toLowerCase().trim();
 
@@ -1482,12 +1638,12 @@ function normalizeCategory(category: string): string {
   const mapped = categoryMap[normalized];
 
   if (mapped) {
-    console.log(`🔄 Mapped "${category}" → "${mapped}"`);
+    console.log(` Mapped "${category}" → "${mapped}"`);
     return mapped;
   }
 
   // If not in map, capitalize first letter (for exact matches like "Admission")
   const capitalized = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
-  console.log(`🔄 Capitalized "${category}" → "${capitalized}"`);
+  console.log(` Capitalized "${category}" → "${capitalized}"`);
   return capitalized;
 }

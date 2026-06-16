@@ -1,8 +1,11 @@
-import 'package:capstone_project/modules/admin_module/services_module/admission_module/add_edit_admission.dart';
+import 'dart:async';
+
+import 'package:capstone_project/modules/admin/service_information/admission/add_edit_admission.dart';
+import 'package:capstone_project/modules/admin/service_information/admission/admission_info.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:capstone_project/modules/admin_module/services_module/admission_module/admission_info.dart';
+
 
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 
@@ -815,88 +818,80 @@ Future<void> _handleSaveChanges(
   }
 
   try {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      ),
-    );
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-    // Update the document
-    await FirebaseFirestore.instance
-        .collection('admissions') // Updated collection name
-        .doc(userDoc.id)
-        .update({
+    unawaited(() async {
+      try {
+        await FirebaseFirestore.instance
+            .collection('admissions')
+            .doc(userDoc.id)
+            .update({
           'title': title,
           'source': source,
           'academicYear': academicYear,
           'updatedAt': Timestamp.now(),
         });
 
-    // Get current user for logging
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
+        final currentUser = FirebaseAuth.instance.currentUser;
+        String actorName = 'Unknown';
 
-    if (currentUser != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        actorName = data['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
-    // Log the update
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    final logData = {
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Updated admission: $title',
-      'time': Timestamp.now(),
-    };
-    await logRef.set(logData);
-
-    // Close loading and modal, then navigate back if needed
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close edit modal
-
-      // Use Future.delayed to prevent black screen flash
-      Future.delayed(const Duration(milliseconds: 200), () {
-        // If we came from another modal, show it again
-        if (previousModal == 'info') {
-          showADInfoModal(context, userDoc, fromEdit: true);
-        } else if (previousModal == 'fullContent') {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final screenWidth = MediaQuery.of(context).size.width;
-          final isMobile = screenWidth < 600;
-          final isTablet = screenWidth >= 600 && screenWidth < 1024;
-          _showFullContentModal(context, userData, isMobile, isTablet, userDoc);
+        if (currentUser != null) {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+          if (doc.exists) {
+            final data = doc.data() as Map<String, dynamic>;
+            actorName = data['name'] ?? currentUser.email ?? 'Unknown';
+          }
         }
-      });
 
+        final logRef = FirebaseFirestore.instance.collection('logs').doc();
+        final logData = {
+          'logId': logRef.id,
+          'user': actorName,
+          'action': 'Updated admission: $title',
+          'time': Timestamp.now(),
+        };
+        await logRef.set(logData);
+
+        if (feedbackContext.mounted) {
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (previousModal == 'info') {
+              showADInfoModal(feedbackContext, userDoc, fromEdit: true);
+            }
+          });
+
+          ScaffoldMessenger.of(feedbackContext).showSnackBar(
+            const SnackBar(
+              content: Text('Admission updated successfully'),
+              backgroundColor: Color(0xFF2E7D32),
+            ),
+          );
+        }
+      } catch (e) {
+        if (feedbackContext.mounted) {
+          ScaffoldMessenger.of(feedbackContext).showSnackBar(
+            SnackBar(
+              content: Text('Error updating admission: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }());
+
+    if (context.mounted) {
+      Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text('Admission updated successfully'),
-            ],
-          ),
-          backgroundColor: const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        const SnackBar(
+          content: Text('Admission update is running in background'),
+          backgroundColor: Color(0xFF2E7D32),
         ),
       );
     }
   } catch (e) {
     if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(

@@ -54,6 +54,20 @@ class UniversalUIComponents {
   static Color get primaryGreen => const Color(0xFF2E7D32);
   static Color get lightGreen => const Color(0xFF4CAF50);
   static Color get backgroundGrey => Colors.grey[50]!;
+  static final Map<String, Stream<QuerySnapshot>> _conversationStreams = {};
+  static final Map<String, QuerySnapshot> _conversationSnapshots = {};
+
+  static Stream<QuerySnapshot> _getConversationStream(String userId) {
+    return _conversationStreams.putIfAbsent(
+      userId,
+      () =>
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+    );
+  }
 
   static AppBar buildAppBar({
     required BuildContext context,
@@ -96,14 +110,7 @@ class UniversalUIComponents {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 18,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+
       actions: appBarActions,
       iconTheme: const IconThemeData(color: Colors.black54),
       automaticallyImplyLeading: showBackButton && customLeading == null,
@@ -206,6 +213,7 @@ class UniversalUIComponents {
                       selectedConversationId: selectedConversationId,
                       onConversationSelected:
                           onConversationSelected, // Pass it down
+                      onNewChat: onNewChat,
                     ),
                   ),
                 ],
@@ -222,7 +230,7 @@ class UniversalUIComponents {
     required Function(int) onItemTap,
     required bool isExpanded,
     Function(BuildContext, String?)? onConversationSelected,
-    VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+    VoidCallback? onNewChat, //  ADD THIS PARAMETER
   }) {
     final menuConfig = _getMenuConfig(userRole);
 
@@ -255,7 +263,7 @@ class UniversalUIComponents {
                   onItemTap,
                   isExpanded,
                   onConversationSelected: onConversationSelected,
-                  onNewChat: onNewChat, // ✅ PASS IT HERE
+                  onNewChat: onNewChat, //  PASS IT HERE
                 ),
               ),
             ),
@@ -432,60 +440,6 @@ class UniversalUIComponents {
     Function(int)? onItemTap,
     int? selectedIndex,
   }) {
-    if (userRole == UserRole.user && onNewChat != null) {
-      return DrawerHeader(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'lib/images/oasp.png',
-              width: 72,
-              height: 72,
-              // color: Colors.grey[300],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  HapticFeedback.mediumImpact();
-                  Navigator.of(context).pop(); // Close drawer first
-
-                  // ✅ FIX: Wait for drawer to close
-                  await Future.delayed(Duration(milliseconds: 300));
-
-                  // ✅ Then call the callback
-                  if (context.mounted) {
-                    onNewChat();
-                  }
-                },
-                icon: const Icon(Icons.add_comment_rounded, size: 20),
-                label: const Text(
-                  'New Chat',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return DrawerHeader(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -497,19 +451,25 @@ class UniversalUIComponents {
                 ),
       ),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 80, height: 80),
+        child: Transform.scale(
+          scale: 1.8,
+          child: Image.asset('lib/images/oasp.png', width: 80, height: 80),
+        ),
       ),
     );
   }
 
   static Widget _buildPersistentDrawerHeader() {
     return Container(
-      height: 80,
+      height: 96,
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
       decoration: BoxDecoration(color: Colors.white),
       child: Center(
-        child: Image.asset('lib/images/oasp.png', width: 90, height: 90),
+        child: Transform.scale(
+          scale: 1.8,
+          child: Image.asset('lib/images/oasp.png', width: 90, height: 90),
+        ),
       ),
     );
   }
@@ -525,6 +485,7 @@ class UniversalUIComponents {
     List<Map<String, dynamic>>? recentConversations,
     String? selectedConversationId,
     Function(BuildContext, String?)? onConversationSelected,
+    VoidCallback? onNewChat,
   }) {
     List<Widget> menuItems = [];
 
@@ -558,6 +519,7 @@ class UniversalUIComponents {
               selectedConversationId,
               onConversationSelected,
               setDrawerState,
+              onNewChat,
             ),
           );
         }
@@ -569,13 +531,13 @@ class UniversalUIComponents {
             selectedIndex,
             onItemTap,
             userRole,
-            setDrawerState: setDrawerState, // ✅ ADD THIS
+            setDrawerState: setDrawerState, //  ADD THIS
           ),
         );
       }
     }
 
-    // ✅ CRITICAL FIX: Wrap in SingleChildScrollView to prevent overflow
+    //  CRITICAL  Wrap in SingleChildScrollView to prevent overflow
     return SingleChildScrollView(
       physics: BouncingScrollPhysics(),
       child: Column(children: menuItems),
@@ -588,7 +550,7 @@ class UniversalUIComponents {
     int selectedIndex,
     Function(int) onItemTap,
     UserRole userRole, {
-    StateSetter? setDrawerState, // ✅ ADD THIS
+    StateSetter? setDrawerState, //  ADD THIS
   }) {
     final isSelected = selectedIndex == item.index;
 
@@ -660,7 +622,7 @@ class UniversalUIComponents {
     'User Management': false,
   };
 
-  // ✅ Add this counter to force rebuild
+  //  Add this counter to force rebuild
   static int _rebuildCounter = 0;
 
   // Replace the entire _buildExpandableMenuItem method with this:
@@ -693,7 +655,7 @@ class UniversalUIComponents {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: ExpansionTile(
-              // ✅ Use counter to force unique key on every rebuild
+              //  Use counter to force unique key on every rebuild
               key: ValueKey('${item.title}_$isExpanded\_$_rebuildCounter'),
               tilePadding: const EdgeInsets.symmetric(
                 horizontal: 8,
@@ -759,7 +721,7 @@ class UniversalUIComponents {
                   }
                 }
 
-                // ✅ Increment counter to force all tiles to rebuild
+                //  Increment counter to force all tiles to rebuild
                 _rebuildCounter++;
 
                 // Force UI update
@@ -886,6 +848,7 @@ class UniversalUIComponents {
     String? selectedConversationId,
     Function(BuildContext, String?)? onConversationSelected,
     StateSetter? setDrawerState,
+    VoidCallback? onNewChat,
   ) {
     bool isExpanded = UserConstant.isOASPAssistExpanded;
 
@@ -905,15 +868,8 @@ class UniversalUIComponents {
                     Navigator.of(context).pop();
                     await Future.delayed(Duration(milliseconds: 300));
 
-                    if (context.mounted) {
-                      final parentState =
-                          context.findAncestorStateOfType<State>();
-                      if (parentState != null) {
-                        if (parentState.widget.runtimeType.toString() ==
-                            '_UserMainPageState') {
-                          await (parentState as dynamic)._onNewChatPressed();
-                        }
-                      }
+                    if (context.mounted && onNewChat != null) {
+                      onNewChat();
                     }
                   },
                   icon: const Icon(Icons.add, size: 18),
@@ -1105,14 +1061,15 @@ class UniversalUIComponents {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      initialData: _conversationSnapshots[userId],
+      stream: _getConversationStream(userId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData) {
+          _conversationSnapshots[userId] = snapshot.data!;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return Container(
             padding: const EdgeInsets.all(16),
             child: Center(
@@ -1280,7 +1237,7 @@ class UniversalUIComponents {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    // ✅ CRITICAL: Close drawer FIRST on mobile before showing dialog
+    //  CRITICAL: Close drawer FIRST on mobile before showing dialog
     if (isMobile && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
       // Wait for drawer animation to complete
@@ -1541,7 +1498,7 @@ class UniversalUIComponents {
                                 );
                               }
                             } catch (e) {
-                              print('❌ Delete error: $e');
+                              print(' Delete error: $e');
                               if (context.mounted) {
                                 Navigator.of(context).pop(); // Close dialog
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1620,7 +1577,7 @@ class UniversalUIComponents {
     Function(int) onItemTap,
     bool isExpanded, {
     Function(BuildContext, String?)? onConversationSelected,
-    VoidCallback? onNewChat, // ✅ ADD THIS PARAMETER
+    VoidCallback? onNewChat, //  ADD THIS PARAMETER
   }) {
     List<Widget> items = [];
 
@@ -1678,7 +1635,7 @@ class UniversalUIComponents {
               context,
               isExpanded,
               onConversationSelected: onConversationSelected,
-              onNewChat: onNewChat, // ✅ PASS IT HERE
+              onNewChat: onNewChat, //  PASS IT HERE
             ),
           );
         }
@@ -1726,7 +1683,7 @@ class UniversalUIComponents {
                     onPressed: () async {
                       HapticFeedback.mediumImpact();
 
-                      // ✅ FIX: Call the callback with proper async handling
+                      //   Call the callback with proper async handling
                       if (onNewChat != null && context.mounted) {
                         onNewChat();
                       }
@@ -1841,7 +1798,7 @@ class UniversalUIComponents {
                       onTap: () async {
                         HapticFeedback.mediumImpact();
 
-                        // ✅ FIX: Use callback for collapsed state
+                        //   Use callback for collapsed state
                         if (onNewChat != null && context.mounted) {
                           onNewChat();
                         }
@@ -1886,13 +1843,13 @@ class UniversalUIComponents {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      initialData: _conversationSnapshots[userId],
+      stream: _getConversationStream(userId),
       builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _conversationSnapshots[userId] = snapshot.data!;
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return Container(
@@ -2273,7 +2230,7 @@ class UniversalUIComponents {
       barrierDismissible: true,
       barrierLabel: 'Notifications',
       barrierColor: Colors.black.withOpacity(0.3),
-      transitionDuration: Duration.zero, // ✅ No animation
+      transitionDuration: Duration.zero, //  No animation
       pageBuilder: (context, animation, secondaryAnimation) {
         return Align(
           alignment: Alignment.topRight,
@@ -2322,7 +2279,7 @@ class UniversalUIComponents {
       stream:
           FirebaseFirestore.instance
               .collection('notifications')
-              .where('userId', isEqualTo: currentUserId) // ✅ Filter by userId
+              .where('userId', isEqualTo: currentUserId) //  Filter by userId
               .where('targetRole', isEqualTo: roleToString(userRole))
               .orderBy('createdAt', descending: true)
               .limit(50)
@@ -2358,7 +2315,7 @@ class UniversalUIComponents {
               onPressed: () => _showNotifications(context, userRole),
             ),
 
-            // 🔴 Small badge
+            //  Small badge
             if (unreadCount > 0)
               Positioned(
                 right: 6,

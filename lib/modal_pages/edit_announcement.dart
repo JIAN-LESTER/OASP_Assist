@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:capstone_project/modal_pages/programs.modal.dart';
-import 'package:capstone_project/modules/admin_module/program_management.dart';
-import 'package:capstone_project/modules/admin_module/user_management_module/user_info.dart';
+import 'package:capstone_project/modules/admin/program_management.dart';
+import 'package:capstone_project/modules/admin/user_management/user_info.dart';
 
 void showEditAnnouncementModal(
   BuildContext context,
@@ -120,7 +120,7 @@ class _EditUserModalState extends State<EditUserModal> {
         programs = fetchedPrograms;
         isLoadingPrograms = false;
 
-        // ✅ Ensure selectedProgram exists, otherwise default to 'N/A'
+        //  Ensure selectedProgram exists, otherwise default to 'N/A'
         if (!programs.contains(selectedProgram)) {
           selectedProgram = 'N/A';
         }
@@ -410,7 +410,7 @@ class _EditUserModalState extends State<EditUserModal> {
                                     ) // Loader
                                     : _buildDropdownField(
                                       label: 'Program',
-                                      // ✅ Ensure value is always valid
+                                      //  Ensure value is always valid
                                       value:
                                           programs.contains(selectedProgram)
                                               ? selectedProgram
@@ -436,7 +436,7 @@ class _EditUserModalState extends State<EditUserModal> {
                                   builder:
                                       (context) => const ManageProgramsDialog(),
                                 );
-                                // ✅ Re-fetch programs after managing
+                                //  Re-fetch programs after managing
                                 await _fetchPrograms();
                               },
                               icon: const Icon(Icons.settings, size: 16),
@@ -714,7 +714,6 @@ class _EditUserModalState extends State<EditUserModal> {
       }
     }
   }
-
 
   Widget _buildDropdownField({
     required String label,

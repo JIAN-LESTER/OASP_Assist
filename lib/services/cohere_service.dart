@@ -8,7 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class CohereService {
   final FirebaseFunctions functions = FirebaseFunctions.instance;
   final bool _isDesktop;
-  
+
   // Desktop-only fields
   late final String _cohereApiKey;
   late final String _geminiApiKey;
@@ -19,27 +19,28 @@ class CohereService {
     if (_isDesktop) {
       _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
       _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-      
+
       if (_cohereApiKey.isEmpty || _geminiApiKey.isEmpty) {
         throw Exception('Cohere/Gemini API keys not found in .env file');
       }
-      
+
       _chatUrl = Uri.parse('https://api.cohere.ai/v1/chat');
-      _embedUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey";
-      
+      _embedUrl =
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey";
+
       if (kDebugMode) {
         print('🖥️ Using desktop Cohere implementation');
       }
     } else {
       if (kDebugMode) {
-        print('📱 Using Cloud Functions Cohere implementation');
+        print(' Using Cloud Functions Cohere implementation');
       }
     }
   }
 
   static bool _checkIfDesktop() {
     if (kIsWeb) return false;
-    
+
     try {
       return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
     } catch (e) {
@@ -73,14 +74,15 @@ class CohereService {
         body: jsonEncode({
           'model': 'models/gemini-embedding-001',
           'content': {
-            'parts': [{'text': text}]
+            'parts': [
+              {'text': text},
+            ],
           },
-   
         }),
       );
 
       if (response.statusCode != 200) {
-        print('❌ Gemini Embed API error: ${response.body}');
+        print(' Gemini Embed API error: ${response.body}');
         throw Exception('Failed to generate embedding: ${response.body}');
       }
 
@@ -88,7 +90,7 @@ class CohereService {
       final embedding = data['embedding']['values'] as List;
       return embedding.map((e) => (e as num).toDouble()).toList();
     } catch (e) {
-      print('❌ Error generating Gemini embedding: $e');
+      print(' Error generating Gemini embedding: $e');
       rethrow;
     }
   }
@@ -99,15 +101,12 @@ class CohereService {
   }) async {
     try {
       final callable = functions.httpsCallable('generateGeminiEmbedding');
-      final result = await callable.call({
-        'text': text,
-        'taskType': taskType,
-      });
-      
+      final result = await callable.call({'text': text, 'taskType': taskType});
+
       final embedding = result.data['embedding'] as List;
       return embedding.map((e) => (e as num).toDouble()).toList();
     } catch (e) {
-      print('❌ Error generating embedding: $e');
+      print(' Error generating embedding: $e');
       rethrow;
     }
   }
@@ -148,7 +147,7 @@ class CohereService {
       final data = jsonDecode(response.body);
       return data['text'] ?? '';
     } catch (e) {
-      print('❌ Error generating Cohere response: $e');
+      print(' Error generating Cohere response: $e');
       rethrow;
     }
   }
@@ -159,7 +158,7 @@ class CohereService {
       final result = await callable.call({'prompt': prompt});
       return result.data['text'] ?? '';
     } catch (e) {
-      print('❌ Error generating Cohere response: $e');
+      print(' Error generating Cohere response: $e');
       rethrow;
     }
   }
@@ -233,7 +232,7 @@ Return valid JSON only in this format:
         }
 
         String cleanedResponse = _extractJsonFromResponse(generatedText);
-        
+
         try {
           final result = jsonDecode(cleanedResponse);
           return _processAdmissionResult(result, message);
@@ -244,12 +243,14 @@ Return valid JSON only in this format:
         return _fallbackAdmissionExtraction(message);
       }
     } catch (e) {
-      print('❌ Error analyzing admission: $e');
+      print(' Error analyzing admission: $e');
       return _fallbackAdmissionExtraction(message);
     }
   }
 
-  Future<Map<String, dynamic>> _analyzeAdmissionCloudFunction(String message) async {
+  Future<Map<String, dynamic>> _analyzeAdmissionCloudFunction(
+    String message,
+  ) async {
     try {
       if (message.trim().isEmpty) {
         return _fallbackAdmissionExtraction(message);
@@ -264,7 +265,7 @@ Return valid JSON only in this format:
 
       return _processAdmissionResult(result.data, message);
     } catch (e) {
-      print('❌ Error analyzing admission: $e');
+      print(' Error analyzing admission: $e');
       return _fallbackAdmissionExtraction(message);
     }
   }
@@ -281,7 +282,9 @@ Return valid JSON only in this format:
     }
   }
 
-  Future<Map<String, dynamic>> _analyzeScholarshipDesktop(String message) async {
+  Future<Map<String, dynamic>> _analyzeScholarshipDesktop(
+    String message,
+  ) async {
     try {
       if (message.trim().isEmpty) {
         return {"scholarships": [], "deadline": null};
@@ -342,12 +345,14 @@ Return valid JSON:
         return {"scholarships": [], "deadline": null};
       }
     } catch (e) {
-      print('❌ Error analyzing scholarship: $e');
+      print(' Error analyzing scholarship: $e');
       return {"scholarships": [], "deadline": null};
     }
   }
 
-  Future<Map<String, dynamic>> _analyzeScholarshipCloudFunction(String message) async {
+  Future<Map<String, dynamic>> _analyzeScholarshipCloudFunction(
+    String message,
+  ) async {
     try {
       if (message.trim().isEmpty) {
         return {"scholarships": [], "deadline": null};
@@ -358,7 +363,7 @@ Return valid JSON:
 
       return _processScholarshipResult(result.data);
     } catch (e) {
-      print('❌ Error analyzing scholarship: $e');
+      print(' Error analyzing scholarship: $e');
       return {"scholarships": [], "deadline": null};
     }
   }
@@ -434,12 +439,14 @@ Return valid JSON:
         return {"placements": []};
       }
     } catch (e) {
-      print('❌ Error analyzing placement: $e');
+      print(' Error analyzing placement: $e');
       return {"placements": []};
     }
   }
 
-  Future<Map<String, dynamic>> _analyzePlacementCloudFunction(String message) async {
+  Future<Map<String, dynamic>> _analyzePlacementCloudFunction(
+    String message,
+  ) async {
     try {
       if (message.trim().isEmpty) {
         return {"placements": []};
@@ -450,7 +457,7 @@ Return valid JSON:
 
       return _processPlacementResult(result.data);
     } catch (e) {
-      print('❌ Error analyzing placement: $e');
+      print(' Error analyzing placement: $e');
       return {"placements": []};
     }
   }
@@ -459,19 +466,25 @@ Return valid JSON:
   // Helper Methods
   // =========================================================================
 
-  Map<String, dynamic> _processAdmissionResult(Map<String, dynamic> data, String message) {
+  Map<String, dynamic> _processAdmissionResult(
+    Map<String, dynamic> data,
+    String message,
+  ) {
     String? admissionType = data['type']?.toString();
-    if (admissionType == null || admissionType.isEmpty || admissionType == 'null') {
+    if (admissionType == null ||
+        admissionType.isEmpty ||
+        admissionType == 'null') {
       admissionType = _detectAdmissionType(message);
     }
 
     List<Map<String, dynamic>> contacts = _processContacts(data['contacts']);
     List<String> steps = _processSteps(data['steps']);
     List<String> requirements = _processStringList(data['requirements']);
-    List<String> links = (data['links'] is List)
-        ? List<String>.from(data['links'].map((e) => e.toString()))
-        : [];
-    
+    List<String> links =
+        (data['links'] is List)
+            ? List<String>.from(data['links'].map((e) => e.toString()))
+            : [];
+
     List<Map<String, dynamic>> schedules = [];
     if (data['schedules'] is List) {
       for (var schedule in data['schedules']) {
@@ -479,9 +492,12 @@ Return valid JSON:
           schedules.add({
             'date': schedule['date']?.toString() ?? '',
             'dayOfWeek': schedule['dayOfWeek']?.toString() ?? '',
-            'locations': schedule['locations'] is List
-                ? List<String>.from(schedule['locations'].map((e) => e.toString()))
-                : [],
+            'locations':
+                schedule['locations'] is List
+                    ? List<String>.from(
+                      schedule['locations'].map((e) => e.toString()),
+                    )
+                    : [],
           });
         }
       }
@@ -489,13 +505,19 @@ Return valid JSON:
 
     Map<String, int>? academicYearMap;
     if (data['academicYear'] != null) {
-      academicYearMap = _parseAcademicYear(data['academicYear'].toString(), message);
+      academicYearMap = _parseAcademicYear(
+        data['academicYear'].toString(),
+        message,
+      );
     }
 
-    if (steps.isEmpty || requirements.isEmpty || (contacts.isEmpty && links.isEmpty)) {
+    if (steps.isEmpty ||
+        requirements.isEmpty ||
+        (contacts.isEmpty && links.isEmpty)) {
       final fallback = _fallbackAdmissionExtraction(message);
       if (steps.isEmpty) steps = fallback['steps'] as List<String>;
-      if (requirements.isEmpty) requirements = fallback['requirements'] as List<String>;
+      if (requirements.isEmpty)
+        requirements = fallback['requirements'] as List<String>;
       if (contacts.isEmpty && links.isEmpty) {
         contacts = fallback['contacts'] as List<Map<String, dynamic>>;
         links = fallback['links'] as List<String>;
@@ -534,8 +556,11 @@ Return valid JSON:
           scholarships.add({
             "name": s["name"]?.toString().trim() ?? "",
             "description": s["description"]?.toString().trim() ?? "",
-            "scholarshipProvider": s["scholarshipProvider"]?.toString().trim() ?? "",
-            "eligibilityRequirements": _processStringList(s["eligibilityRequirements"]),
+            "scholarshipProvider":
+                s["scholarshipProvider"]?.toString().trim() ?? "",
+            "eligibilityRequirements": _processStringList(
+              s["eligibilityRequirements"],
+            ),
             "privileges": _processStringList(s["privileges"]),
             "deadline": s["deadline"]?.toString().trim() ?? "",
             "application_link": s["application_link"]?.toString().trim() ?? "",
@@ -564,7 +589,9 @@ Return valid JSON:
             "contacts": _processStringList(p["contacts"]),
             "positions": _processStringList(p["positions"]),
             "deadline": deadline?.toIso8601String(),
-            "createdAt": p["createdAt"]?.toString().trim() ?? DateTime.now().toIso8601String(),
+            "createdAt":
+                p["createdAt"]?.toString().trim() ??
+                DateTime.now().toIso8601String(),
           });
         }
       }
@@ -582,7 +609,8 @@ Return valid JSON:
   }
 
   Map<String, int>? _parseAcademicYear(String? yearStr, String fallbackText) {
-    if ((yearStr == null || yearStr.trim().isEmpty) && fallbackText.isNotEmpty) {
+    if ((yearStr == null || yearStr.trim().isEmpty) &&
+        fallbackText.isNotEmpty) {
       yearStr = fallbackText;
     }
     if (yearStr == null || yearStr.trim().isEmpty) return null;
@@ -616,9 +644,16 @@ Return valid JSON:
     Map<String, int>? academicYear;
 
     final requirementKeywords = [
-      'Form 137', 'Form 138', 'NSO Birth Certificate', 'Birth Certificate',
-      'Certificate of Good Moral', 'Medical Certificate', 'ID Picture',
-      'Transcript of Records', 'TOR', '2x2'
+      'Form 137',
+      'Form 138',
+      'NSO Birth Certificate',
+      'Birth Certificate',
+      'Certificate of Good Moral',
+      'Medical Certificate',
+      'ID Picture',
+      'Transcript of Records',
+      'TOR',
+      '2x2',
     ];
 
     final lines = text.split('\n');
@@ -634,9 +669,13 @@ Return valid JSON:
       }
     }
 
-    final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
+    final emailRegex = RegExp(
+      r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+    );
     final phoneRegex = RegExp(r'(?<!\d)(?:\+63|63|0)?[89]\d{9}(?!\d)');
-    final websiteRegex = RegExp(r'https?:\/\/[\w\.-]+\.[\w]{2,}(?:\/[\w\.-]*)*');
+    final websiteRegex = RegExp(
+      r'https?:\/\/[\w\.-]+\.[\w]{2,}(?:\/[\w\.-]*)*',
+    );
 
     for (final match in emailRegex.allMatches(text)) {
       String email = match.group(0) ?? '';
@@ -671,16 +710,17 @@ Return valid JSON:
   }
 
   String _extractJsonFromResponse(String response) {
-    String cleaned = response
-        .replaceAll('```json', '')
-        .replaceAll('```', '')
-        .replaceAll(RegExp(r'^[^{]*'), '')
-        .replaceAll(RegExp(r'}[^}]*$'), '}')
-        .trim();
+    String cleaned =
+        response
+            .replaceAll('```json', '')
+            .replaceAll('```', '')
+            .replaceAll(RegExp(r'^[^{]*'), '')
+            .replaceAll(RegExp(r'}[^}]*$'), '}')
+            .trim();
 
     int startIndex = cleaned.indexOf('{');
     int endIndex = -1;
-    
+
     if (startIndex != -1) {
       int braceCount = 0;
       for (int i = startIndex; i < cleaned.length; i++) {
@@ -707,10 +747,12 @@ Return valid JSON:
 
     if (contactsData is List) {
       for (var contact in contactsData) {
-        if (contact is Map && contact['type'] != null && contact['value'] != null) {
+        if (contact is Map &&
+            contact['type'] != null &&
+            contact['value'] != null) {
           String type = contact['type'].toString().toLowerCase();
           String value = contact['value'].toString().trim();
-          
+
           if (_isValidContact(type, value)) {
             contacts.add({'type': type, 'value': value});
           }
@@ -724,7 +766,9 @@ Return valid JSON:
   bool _isValidContact(String type, String value) {
     switch (type) {
       case 'email':
-        return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(value);
+        return RegExp(
+          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+        ).hasMatch(value);
       case 'phone':
         if (RegExp(r'^\d{4}-\d{4}$').hasMatch(value)) return false;
         if (value.length < 7) return false;
@@ -756,7 +800,10 @@ Return valid JSON:
 
   List<String> _processStringList(dynamic data) {
     if (data is List) {
-      return data.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      return data
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     } else if (data is String && data.trim().isNotEmpty) {
       return data
           .split(RegExp(r'\n|,|•'))

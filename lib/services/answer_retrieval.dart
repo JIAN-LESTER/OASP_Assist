@@ -1,10 +1,10 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/models/message.dart';
 
 class AnswerRetrievalService {
-  // FIX: The Cloud Run URL for an onRequest function already IS the endpoint.
+  //  The Cloud Run URL for an onRequest function already IS the endpoint.
   // Do NOT append '/generateAnswer' — that would 404.
   // This URL is the full address exported as `generateAnswer` in index.ts.
   final String cloudFunctionUrl =
@@ -18,7 +18,7 @@ class AnswerRetrievalService {
   }) async* {
     try {
       print(
-        '🚀 Starting streaming for: '
+        ' Starting streaming for: '
         '"${question.substring(0, min(50, question.length))}..."',
       );
 
@@ -34,7 +34,7 @@ class AnswerRetrievalService {
             [],
       };
 
-      // FIX: POST directly to cloudFunctionUrl — the function IS the endpoint.
+      //  POST directly to cloudFunctionUrl — the function IS the endpoint.
       final request = http.Request('POST', Uri.parse(cloudFunctionUrl));
       request.headers['Content-Type'] = 'application/json';
       request.body = json.encode(requestBody);
@@ -43,7 +43,7 @@ class AnswerRetrievalService {
 
       if (streamedResponse.statusCode != 200) {
         final errorBody = await streamedResponse.stream.bytesToString();
-        print('❌ HTTP Error ${streamedResponse.statusCode}: $errorBody');
+        print(' HTTP Error ${streamedResponse.statusCode}: $errorBody');
         yield 'I apologize, but I encountered an error processing your '
             'request. Please try again.';
         return;
@@ -84,16 +84,14 @@ class AnswerRetrievalService {
           } else if (data['type'] == 'message-end') {
             final totalTime =
                 DateTime.now().difference(startTime).inMilliseconds;
-            print(
-              '✅ Streaming complete: $chunkCount chunks in ${totalTime}ms',
-            );
+            print(' Streaming complete: $chunkCount chunks in ${totalTime}ms');
 
             if (fullAnswer.isNotEmpty) {
               yield fullAnswer;
             }
             break;
           } else if (data['type'] == 'error') {
-            print('❌ Streaming error from server: ${data['error']}');
+            print(' Streaming error from server: ${data['error']}');
             if (fullAnswer.isEmpty) {
               yield 'I encountered an error processing your request. '
                   'Please try again.';
@@ -103,7 +101,7 @@ class AnswerRetrievalService {
         } catch (e) {
           // Skip malformed SSE chunks without crashing.
           print(
-            '⚠️ Failed to parse chunk: '
+            ' Failed to parse chunk: '
             '${jsonStr.substring(0, min(100, jsonStr.length))}',
           );
           continue;
@@ -111,12 +109,12 @@ class AnswerRetrievalService {
       }
 
       if (fullAnswer.isEmpty) {
-        print('⚠️ No content received from stream');
+        print(' No content received from stream');
         yield 'I apologize, but I was unable to generate a response. '
             'Please try again.';
       }
     } catch (e) {
-      print('❌ Streaming error: $e');
+      print(' Streaming error: $e');
       yield 'I apologize, but I encountered an error. Please try again or '
           'contact OASP staff.';
     }
@@ -131,7 +129,7 @@ class AnswerRetrievalService {
     double minSimilarityScore = 0.3,
   }) async {
     try {
-      print('🤖 Generating answer for: "$query"');
+      print(' Generating answer for: "$query"');
 
       final historyData =
           conversationHistory
@@ -147,7 +145,7 @@ class AnswerRetrievalService {
         'minSimilarityScore': minSimilarityScore,
       };
 
-      // FIX: POST directly to cloudFunctionUrl (same as streaming path).
+      //  POST directly to cloudFunctionUrl (same as streaming path).
       final response = await http
           .post(
             Uri.parse(cloudFunctionUrl),
@@ -161,10 +159,10 @@ class AnswerRetrievalService {
             },
           );
 
-      print('📥 Received response: ${response.statusCode}');
+      print(' Received response: ${response.statusCode}');
 
       if (response.statusCode != 200) {
-        print('❌ Cloud Function error: ${response.body}');
+        print(' Cloud Function error: ${response.body}');
         throw Exception(
           'Cloud Function returned error: ${response.statusCode}',
         );
@@ -172,8 +170,7 @@ class AnswerRetrievalService {
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
 
-      if (data['answer'] == null ||
-          data['answer'].toString().trim().isEmpty) {
+      if (data['answer'] == null || data['answer'].toString().trim().isEmpty) {
         return "I'm having trouble processing your question right now. "
             "Please try again or contact OASP staff for assistance.";
       }
@@ -181,11 +178,11 @@ class AnswerRetrievalService {
       final answer = data['answer'] as String;
       final source = data['source'] as String?;
 
-      print('✅ Generated answer from source: $source');
+      print(' Generated answer from source: $source');
 
       return answer.trim();
     } catch (e, stackTrace) {
-      print('❌ Error in generateAnswer: $e');
+      print(' Error in generateAnswer: $e');
       print('Stack trace: $stackTrace');
 
       if (e.toString().contains('timeout')) {

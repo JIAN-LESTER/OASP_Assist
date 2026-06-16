@@ -4,7 +4,6 @@ import * as admin from "firebase-admin";
 
 const db = admin.firestore();
 
-// Helper function remains the same
 async function isAdmin(uid: string): Promise<boolean> {
   try {
     const userDoc = await db.collection("users").doc(uid).get();
@@ -41,9 +40,9 @@ export const createUser = onCall(
   },
   async (request) => {
     console.log("========================================");
-    console.log("🔥 createUser function called");
-    console.log("📊 Request auth:", JSON.stringify(request.auth, null, 2));
-    console.log("📊 Request data:", JSON.stringify(request.data, null, 2));
+    console.log(" createUser function called");
+    console.log(" Request auth:", JSON.stringify(request.auth, null, 2));
+    console.log(" Request data:", JSON.stringify(request.data, null, 2));
     console.log("========================================");
 
     try {
@@ -101,9 +100,9 @@ export const createUser = onCall(
         name: displayName || email.split("@")[0],
         role: role || "user",
         profileComplete: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
+        createdAt: admin.firestore.FieldValue.serverTimestamp(), 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        verifiedAt: admin.firestore.FieldValue.serverTimestamp(), // ✅ Add server timestamp
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(), 
         createdBy: callerUid,
         isActive: true,
         isVerified: true,
@@ -152,7 +151,7 @@ export const createUser = onCall(
         message: "User created successfully.",
       };
     } catch (error: any) {
-      console.error("❌ Error creating user:", error);
+      console.error(" Error creating user:", error);
 
       if (error instanceof HttpsError) {
         throw error;
@@ -184,8 +183,8 @@ export const updateUser = onCall(
     memory: "256MiB",
   },
   async (request) => {
-    console.log("🔥 updateUser function called");
-    console.log("📊 Update data:", JSON.stringify(request.data, null, 2));
+    console.log(" updateUser function called");
+    console.log(" Update data:", JSON.stringify(request.data, null, 2));
 
     try {
       if (!request.auth) {
@@ -309,14 +308,14 @@ export const updateUser = onCall(
         updatedBy: callerUid,
       });
 
-      console.log("✅ User updated successfully:", uid);
+      console.log(" User updated successfully:", uid);
 
       return {
         success: true,
         message: `User ${uid} updated successfully.`,
       };
     } catch (error: any) {
-      console.error("❌ Error updating user:", error);
+      console.error(" Error updating user:", error);
 
       if (error instanceof HttpsError) {
         throw error;
@@ -336,7 +335,7 @@ export const deleteUser = onCall(
     memory: "512MiB",
   },
   async (request) => {
-    console.log("🔥 deleteUser function called");
+    console.log(" deleteUser function called");
 
     try {
       if (!request.auth) {
@@ -355,12 +354,12 @@ export const deleteUser = onCall(
         throw new HttpsError("invalid-argument", "User ID (uid) is required.");
       }
 
-      console.log(`🗑️ Starting cascade delete for user: ${uid}`);
+      console.log(` Starting cascade delete for user: ${uid}`);
 
       // Get user document
       const userDoc = await db.collection("users").doc(uid).get();
       if (!userDoc.exists) {
-        console.warn(`⚠️ User document not found: ${uid}`);
+        console.warn(` User document not found: ${uid}`);
       }
 
       // Delete conversations and messages
@@ -376,18 +375,18 @@ export const deleteUser = onCall(
           .get();
       }
 
-      console.log(`📦 Found ${conversationsSnapshot.size} conversations`);
+      console.log(` Found ${conversationsSnapshot.size} conversations`);
 
       for (const doc of conversationsSnapshot.docs) {
         console.log(`➡ Deleting conversation: ${doc.id}`);
         try {
           await db.recursiveDelete(doc.ref);
         } catch (deleteError) {
-          console.error(`❌ Failed to delete conversation ${doc.id}:`, deleteError);
+          console.error(` Failed to delete conversation ${doc.id}:`, deleteError);
         }
       }
 
-      console.log(`✅ Deleted all conversations & messages for ${uid}`);
+      console.log(` Deleted all conversations & messages for ${uid}`);
 
       // Delete escalations
       let escSnapshot = await db
@@ -406,25 +405,25 @@ export const deleteUser = onCall(
         const batch = db.batch();
         escSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        console.log(`✅ Deleted ${escSnapshot.size} escalations`);
+        console.log(` Deleted ${escSnapshot.size} escalations`);
       } else {
-        console.log(`ℹ️ No escalations found for ${uid}`);
+        console.log(` No escalations found for ${uid}`);
       }
 
       // Delete Firebase Authentication user
       try {
         await admin.auth().deleteUser(uid);
-        console.log(`✅ Auth user deleted: ${uid}`);
+        console.log(` Auth user deleted: ${uid}`);
       } catch (authError: any) {
-        console.warn(`⚠️ Could not delete auth user: ${authError.message}`);
+        console.warn(` Could not delete auth user: ${authError.message}`);
       }
 
       // Delete user document from Firestore
       try {
         await db.collection("users").doc(uid).delete();
-        console.log(`✅ User document deleted: ${uid}`);
+        console.log(` User document deleted: ${uid}`);
       } catch (firestoreError) {
-        console.warn("⚠️ Could not delete user from Firestore:", firestoreError);
+        console.warn(" Could not delete user from Firestore:", firestoreError);
       }
 
       // Create log entry
@@ -437,7 +436,7 @@ export const deleteUser = onCall(
         deletedBy: callerUid,
       });
 
-      console.log(`🚀 Completed cascade delete for user: ${uid}`);
+      console.log(` Completed cascade delete for user: ${uid}`);
 
       return {
         success: true,
@@ -446,7 +445,7 @@ export const deleteUser = onCall(
         deletedEscalations: escSnapshot.size,
       };
     } catch (error: any) {
-      console.error("❌ Error deleting user:", error);
+      console.error(" Error deleting user:", error);
 
       if (error instanceof HttpsError) {
         throw error;
@@ -466,7 +465,7 @@ export const setAdminRole = onCall(
     memory: "256MiB",
   },
   async (request) => {
-    console.log("🔥 setAdminRole function called");
+    console.log(" setAdminRole function called");
 
     try {
       if (!request.auth) {
@@ -501,7 +500,7 @@ export const setAdminRole = onCall(
         message: `User ${uid} ${makeAdmin ? "promoted to" : "removed from"} admin role.`,
       };
     } catch (error: any) {
-      console.error("❌ Error setting admin role:", error);
+      console.error(" Error setting admin role:", error);
 
       if (error instanceof HttpsError) {
         throw error;
@@ -518,15 +517,15 @@ export const onUserDelete = onDocumentDeleted(
     const userId = event.params.userId;
     const db = admin.firestore();
 
-    console.log(`🗑️ [TRIGGER] Starting cascade delete for user: ${userId}`);
+    console.log(` [TRIGGER] Starting cascade delete for user: ${userId}`);
 
     try {
       // Delete Firebase Authentication user IF still present
       try {
         await admin.auth().deleteUser(userId);
-        console.log(`✅ [TRIGGER] Auth user deleted: ${userId}`);
+        console.log(` [TRIGGER] Auth user deleted: ${userId}`);
       } catch (authErr) {
-        console.log(`⚠️ [TRIGGER] Auth user not found or already deleted: ${userId}`);
+        console.log(` [TRIGGER] Auth user not found or already deleted: ${userId}`);
       }
 
       // Delete conversations
@@ -542,14 +541,14 @@ export const onUserDelete = onDocumentDeleted(
           .get();
       }
 
-      console.log(`📦 [TRIGGER] Found ${conversationsSnapshot.size} conversations`);
+      console.log(` [TRIGGER] Found ${conversationsSnapshot.size} conversations`);
 
       for (const doc of conversationsSnapshot.docs) {
         console.log(`➡ [TRIGGER] Deleting conversation: ${doc.id}`);
         await db.recursiveDelete(doc.ref);
       }
 
-      console.log(`✅ [TRIGGER] Deleted all conversations & messages for ${userId}`);
+      console.log(` [TRIGGER] Deleted all conversations & messages for ${userId}`);
 
       // Delete escalations
       let escSnapshot = await db
@@ -568,9 +567,9 @@ export const onUserDelete = onDocumentDeleted(
         const batch = db.batch();
         escSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        console.log(`✅ [TRIGGER] Deleted ${escSnapshot.size} escalations`);
+        console.log(` [TRIGGER] Deleted ${escSnapshot.size} escalations`);
       } else {
-        console.log(`ℹ️ [TRIGGER] No escalations found for ${userId}`);
+        console.log(` [TRIGGER] No escalations found for ${userId}`);
       }
 
       // Create a log entry
@@ -582,11 +581,11 @@ export const onUserDelete = onDocumentDeleted(
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`🚀 [TRIGGER] Completed cascade delete for user: ${userId}`);
+      console.log(` [TRIGGER] Completed cascade delete for user: ${userId}`);
 
       return true;
     } catch (error) {
-      console.error(`❌ [TRIGGER] Cascade delete error for ${userId}:`, error);
+      console.error(` [TRIGGER] Cascade delete error for ${userId}:`, error);
       throw error;
     }
   }

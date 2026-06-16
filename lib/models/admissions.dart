@@ -12,7 +12,7 @@ class Admissions {
   final String source;
   final DateTime createdAt;
   final List<Map<String, dynamic>>? schedules;
-  final String? type; // ✅ EXISTING: Type field for CMUCAT, GSAT, ULHSAT
+  final String? type; //  EXISTING: Type field for CMUCAT, GSAT, ULHSAT
 
   Admissions({
     required this.id,
@@ -26,15 +26,23 @@ class Admissions {
     required this.source,
     required this.createdAt,
     this.schedules,
-    this.type, // ✅ Already exists
+    this.type, //  Already exists
   });
 
   factory Admissions.fromJson(Map<String, dynamic> json) {
-    print("📥 Admissions.fromJson input: $json");
+    Map<String, int>? parseAcademicYear(dynamic value) {
+      if (value is Map) {
+        final start = int.tryParse(value['start']?.toString() ?? '');
+        final end = int.tryParse(value['end']?.toString() ?? '');
 
-    Map<String, int>? parseAcademicYear(String? yearStr) {
+        if (start != null && end != null) return {'start': start, 'end': end};
+        if (start != null) return {'start': start};
+        return null;
+      }
+
+      final yearStr = value?.toString();
       if (yearStr == null || yearStr.trim().isEmpty) return null;
-      final rangeRegex = RegExp(r'(\d{4})\s*[-–]\s*(\d{4})');
+      final rangeRegex = RegExp('(\\d{4})\\s*(?:-|\\u2013)\\s*(\\d{4})');
       final singleRegex = RegExp(r'(\d{4})');
 
       final rangeMatch = rangeRegex.firstMatch(yearStr);
@@ -77,7 +85,7 @@ class Admissions {
       List<String>? contactList = _parseStringList(json['contact']);
 
       Map<String, int>? academicYearMap = parseAcademicYear(
-        json['academicYear']?.toString(),
+        json['academicYear'],
       );
 
       List<Map<String, dynamic>>? schedulesList;
@@ -105,10 +113,9 @@ class Admissions {
                     ? (json['createdAt'] as Timestamp).toDate()
                     : DateTime.now()),
         schedules: schedulesList,
-        type: json['type']?.toString(), // ✅ Parse type field
+        type: json['type']?.toString(), //  Parse type field
       );
     } catch (e) {
-      print("❌ Error in Admissions.fromJson: $e");
       rethrow;
     }
   }
@@ -133,17 +140,17 @@ class Admissions {
       'source': source,
       'createdAt': createdAt.toIso8601String(),
       'schedules': schedules,
-      'type': type, // ✅ Include type in JSON
+      'type': type, //  Include type in JSON
     };
   }
 
-  // ✅ Helper method to display type in UI
+  //  Helper method to display type in UI
   String get displayType {
     if (type == null || type!.isEmpty) return 'General Admission';
     return type!; // Returns CMUCAT, GSAT, or ULHSAT
   }
 
-  // ✅ Helper to check if this is a specific test type
+  //  Helper to check if this is a specific test type
   bool isCMUCAT() => type?.toUpperCase() == 'CMUCAT';
   bool isGSAT() => type?.toUpperCase() == 'GSAT';
   bool isULHSAT() => type?.toUpperCase() == 'ULHSAT';

@@ -18,7 +18,7 @@ export const testSync = onCall(
     cors: true,
   },
   async (request) => {
-    console.log("🧪 Test function called");
+    console.log(" Test function called");
     console.log("Auth:", request.auth ? "Yes" : "No");
     console.log("Data:", request.data);
 
