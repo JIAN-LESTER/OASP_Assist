@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -582,47 +583,64 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
         createdAt: DateTime.now(),
       );
 
-      await _fileService.saveMultipleScholarships([scholarship]);
-
-      // Save to information bank if we have extracted content from a file
+      InformationBank? informationBank;
       if (_extractedContent != null && _extractedContent!.trim().isNotEmpty) {
-        final informationBank = InformationBank(
+        informationBank = InformationBank(
           id: docId,
-          title: _nameController.text.trim(),
+          title: scholarship.name,
           content: _extractedContent!,
           embedding: [],
           source: _selectedFileName ?? 'Manual Entry',
           category: 'Scholarship',
         );
-        await _fileService.saveToInformationBank(informationBank);
-
-        print(
-          ' Saved to information bank with ${_extractedContent!.length} characters',
-        );
       } else if (_descriptionController.text.trim().isNotEmpty) {
-        // Fallback: If no file was uploaded but description was manually entered
-        final informationBank = InformationBank(
+        informationBank = InformationBank(
           id: docId,
-          title: _nameController.text.trim(),
+          title: scholarship.name,
           content: _descriptionController.text.trim(),
           embedding: [],
           source: 'Manual Entry',
           category: 'Scholarship',
         );
-        await _fileService.saveToInformationBank(informationBank);
-
-        print(' Saved to information bank from manual description');
       }
+      final action = widget.isEdit ? 'Updated' : 'Added';
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      await _logAction(widget.isEdit ? 'Updated' : 'Added');
+      unawaited(() async {
+        try {
+          await _fileService.saveMultipleScholarships([scholarship]);
 
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'Scholarship ${widget.isEdit ? 'updated' : 'added'} successfully!',
-        );
-      }
+          if (informationBank != null) {
+            await _fileService.saveToInformationBank(informationBank);
+          }
 
+          await _logAction(action, scholarship.name);
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Scholarship ${widget.isEdit ? 'updated' : 'added'} successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            final message = e.toString();
+            if (message.contains('Duplicate scholarship already exists')) {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'Duplicate scholarship already exists',
+              );
+            } else {
+              SnackbarUtil.showError(feedbackContext, 'Error: $e');
+            }
+          }
+        }
+      }());
+
+      SnackbarUtil.showInfo(
+        context,
+        'Scholarship ${widget.isEdit ? 'update' : 'creation'} is running in background',
+      );
       Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -636,14 +654,10 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
           SnackbarUtil.showError(context, 'Error: $e');
         }
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
   }
 
-  Future<void> _logAction(String action) async {
+  Future<void> _logAction(String action, String name) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
@@ -664,7 +678,7 @@ class _ScholarshipFormDialogState extends State<ScholarshipFormDialog> {
       await logRef.set({
         'logId': logRef.id,
         'user': actorName,
-        'action': '$action scholarship: ${_nameController.text.trim()}',
+        'action': '$action scholarship: $name',
         'time': Timestamp.now(),
       });
     } catch (e) {
