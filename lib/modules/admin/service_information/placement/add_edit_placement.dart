@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -708,8 +709,6 @@ class _PlacementFormDialogState extends State<PlacementFormDialog> {
         createdAt: DateTime.now(),
       );
 
-      await _fileService.saveMultiplePlacements([placement]);
-
       final contentForIB = '''
 Company: ${_companyController.text.trim()}
 Positions: ${_positionControllers.map((p) => p.text.trim()).join(', ')}
@@ -725,17 +724,41 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
         source: _selectedFileName ?? 'Manual Entry',
         category: 'Placement',
       );
-      await _fileService.saveToInformationBank(informationBank);
+      final action = widget.isEdit ? 'Updated' : 'Added';
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      await _logAction(widget.isEdit ? 'Updated' : 'Added');
+      unawaited(() async {
+        try {
+          await _fileService.saveMultiplePlacements([placement]);
+          await _fileService.saveToInformationBank(informationBank);
+          await _logAction(action, placement.partnerCompany);
 
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'Placement ${widget.isEdit ? 'updated' : 'added'} successfully!',
-        );
-        Navigator.of(context).pop(true);
-      }
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Placement ${widget.isEdit ? 'updated' : 'added'} successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            final message = e.toString();
+            if (message.contains('Duplicate placement already exists')) {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'Duplicate placement already exists',
+              );
+            } else {
+              SnackbarUtil.showError(feedbackContext, 'Error: $e');
+            }
+          }
+        }
+      }());
+
+      SnackbarUtil.showInfo(
+        context,
+        'Placement ${widget.isEdit ? 'update' : 'creation'} is running in background',
+      );
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         final message = e.toString();
@@ -748,14 +771,10 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
           SnackbarUtil.showError(context, 'Error: $e');
         }
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
   }
 
-  Future<void> _logAction(String action) async {
+  Future<void> _logAction(String action, String company) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
       String actorName = 'Unknown';
@@ -776,7 +795,7 @@ Status: ${_isRecruiting ? 'Currently Vacant' : 'Not Vacant'}
       await logRef.set({
         'logId': logRef.id,
         'user': actorName,
-        'action': '$action placement: ${_companyController.text.trim()}',
+        'action': '$action placement: $company',
         'time': Timestamp.now(),
       });
     } catch (e) {

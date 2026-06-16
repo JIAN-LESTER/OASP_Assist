@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -272,10 +274,12 @@ void showEditPlacementDialog(DocumentSnapshot doc, BuildContext context) {
         }
       }
 
-      await FirebaseFirestore.instance
-          .collection('placements')
-          .doc(doc.id)
-          .update({
+      unawaited(() async {
+        try {
+          await FirebaseFirestore.instance
+              .collection('placements')
+              .doc(doc.id)
+              .update({
             'placementID': placementIdController.text,
             'events': eventsController.text,
             'partnerCompany': partnerCompanyController.text,
@@ -284,15 +288,47 @@ void showEditPlacementDialog(DocumentSnapshot doc, BuildContext context) {
             'deadline': Timestamp.fromDate(deadline),
             'updated_at': FieldValue.serverTimestamp(),
           });
-      
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Placement updated successfully'),
+                ],
+              ),
+              backgroundColor: Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('Error updating placement: $e'),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          );
+        }
+      }());
+
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              Icon(Icons.info, color: Colors.white, size: 20),
               SizedBox(width: 8),
-              Text('Placement updated successfully'),
+              Text('Placement update is running in background'),
             ],
           ),
           backgroundColor: Color(0xFF10B981),

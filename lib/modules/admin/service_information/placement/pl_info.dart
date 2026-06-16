@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:capstone_project/modules/admin/service_information/placement/add_edit_placement.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -500,40 +501,62 @@ class _DeletePlacementModalState extends State<_DeletePlacementModal> {
 
   Future<void> _deletePlacement() async {
     setState(() => _isDeleting = true);
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+    final partnerCompany = widget.data['partnerCompany'] ?? 'Unknown';
 
     try {
-      await FirebaseFirestore.instance
-          .collection('placements')
-          .doc(widget.doc.id)
-          .delete();
+      unawaited(() async {
+        try {
+          await FirebaseFirestore.instance
+              .collection('placements')
+              .doc(widget.doc.id)
+              .delete();
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-      if (currentUser != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action': 'Deleted placement: $partnerCompany',
+            'time': Timestamp.now(),
+          });
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Placement deleted successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to delete placement: $e',
+            );
+          }
         }
-      }
-
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action':
-            'Deleted placement: ${widget.data['partnerCompany'] ?? 'Unknown'}',
-        'time': Timestamp.now(),
-      });
+      }());
 
       if (mounted) {
         Navigator.of(context).pop(); // Close delete modal
         Navigator.of(context).pop(); // Close info modal
-        SnackbarUtil.showSuccess(context, 'Placement deleted successfully!');
+        SnackbarUtil.showInfo(
+          context,
+          'Placement deletion is running in background',
+        );
       }
     } catch (e) {
       if (mounted) {
