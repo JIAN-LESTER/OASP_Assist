@@ -54,6 +54,20 @@ class UniversalUIComponents {
   static Color get primaryGreen => const Color(0xFF2E7D32);
   static Color get lightGreen => const Color(0xFF4CAF50);
   static Color get backgroundGrey => Colors.grey[50]!;
+  static final Map<String, Stream<QuerySnapshot>> _conversationStreams = {};
+  static final Map<String, QuerySnapshot> _conversationSnapshots = {};
+
+  static Stream<QuerySnapshot> _getConversationStream(String userId) {
+    return _conversationStreams.putIfAbsent(
+      userId,
+      () =>
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+    );
+  }
 
   static AppBar buildAppBar({
     required BuildContext context,
@@ -199,6 +213,7 @@ class UniversalUIComponents {
                       selectedConversationId: selectedConversationId,
                       onConversationSelected:
                           onConversationSelected, // Pass it down
+                      onNewChat: onNewChat,
                     ),
                   ),
                 ],
@@ -425,63 +440,6 @@ class UniversalUIComponents {
     Function(int)? onItemTap,
     int? selectedIndex,
   }) {
-    if (userRole == UserRole.user && onNewChat != null) {
-      return DrawerHeader(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(
-            bottom: BorderSide(color: Colors.grey[300]!, width: 1),
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Transform.scale(
-              scale: 1.8,
-              child: Image.asset(
-                'lib/images/oasp.png',
-                width: 72,
-                height: 72,
-                // color: Colors.grey[300],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  HapticFeedback.mediumImpact();
-                  Navigator.of(context).pop(); // Close drawer first
-
-                  //   Wait for drawer to close
-                  await Future.delayed(Duration(milliseconds: 300));
-
-                  //  Then call the callback
-                  if (context.mounted) {
-                    onNewChat();
-                  }
-                },
-                icon: const Icon(Icons.add_comment_rounded, size: 20),
-                label: const Text(
-                  'New Chat',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return DrawerHeader(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -527,6 +485,7 @@ class UniversalUIComponents {
     List<Map<String, dynamic>>? recentConversations,
     String? selectedConversationId,
     Function(BuildContext, String?)? onConversationSelected,
+    VoidCallback? onNewChat,
   }) {
     List<Widget> menuItems = [];
 
@@ -560,6 +519,7 @@ class UniversalUIComponents {
               selectedConversationId,
               onConversationSelected,
               setDrawerState,
+              onNewChat,
             ),
           );
         }
@@ -888,6 +848,7 @@ class UniversalUIComponents {
     String? selectedConversationId,
     Function(BuildContext, String?)? onConversationSelected,
     StateSetter? setDrawerState,
+    VoidCallback? onNewChat,
   ) {
     bool isExpanded = UserConstant.isOASPAssistExpanded;
 
@@ -907,15 +868,8 @@ class UniversalUIComponents {
                     Navigator.of(context).pop();
                     await Future.delayed(Duration(milliseconds: 300));
 
-                    if (context.mounted) {
-                      final parentState =
-                          context.findAncestorStateOfType<State>();
-                      if (parentState != null) {
-                        if (parentState.widget.runtimeType.toString() ==
-                            '_UserMainPageState') {
-                          await (parentState as dynamic)._onNewChatPressed();
-                        }
-                      }
+                    if (context.mounted && onNewChat != null) {
+                      onNewChat();
                     }
                   },
                   icon: const Icon(Icons.add, size: 18),
@@ -1107,14 +1061,15 @@ class UniversalUIComponents {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      initialData: _conversationSnapshots[userId],
+      stream: _getConversationStream(userId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData) {
+          _conversationSnapshots[userId] = snapshot.data!;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return Container(
             padding: const EdgeInsets.all(16),
             child: Center(
@@ -1888,13 +1843,13 @@ class UniversalUIComponents {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      initialData: _conversationSnapshots[userId],
+      stream: _getConversationStream(userId),
       builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          _conversationSnapshots[userId] = snapshot.data!;
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return Container(

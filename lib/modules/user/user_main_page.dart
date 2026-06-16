@@ -48,6 +48,21 @@ class UserMainPage extends StatefulWidget {
 
 class _UserMainPageState extends State<UserMainPage>
     with TickerProviderStateMixin {
+  static final Map<String, Stream<QuerySnapshot>> _conversationStreams = {};
+  static final Map<String, QuerySnapshot> _conversationSnapshots = {};
+
+  static Stream<QuerySnapshot> _getConversationStream(String userId) {
+    return _conversationStreams.putIfAbsent(
+      userId,
+      () =>
+          FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+    );
+  }
+
   int _selectedIndex = 0;
   int _currentIndex = 0;
   late TabController _tabController;
@@ -964,48 +979,50 @@ class _UserMainPageState extends State<UserMainPage>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _onNewChatPressed();
-                      },
-                      icon: const Icon(Icons.add_comment_rounded, size: 20),
-                      label: const Text(
-                        'New Chat',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: UniversalUIComponents.primaryGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Recent Conversations',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Recent Conversations',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
                   ),
-                ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _onNewChatPressed();
+                    },
+                    icon: const Icon(Icons.add_comment_rounded, size: 16),
+                    label: const Text(
+                      'New Chat',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: UniversalUIComponents.primaryGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(child: _buildDrawerConversationsList()),
@@ -1035,14 +1052,15 @@ class _UserMainPageState extends State<UserMainPage>
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('conversations')
-              .where('userId', isEqualTo: userId)
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      initialData: _conversationSnapshots[userId],
+      stream: _getConversationStream(userId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.hasData) {
+          _conversationSnapshots[userId] = snapshot.data!;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return Center(
             child: CircularProgressIndicator(
               color: UniversalUIComponents.primaryGreen,
