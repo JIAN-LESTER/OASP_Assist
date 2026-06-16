@@ -458,7 +458,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
     ];
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -494,15 +494,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          Expanded(
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: features.length,
-              itemBuilder:
-                  (context, index) =>
-                      _buildFeatureCard(features[index], descriptionFontSize),
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: features.length,
+            itemBuilder:
+                (context, index) =>
+                    _buildFeatureCard(features[index], descriptionFontSize),
           ),
         ],
       ),
@@ -538,7 +536,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
     ];
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -574,17 +572,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          Expanded(
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: dataItems.length,
-              itemBuilder:
-                  (context, index) => _buildDataCollectionCard(
-                    dataItems[index],
-                    descriptionFontSize,
-                  ),
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: dataItems.length,
+            itemBuilder:
+                (context, index) => _buildDataCollectionCard(
+                  dataItems[index],
+                  descriptionFontSize,
+                ),
           ),
           const SizedBox(height: 12),
           Container(

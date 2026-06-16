@@ -340,9 +340,10 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
   }
 
   Widget _buildFeaturePage() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
         Container(
           width: 110,
           height: 110,
@@ -405,7 +406,8 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
             ),
           ],
         ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -467,9 +469,10 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
   }
 
   Widget _buildPrivacyPage() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
         Container(
           width: 110,
           height: 110,
@@ -554,7 +557,8 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
             ],
           ),
         ),
-      ],
+        ],
+      ),
     );
   }
 
