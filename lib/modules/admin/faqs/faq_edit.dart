@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -573,70 +575,73 @@ Future<void> _handleSaveChanges(
   String? previousModal,
 ) async {
   try {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
-    );
-
-    await FirebaseFirestore.instance.collection('faqs').doc(userDoc.id).update({
-      'question': question,
-      'answer': answer,
-      'category': category,
-      'updatedAt': Timestamp.now(),
-    });
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
-
-    if (currentUser != null) {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>;
-        actorName = data['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
     final faqData = userDoc.data() as Map<String, dynamic>;
     final originalQuestion = faqData['question'] ?? 'Unknown';
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    await logRef.set({
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Updated FAQ: $originalQuestion to $question',
-      'time': Timestamp.now(),
-    });
+    unawaited(() async {
+      try {
+        await FirebaseFirestore.instance.collection('faqs').doc(userDoc.id).update({
+          'question': question,
+          'answer': answer,
+          'category': category,
+          'updatedAt': Timestamp.now(),
+        });
 
-    // Fetch the updated document
-    final updatedDoc =
-        await FirebaseFirestore.instance
-            .collection('faqs')
-            .doc(userDoc.id)
-            .get();
+        final currentUser = FirebaseAuth.instance.currentUser;
+        String actorName = 'Unknown';
 
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      Navigator.of(context).pop(); // Close edit modal
-
-      Future.delayed(const Duration(milliseconds: 200), () {
-        if (previousModal == 'info' && updatedDoc.exists) {
-          showFAQInfoModal(context, updatedDoc, fromEdit: true);
+        if (currentUser != null) {
+          final doc =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .get();
+          if (doc.exists) {
+            final data = doc.data() as Map<String, dynamic>;
+            actorName = data['name'] ?? currentUser.email ?? 'Unknown';
+          }
         }
-      });
 
-      SnackbarUtil.showSuccess(context, 'FAQ updated successfully');
+        final logRef = FirebaseFirestore.instance.collection('logs').doc();
+        await logRef.set({
+          'logId': logRef.id,
+          'user': actorName,
+          'action': 'Updated FAQ: $originalQuestion to $question',
+          'time': Timestamp.now(),
+        });
+
+        final updatedDoc =
+            await FirebaseFirestore.instance
+                .collection('faqs')
+                .doc(userDoc.id)
+                .get();
+
+        if (feedbackContext.mounted) {
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (previousModal == 'info' && updatedDoc.exists) {
+              showFAQInfoModal(feedbackContext, updatedDoc, fromEdit: true);
+            }
+          });
+
+          SnackbarUtil.showSuccess(feedbackContext, 'FAQ updated successfully');
+        }
+      } catch (e) {
+        if (feedbackContext.mounted) {
+          SnackbarUtil.showError(
+            feedbackContext,
+            'Failed to update: ${e.toString()}',
+          );
+        }
+      }
+    }());
+
+    SnackbarUtil.showInfo(context, 'FAQ update is running in background');
+    if (context.mounted) {
+      Navigator.of(context).pop();
     }
   } catch (e) {
     if (context.mounted) {
-      Navigator.of(context).pop();
       SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
     }
   }

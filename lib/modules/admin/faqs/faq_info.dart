@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -516,55 +518,55 @@ Future<void> _handleDeleteFAQ(
 ) async {
   try {
     // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (context) => const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          ),
-    );
-
-    final currentUser = FirebaseAuth.instance.currentUser;
-    String actorName = 'Unknown';
-
-    if (currentUser != null) {
-      final currentUserDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUser.uid)
-              .get();
-      if (currentUserDoc.exists) {
-        final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
-        actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-      }
-    }
-
     final docData = doc.data() as Map<String, dynamic>;
     String deletedQuestion = docData['question'] ?? 'Unknown';
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-    // Delete FAQ document
-    await FirebaseFirestore.instance.collection('faqs').doc(doc.id).delete();
+    unawaited(() async {
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        String actorName = 'Unknown';
 
-    // Log action
-    final logRef = FirebaseFirestore.instance.collection('logs').doc();
-    await logRef.set({
-      'logId': logRef.id,
-      'user': actorName,
-      'action': 'Deleted FAQ: $deletedQuestion',
-      'time': Timestamp.now(),
-    });
+        if (currentUser != null) {
+          final currentUserDoc =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .get();
+          if (currentUserDoc.exists) {
+            final currentUserData =
+                currentUserDoc.data() as Map<String, dynamic>;
+            actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
+          }
+        }
+
+        await FirebaseFirestore.instance.collection('faqs').doc(doc.id).delete();
+
+        final logRef = FirebaseFirestore.instance.collection('logs').doc();
+        await logRef.set({
+          'logId': logRef.id,
+          'user': actorName,
+          'action': 'Deleted FAQ: $deletedQuestion',
+          'time': Timestamp.now(),
+        });
+
+        if (feedbackContext.mounted) {
+          SnackbarUtil.showSuccess(feedbackContext, 'FAQ deleted successfully');
+        }
+      } catch (error) {
+        if (feedbackContext.mounted) {
+          SnackbarUtil.showError(
+            feedbackContext,
+            'Failed to delete FAQ: $error',
+          );
+        }
+      }
+    }());
 
     if (context.mounted) {
-      // Close loading dialog
       Navigator.of(context).pop();
-      // Close confirmation dialog
       Navigator.of(context).pop();
-      // Close info modal
-      Navigator.of(context).pop();
-
-      // Show success snackbar using SnackbarUtil
-      SnackbarUtil.showSuccess(context, 'FAQ deleted successfully');
+      SnackbarUtil.showInfo(context, 'FAQ deletion is running in background');
     }
   } catch (error) {
     if (context.mounted) {

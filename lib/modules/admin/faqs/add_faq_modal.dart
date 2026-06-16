@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -195,53 +197,63 @@ class _AddFaqContentState extends State<AddFaqContent> {
     try {
       final question = _questionController.text.trim();
       final answer = _answerController.text.trim();
+      final category = _selectedCategory;
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      //  Generate embedding for the FAQ question
-      List<double>? embedding;
-      try {
-        embedding = await _generateEmbedding(question);
-      } catch (e) {
-        print(' Failed to generate embedding: $e');
-        // Show warning but continue - embedding can be generated later by Cloud Function
-      }
+      unawaited(() async {
+        try {
+          List<double>? embedding;
+          try {
+            embedding = await _generateEmbedding(question);
+          } catch (e) {
+            print(' Failed to generate embedding: $e');
+          }
 
-      //  Include embedding in FAQ data
-      final Map<String, dynamic> faqData = {
-        'question': question,
-        'answer': answer,
-        'category': _selectedCategory,
-        'isPredefined': true,
-        'createdAt': Timestamp.now(),
-        'similarityCount': 0,
-      };
+          final Map<String, dynamic> faqData = {
+            'question': question,
+            'answer': answer,
+            'category': category,
+            'isPredefined': true,
+            'createdAt': Timestamp.now(),
+            'similarityCount': 0,
+          };
 
-      //  Add embedding fields if generated successfully
-      if (embedding != null) {
-        faqData['embedding'] = embedding;
-        faqData['embeddingModel'] = 'embed-multilingual-v3.0';
-        faqData['embeddingDimensions'] = embedding.length;
-      }
+          if (embedding != null) {
+            faqData['embedding'] = embedding;
+            faqData['embeddingModel'] = 'embed-multilingual-v3.0';
+            faqData['embeddingDimensions'] = embedding.length;
+          }
 
-      await FirebaseFirestore.instance.collection('faqs').add(faqData);
+          await FirebaseFirestore.instance.collection('faqs').add(faqData);
+          await _logCreateAction();
 
-      // Log the action
-      await _logCreateAction();
+          if (feedbackContext.mounted) {
+            if (embedding != null) {
+              SnackbarUtil.showSuccess(
+                feedbackContext,
+                'FAQ created successfully!',
+              );
+            } else {
+              SnackbarUtil.showWarning(
+                feedbackContext,
+                'FAQ created successfully!',
+              );
+            }
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to create FAQ: $e',
+            );
+          }
+        }
+      }());
 
-      // Pop the modal
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
-
-      // Show success message using SnackbarUtil
-      if (embedding != null) {
-        SnackbarUtil.showSuccess(context, 'FAQ created successfully!');
-      } else {
-        SnackbarUtil.showWarning(context, 'FAQ created successfully!');
-      }
+      SnackbarUtil.showInfo(context, 'FAQ creation is running in background');
+      Navigator.of(context).pop(true);
     } catch (e) {
       SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
