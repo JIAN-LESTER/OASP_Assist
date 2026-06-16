@@ -797,22 +797,17 @@ class FAQSectionState extends State<FAQSection>
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 1200,
-                ), //  Reduced max width
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, //  Changed to 3 columns
-                    mainAxisSpacing: spacing,
-                    crossAxisSpacing: spacing,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: displayCategories.length,
-                  itemBuilder: (context, index) {
-                    return _buildDesktopCategoryCard(displayCategories[index]);
-                  },
+                constraints: BoxConstraints(maxWidth: 1200),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < displayCategories.length; i++) ...[
+                      if (i > 0) SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildDesktopCategoryCard(displayCategories[i]),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -918,16 +913,16 @@ class FAQSectionState extends State<FAQSection>
       children: [
         // Logo
         Center(
-          child: Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(16),
-            ),
+          child: SizedBox(
+            width: 150,
+            height: 150,
+          
             child: Padding(
               padding: EdgeInsets.all(16),
-              child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
+              child: Transform.scale(
+                scale: 1.8,
+                child: Image.asset('lib/images/oasp.png', fit: BoxFit.contain),
+              ),
             ),
           ),
         ),
