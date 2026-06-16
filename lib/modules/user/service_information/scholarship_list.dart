@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ScholarshipList extends StatefulWidget {
   const ScholarshipList({super.key});
@@ -18,6 +17,8 @@ class _ScholarshipListState extends State<ScholarshipList>
   String _searchQuery = '';
   String _selectedProvider = 'all';
   String _sortBy = 'deadline';
+  int _currentPage = 0;
+  static const int _itemsPerPage = 12;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -25,6 +26,8 @@ class _ScholarshipListState extends State<ScholarshipList>
   final Color lightGreen = const Color(0xFF4CAF50);
   final Color accentGreen = const Color(0xFF81C784);
   final Color successGreen = const Color(0xFF66BB6A);
+  final Color deadlineYellow = const Color(0xFFF59E0B);
+  final Color lightYellow = const Color(0xFFFFF7D6);
 
   @override
   void initState() {
@@ -114,7 +117,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -127,7 +130,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                             const Text(
                               "Scholarships",
                               style: TextStyle(
-                                fontSize: 22,
+                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
@@ -135,7 +138,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                             Text(
                               "Explore available scholarship opportunities",
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w400,
                               ),
@@ -165,6 +168,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                 } else {
                                   _selectedProvider = value;
                                 }
+                                _currentPage = 0;
                               });
                             },
                             itemBuilder: (BuildContext context) {
@@ -310,7 +314,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                               ];
                             },
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2E7D32),
                                 borderRadius: BorderRadius.circular(8),
@@ -325,11 +329,11 @@ class _ScholarshipListState extends State<ScholarshipList>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
 
                     // Search Bar
                     Container(
-                      margin: const EdgeInsets.only(bottom: 24),
+                      margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
@@ -345,6 +349,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                         onChanged: (value) {
                           setState(() {
                             _searchQuery = value.toLowerCase().trim();
+                            _currentPage = 0;
                           });
                         },
                         decoration: InputDecoration(
@@ -365,6 +370,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                       _searchController.clear();
                                       setState(() {
                                         _searchQuery = '';
+                                        _currentPage = 0;
                                       });
                                     },
                                   )
@@ -376,8 +382,8 @@ class _ScholarshipListState extends State<ScholarshipList>
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 18,
+                            horizontal: 16,
+                            vertical: 12,
                           ),
                         ),
                       ),
@@ -467,173 +473,73 @@ class _ScholarshipListState extends State<ScholarshipList>
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(24),
-                    itemCount: scholarships.length,
-                    itemBuilder: (context, index) {
-                      final doc = scholarships[index];
-                      final scholarship = doc.data() as Map<String, dynamic>;
-                      final deadline = scholarship['deadline'] as Timestamp?;
-                      final daysLeft =
-                          deadline != null
-                              ? deadline
-                                  .toDate()
-                                  .difference(DateTime.now())
-                                  .inDays
-                              : null;
+                  final totalPages =
+                      (scholarships.length / _itemsPerPage).ceil();
+                  final currentPage =
+                      _currentPage >= totalPages ? totalPages - 1 : _currentPage;
+                  final start = currentPage * _itemsPerPage;
+                  final end =
+                      (start + _itemsPerPage) > scholarships.length
+                          ? scholarships.length
+                          : start + _itemsPerPage;
+                  final pageScholarships = scholarships.sublist(start, end);
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border(
-                            left: BorderSide(
-                              color: _getStatusColor(daysLeft),
-                              width: 4,
-                            ),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.07),
-                              spreadRadius: 0,
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () => _showScholarshipDetails(scholarship),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: Row(
-                                children: [
-                                  // Status indicator
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: _getStatusColor(
-                                        daysLeft,
-                                      ).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final useCards = constraints.maxWidth >= 900;
+
+                      if (useCards) {
+                        return CustomScrollView(
+                          slivers: [
+                            SliverPadding(
+                              padding: const EdgeInsets.all(24),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 4,
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      childAspectRatio: 0.82,
                                     ),
-                                    child: Icon(
-                                      _getStatusIcon(daysLeft),
-                                      color: _getStatusColor(daysLeft),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-
-                                  // Content
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // Scholarship name
-                                        Text(
-                                          scholarship['name'] ??
-                                              'Unnamed Scholarship',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF0F172A),
-                                            height: 1.4,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        // Meta info
-                                        Row(
-                                          children: [
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: _getStatusColor(
-                                                  daysLeft,
-                                                ).withOpacity(0.15),
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                _formatDeadline(
-                                                  deadline,
-                                                ).toUpperCase(),
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: _getStatusColor(
-                                                    daysLeft,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Icon(
-                                              Icons.business,
-                                              size: 14,
-                                              color: Colors.grey[500],
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                scholarship['scholarshipProvider'] ??
-                                                    'Unknown',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.grey[600],
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-
-                                        if (scholarship['description'] !=
-                                                null &&
-                                            scholarship['description']
-                                                .toString()
-                                                .trim()
-                                                .isNotEmpty) ...[
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            scholarship['description'],
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[600],
-                                              height: 1.3,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Arrow
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey[400],
-                                    size: 16,
-                                  ),
-                                ],
+                                delegate: SliverChildBuilderDelegate((
+                                  context,
+                                  index,
+                                ) {
+                                  final scholarship =
+                                      pageScholarships[index].data()
+                                          as Map<String, dynamic>;
+                                  return _buildDesktopScholarshipCard(
+                                    scholarship,
+                                  );
+                                }, childCount: pageScholarships.length),
                               ),
                             ),
-                          ),
-                        ),
+                            SliverToBoxAdapter(
+                              child: _buildPaginationControls(
+                                totalPages,
+                                currentPage,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: pageScholarships.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == pageScholarships.length) {
+                            return _buildPaginationControls(
+                              totalPages,
+                              currentPage,
+                            );
+                          }
+
+                          final scholarship =
+                              pageScholarships[index].data()
+                                  as Map<String, dynamic>;
+                          return _buildMobileScholarshipTile(scholarship);
+                        },
                       );
                     },
                   );
@@ -641,6 +547,384 @@ class _ScholarshipListState extends State<ScholarshipList>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopScholarshipCard(Map<String, dynamic> scholarship) {
+    final deadline = scholarship['deadline'] as Timestamp?;
+    final deadlineText = _deadlineDateText(deadline);
+    final eligibilityItems = _normalizedEligibilityItems(
+      scholarship['eligibilityRequirements'],
+    );
+    final benefitItems = _stringListFrom(scholarship['privileges']);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showScholarshipDetails(scholarship),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: deadlineYellow, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: lightYellow,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.card_giftcard_outlined,
+                  color: deadlineYellow,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                scholarship['name'] ?? 'Unnamed Scholarship',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.business, size: 14, color: Colors.grey[500]),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      scholarship['scholarshipProvider'] ?? 'Unknown',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildCardSummarySection(
+                        'Eligibility',
+                        eligibilityItems,
+                      ),
+                      if (eligibilityItems.isNotEmpty &&
+                          benefitItems.isNotEmpty)
+                        const SizedBox(height: 8),
+                      _buildCardSummarySection('Benefits', benefitItems),
+                    ],
+                  ),
+                ),
+              ),
+              if (deadlineText != null)
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: _buildDeadlineText(deadlineText),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileScholarshipTile(Map<String, dynamic> scholarship) {
+    final deadline = scholarship['deadline'] as Timestamp?;
+    final deadlineText = _deadlineDateText(deadline);
+    final eligibilityItems = _normalizedEligibilityItems(
+      scholarship['eligibilityRequirements'],
+    );
+    final benefitItems = _stringListFrom(scholarship['privileges']);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _showScholarshipDetails(scholarship),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                Container(
+                  width: 5,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFFFFD54F), Color(0xFFF59E0B)],
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          scholarship['name'] ?? 'Unnamed Scholarship',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                            height: 1.35,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.business,
+                              size: 14,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                scholarship['scholarshipProvider'] ??
+                                    'Unknown',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (eligibilityItems.isNotEmpty ||
+                            benefitItems.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildCardSummarySection(
+                            'Eligibility',
+                            eligibilityItems,
+                          ),
+                          if (eligibilityItems.isNotEmpty &&
+                              benefitItems.isNotEmpty)
+                            const SizedBox(height: 8),
+                          _buildCardSummarySection('Benefits', benefitItems),
+                        ],
+                        if (deadlineText != null) ...[
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.bottomRight,
+                            child: _buildDeadlineText(deadlineText),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeadlineText(String deadlineText) {
+    return Text(
+      'Deadline: $deadlineText',
+      style: const TextStyle(
+        fontSize: 12,
+        color: Color(0xFF92400E),
+        fontWeight: FontWeight.w700,
+      ),
+      textAlign: TextAlign.right,
+    );
+  }
+
+  Widget _buildCardSummarySection(String title, List<String> items) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final visibleItems = items.take(3).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 11,
+            color: Color(0xFF92400E),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        ...visibleItems.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '- ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                    height: 1.3,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      height: 1.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        if (items.length > 3)
+          const Text(
+            '...',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontWeight: FontWeight.w600,
+              height: 1,
+            ),
+          ),
+      ],
+    );
+  }
+
+  List<String> _stringListFrom(dynamic value) {
+    if (value is! List) return [];
+
+    return value
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+
+  List<String> _normalizedEligibilityItems(dynamic value) {
+    final items = _stringListFrom(value);
+    if (items.isEmpty) return [];
+
+    final combined = items.join(' ').toLowerCase();
+    final isGenericMissingEligibility =
+        combined.contains('not explicitly mentioned') ||
+        combined.contains('provided text or image') ||
+        combined.contains('further details') ||
+        combined.contains('official ched channels');
+
+    if (isGenericMissingEligibility) {
+      return ['N/A, please refer to OASP.'];
+    }
+
+    return items;
+  }
+
+  String? _deadlineDateText(Timestamp? timestamp) {
+    if (timestamp == null) return null;
+    return DateFormat('dd MMM yyyy').format(timestamp.toDate());
+  }
+
+  Widget _buildPaginationControls(int totalPages, int currentPage) {
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 24, 12),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed:
+                    currentPage == 0
+                        ? null
+                        : () {
+                          setState(() {
+                            _currentPage = currentPage - 1;
+                          });
+                        },
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Text(
+                'Page ${currentPage + 1} of $totalPages',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              IconButton(
+                onPressed:
+                    currentPage >= totalPages - 1
+                        ? null
+                        : () {
+                          setState(() {
+                            _currentPage = currentPage + 1;
+                          });
+                        },
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -708,6 +992,10 @@ class _ScholarshipListState extends State<ScholarshipList>
 
   void _showScholarshipDetails(Map<String, dynamic> data) {
     final deadline = data['deadline'] as Timestamp?;
+    final eligibilityItems = _normalizedEligibilityItems(
+      data['eligibilityRequirements'],
+    );
+    final benefitItems = _stringListFrom(data['privileges']);
     final daysLeft =
         deadline != null
             ? deadline.toDate().difference(DateTime.now()).inDays
@@ -982,72 +1270,8 @@ class _ScholarshipListState extends State<ScholarshipList>
                             ),
                           ],
 
-                          // Description
-                          if (data['description'] != null &&
-                              data['description']
-                                  .toString()
-                                  .trim()
-                                  .isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF0F4F8),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'DESCRIPTION',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF2E7D32),
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 6),
-                                        child: Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[800],
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          data['description'],
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            height: 1.5,
-                                            color: Colors.grey[800],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-
                           // Eligibility Requirements
-                          if (data['eligibilityRequirements'] != null &&
-                              data['eligibilityRequirements'] is List &&
-                              (data['eligibilityRequirements'] as List)
-                                  .isNotEmpty) ...[
+                          if (eligibilityItems.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             Container(
                               width: double.infinity,
@@ -1069,9 +1293,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  ...List<String>.from(
-                                    data['eligibilityRequirements'],
-                                  ).map((requirement) {
+                                  ...eligibilityItems.map((requirement) {
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: Row(
@@ -1113,9 +1335,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                           ],
 
                           // Privileges
-                          if (data['privileges'] != null &&
-                              data['privileges'] is List &&
-                              (data['privileges'] as List).isNotEmpty) ...[
+                          if (benefitItems.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             Container(
                               width: double.infinity,
@@ -1137,9 +1357,7 @@ class _ScholarshipListState extends State<ScholarshipList>
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  ...List<String>.from(data['privileges']).map((
-                                    privilege,
-                                  ) {
+                                  ...benefitItems.map((privilege) {
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: Row(
