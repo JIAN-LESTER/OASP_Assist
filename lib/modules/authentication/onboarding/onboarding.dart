@@ -755,7 +755,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
     ];
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -791,18 +791,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          Expanded(
-            child: ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: steps.length,
-              itemBuilder:
-                  (context, index) => _buildStepItem(
-                    steps[index],
-                    index == steps.length - 1,
-                    descriptionFontSize,
-                  ),
-            ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: steps.length,
+            itemBuilder:
+                (context, index) => _buildStepItem(
+                  steps[index],
+                  index == steps.length - 1,
+                  descriptionFontSize,
+                ),
           ),
         ],
       ),

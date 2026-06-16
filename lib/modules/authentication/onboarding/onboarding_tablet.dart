@@ -615,7 +615,7 @@ class _OnboardingTabletState extends State<OnboardingTablet>
   }
 
   Widget _buildStepsPage() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -624,9 +624,10 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
   }
 
   Widget _buildStepsPage() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
         Container(
           width: 110,
           height: 110,
@@ -691,7 +692,8 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
             ),
           ],
         ),
-      ],
+        ],
+      ),
     );
   }
 
