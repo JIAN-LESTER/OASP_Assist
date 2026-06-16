@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
 
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -1115,40 +1117,62 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
   Future<void> _deleteProgram(BuildContext dialogContext) async {
     setState(() => _isDeleting = true);
     final data = widget.programDoc.data() as Map<String, dynamic>;
+    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('programs')
-          .doc(widget.programDoc.id)
-          .delete();
+      unawaited(() async {
+        try {
+          await FirebaseFirestore.instance
+              .collection('programs')
+              .doc(widget.programDoc.id)
+              .delete();
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-      if (currentUser != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action': 'Deleted program: ${data['name']}',
+            'time': Timestamp.now(),
+          });
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Program deleted successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to delete program: $e',
+            );
+          }
         }
-      }
-
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action': 'Deleted program: ${data['name']}',
-        'time': Timestamp.now(),
-      });
+      }());
 
       if (mounted) {
         Navigator.of(
           dialogContext,
         ).pop(true); // Return true to indicate success
-        SnackbarUtil.showSuccess(context, 'Program deleted successfully!');
+        SnackbarUtil.showInfo(
+          context,
+          'Program deletion is running in background',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1584,50 +1608,66 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         programData['collegeId'] = '';
       }
 
-      if (isEditing) {
-        await FirebaseFirestore.instance
-            .collection('programs')
-            .doc(widget.programDoc!.id)
-            .update(programData);
-      } else {
-        programData['created_at'] = Timestamp.now();
-        await FirebaseFirestore.instance
-            .collection('programs')
-            .add(programData);
-      }
+      final feedbackContext = Navigator.of(context, rootNavigator: true).context;
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-      if (currentUser != null) {
-        final userDoc =
+      unawaited(() async {
+        try {
+          if (isEditing) {
             await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+                .collection('programs')
+                .doc(widget.programDoc!.id)
+                .update(programData);
+          } else {
+            programData['created_at'] = Timestamp.now();
+            await FirebaseFirestore.instance
+                .collection('programs')
+                .add(programData);
+          }
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action':
+                '${isEditing ? 'Updated' : 'Created'} program: $formattedName',
+            'time': Timestamp.now(),
+          });
+
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showSuccess(
+              feedbackContext,
+              'Program ${isEditing ? 'updated' : 'created'} successfully!',
+            );
+          }
+        } catch (e) {
+          if (feedbackContext.mounted) {
+            SnackbarUtil.showError(
+              feedbackContext,
+              'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+            );
+          }
         }
-      }
+      }());
 
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action':
-            '${isEditing ? 'Updated' : 'Created'} program: $formattedName',
-        'time': Timestamp.now(),
-      });
-
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'Program ${isEditing ? 'updated' : 'created'} successfully!',
-        );
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) Navigator.of(context).pop();
-        });
-      }
+      SnackbarUtil.showInfo(
+        context,
+        'Program ${isEditing ? 'update' : 'creation'} is running in background',
+      );
+      Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);

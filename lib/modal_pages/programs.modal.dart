@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -671,42 +673,53 @@ class _ManageProgramsContentState extends State<ManageProgramsContent> {
   Future<void> _deleteProgram(DocumentSnapshot program) async {
     try {
       Navigator.of(context).pop(); // Close confirmation dialog
+      final programName = (program.data() as Map<String, dynamic>)['name'];
 
-      await FirebaseFirestore.instance
-          .collection('programs')
-          .doc(program.id)
-          .delete();
+      unawaited(() async {
+        try {
+          await FirebaseFirestore.instance
+              .collection('programs')
+              .doc(program.id)
+              .delete();
 
-      // Log the action
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
+          // Log the action
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
 
-      if (currentUser != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
 
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action': 'Deleted program: $programName',
+            'time': Timestamp.now(),
+          });
+
+          _fetchPrograms();
+          widget.onProgramsUpdated?.call();
+
+          _showTopRightAlert('Program deleted successfully', AlertType.success);
+        } catch (e) {
+          _showTopRightAlert('Failed to delete program: $e', AlertType.error);
         }
-      }
+      }());
 
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action':
-            'Deleted program: ${(program.data() as Map<String, dynamic>)['name']}',
-        'time': Timestamp.now(),
-      });
-
-      _fetchPrograms();
-      widget.onProgramsUpdated?.call();
-
-      _showTopRightAlert('Program deleted successfully', AlertType.success);
+      _showTopRightAlert(
+        'Program deletion is running in background',
+        AlertType.info,
+      );
     } catch (e) {
       _showTopRightAlert('Failed to delete program: $e', AlertType.error);
     }
@@ -886,49 +899,56 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
         'updatedAt': Timestamp.now(),
       };
 
-      if (isEditing) {
-        await FirebaseFirestore.instance
-            .collection('programs')
-            .doc(widget.program!.id)
-            .update(programData);
-      } else {
-        programData['createdAt'] = Timestamp.now();
-        await FirebaseFirestore.instance
-            .collection('programs')
-            .add(programData);
-      }
+      final programName = _nameController.text.trim();
 
-      // Log the action
-      final currentUser = FirebaseAuth.instance.currentUser;
-      String actorName = 'Unknown';
-
-      if (currentUser != null) {
-        final userDoc =
+      unawaited(() async {
+        try {
+          if (isEditing) {
             await FirebaseFirestore.instance
-                .collection('users')
-                .doc(currentUser.uid)
-                .get();
+                .collection('programs')
+                .doc(widget.program!.id)
+                .update(programData);
+          } else {
+            programData['createdAt'] = Timestamp.now();
+            await FirebaseFirestore.instance
+                .collection('programs')
+                .add(programData);
+          }
 
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+          final currentUser = FirebaseAuth.instance.currentUser;
+          String actorName = 'Unknown';
+
+          if (currentUser != null) {
+            final userDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(currentUser.uid)
+                    .get();
+
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              actorName = userData['name'] ?? currentUser.email ?? 'Unknown';
+            }
+          }
+
+          final logRef = FirebaseFirestore.instance.collection('logs').doc();
+          await logRef.set({
+            'logId': logRef.id,
+            'user': actorName,
+            'action':
+                '${isEditing ? 'Updated' : 'Created'} program: $programName',
+            'time': Timestamp.now(),
+          });
+        } catch (e) {
+          print('Program save failed: $e');
         }
-      }
-
-      final logRef = FirebaseFirestore.instance.collection('logs').doc();
-      await logRef.set({
-        'logId': logRef.id,
-        'user': actorName,
-        'action':
-            '${isEditing ? 'Updated' : 'Created'} program: ${_nameController.text.trim()}',
-        'time': Timestamp.now(),
-      });
+      }());
 
       widget.onSaved();
 
       _showTopRightAlert(
-        'Program ${isEditing ? 'updated' : 'created'} successfully!',
-        AlertType.success,
+        'Program ${isEditing ? 'update' : 'creation'} is running in background',
+        AlertType.info,
       );
 
       Navigator.of(context).pop();
