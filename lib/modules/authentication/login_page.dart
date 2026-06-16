@@ -795,14 +795,16 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _buildMobileBody() {
     return _buildDecoratedBody(
-      child: _buildContent(
-        maxWidth: double.infinity,
-        horizontalPadding: 20,
-        iconSize: 140,
-        titleFontSize: 26,
-        descriptionFontSize: 14,
-        cardPadding: 20,
-        useFormCard: true,
+      child: Center(
+        child: _buildContent(
+          maxWidth: double.infinity,
+          horizontalPadding: 20,
+          iconSize: 140,
+          titleFontSize: 26,
+          descriptionFontSize: 14,
+          cardPadding: 20,
+          useFormCard: true,
+        ),
       ),
     );
   }
