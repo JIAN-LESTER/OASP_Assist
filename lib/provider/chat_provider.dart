@@ -65,6 +65,17 @@ class ChatProvider extends ChangeNotifier {
 
   static const int MAX_DAILY_MESSAGES = 5;
 
+  DateTime _currentChatWindowStart() {
+    final now = DateTime.now();
+    final todayReset = DateTime(now.year, now.month, now.day, 8);
+
+    if (now.isBefore(todayReset)) {
+      return todayReset.subtract(const Duration(days: 1));
+    }
+
+    return todayReset;
+  }
+
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
 
   int _userDailyMessageCount = 0;
@@ -603,6 +614,23 @@ class ChatProvider extends ChangeNotifier {
       await Future.delayed(Duration(milliseconds: 100));
 
       await loadConversationInfo();
+
+      if (currentConversation != null &&
+          currentConversation!.createdAt.isBefore(_currentChatWindowStart())) {
+        await _firestore.collection('conversations').doc(id).update({
+          'status': 'ended',
+          'endedAt': FieldValue.serverTimestamp(),
+        });
+
+        conversationId = null;
+        currentConversation = null;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return;
+      }
+
       await loadExistingMessages();
 
       listenToMessages();

@@ -33,6 +33,17 @@ class UserConstant {
 
   static bool shouldShowFAQs = false;
 
+  static DateTime _currentChatWindowStart() {
+    final now = DateTime.now();
+    final todayReset = DateTime(now.year, now.month, now.day, 8);
+
+    if (now.isBefore(todayReset)) {
+      return todayReset.subtract(const Duration(days: 1));
+    }
+
+    return todayReset;
+  }
+
   // Fixed logout method that handles both Firebase Auth and Google Sign In
   static Future<void> signUserOut() async {
     try {
@@ -151,35 +162,28 @@ class UserConstant {
       final activeConversation = await findActiveConversation(userId);
 
       if (activeConversation != null) {
-        // Check if conversation is older than 3 days
         final data = activeConversation.data() as Map<String, dynamic>;
         final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
-        if (createdAt != null) {
-          final daysSinceCreation = DateTime.now().difference(createdAt).inDays;
+        if (createdAt != null &&
+            createdAt.isBefore(_currentChatWindowStart())) {
+          print('DEBUG: Auto-ending conversation before current 8 AM window');
+          await _endConversation(activeConversation.id);
 
-          if (daysSinceCreation >= 3) {
-            // End old conversation automatically
-            print('DEBUG: Auto-ending conversation older than 3 days');
-            await _endConversation(activeConversation.id);
-
-            // Clear messages and reset state
-            chatProvider.clearMessages();
-            setState(() {
-              _selectedConversationId = null;
-            });
-          } else {
-            // Continue existing active conversation
-            print(
-              'DEBUG: Found active conversation: ${activeConversation.id} - CONTINUING IT',
-            );
-            await _continueExistingConversation(
-              context,
-              activeConversation.id,
-              chatProvider,
-              setState,
-            );
-          }
+          chatProvider.clearMessages();
+          setState(() {
+            _selectedConversationId = null;
+          });
+        } else {
+          print(
+            'DEBUG: Found active conversation: ${activeConversation.id} - CONTINUING IT',
+          );
+          await _continueExistingConversation(
+            context,
+            activeConversation.id,
+            chatProvider,
+            setState,
+          );
         }
       } else {
         // NO AUTO-CREATION: Just wait for user to start new chat
@@ -457,19 +461,31 @@ class UserConstant {
     if (userId == null) throw Exception('No authenticated user');
 
     try {
+      final chatWindowStart = _currentChatWindowStart();
+
       // Try to find existing active conversation
       final activeQuery =
           await FirebaseFirestore.instance
               .collection('conversations')
               .where('userId', isEqualTo: userId)
               .where('status', isEqualTo: 'active')
-              .limit(1)
+              .orderBy('createdAt', descending: true)
               .get();
 
-      if (activeQuery.docs.isNotEmpty) {
-        final conversationId = activeQuery.docs.first.id;
-        print('DEBUG: Found existing conversation: $conversationId');
-        return conversationId;
+      for (final doc in activeQuery.docs) {
+        final data = doc.data();
+        final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+
+        if (createdAt != null && !createdAt.isBefore(chatWindowStart)) {
+          final conversationId = doc.id;
+          print('DEBUG: Found existing conversation: $conversationId');
+          return conversationId;
+        }
+
+        await doc.reference.update({
+          'status': 'ended',
+          'endedAt': FieldValue.serverTimestamp(),
+        });
       }
 
       // Create new conversation if none exists
@@ -508,41 +524,29 @@ class UserConstant {
       print('DEBUG: Found ${activeQuery.docs.length} active conversations');
 
       if (activeQuery.docs.isNotEmpty) {
-        // Clean up old conversations (older than 3 days)
-        final now = DateTime.now();
+        final chatWindowStart = _currentChatWindowStart();
 
         for (var doc in activeQuery.docs) {
           final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
-          if (createdAt != null) {
-            final daysSinceCreation = now.difference(createdAt).inDays;
-
-            if (daysSinceCreation >= 3) {
-              // Auto-end old conversations
-              print(
-                'DEBUG: Auto-ending old conversation: ${doc.id} (${daysSinceCreation} days old)',
-              );
-              await doc.reference.update({
-                'status': 'ended',
-                'endedAt': FieldValue.serverTimestamp(),
-              });
-            }
+          if (createdAt == null || createdAt.isBefore(chatWindowStart)) {
+            print('DEBUG: Auto-ending old daily conversation: ${doc.id}');
+            await doc.reference.update({
+              'status': 'ended',
+              'endedAt': FieldValue.serverTimestamp(),
+            });
           }
         }
 
-        // Return the most recent non-expired conversation
+        // Return the most recent conversation in the current 8 AM window
         for (var doc in activeQuery.docs) {
           final data = doc.data();
           final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
 
-          if (createdAt != null) {
-            final daysSinceCreation = now.difference(createdAt).inDays;
-
-            if (daysSinceCreation < 3) {
-              print('DEBUG: Using existing active conversation: ${doc.id}');
-              return doc;
-            }
+          if (createdAt != null && !createdAt.isBefore(chatWindowStart)) {
+            print('DEBUG: Using existing active conversation: ${doc.id}');
+            return doc;
           }
         }
       }
