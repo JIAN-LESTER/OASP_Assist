@@ -25,7 +25,7 @@ class AnswerRetrievalService {
       final requestBody = {
         'query': question,
         'stream': true,
-        'topK': 8,
+        'topK': 5,
         'minSimilarityScore': 0.30,
         'conversationHistory':
             conversationHistory

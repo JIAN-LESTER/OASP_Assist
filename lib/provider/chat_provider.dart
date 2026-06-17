@@ -991,8 +991,8 @@ class ChatProvider extends ChangeNotifier {
           _messages.where((m) => m.conversationId == conversationId).toList();
       allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       final recentHistory =
-          allMessages.length > 10
-              ? allMessages.sublist(allMessages.length - 10)
+          allMessages.length > 4
+              ? allMessages.sublist(allMessages.length - 4)
               : allMessages;
 
       final botMessageId = "bot_${userMsg.id}";

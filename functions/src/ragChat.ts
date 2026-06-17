@@ -62,6 +62,14 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
 }
 
 const GEMINI_MODEL = "gemini-2.5-flash";
+const MAX_CONTEXT_CHARS = 900;
+const MAX_HISTORY_CHARS = 220;
+const MAX_RESPONSE_TOKENS = 700;
+
+function limitText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.substring(0, maxChars).trim()}...`;
+}
 
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
@@ -260,7 +268,7 @@ async function retrieveRelevantDocuments(
   _query: string,
   queryEmbedding: number[],
   pineconeIndex: any,
-  topK = 8,
+  topK = 5,
   minSimilarityScore = 0.30
 ): Promise<Array<{
   ibID: string;
@@ -306,7 +314,7 @@ async function retrieveRelevantDocuments(
       const chunks = documentChunks[docId];
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-      const topChunks = chunks.slice(0, 3);
+      const topChunks = chunks.slice(0, 2);
       const combinedContent = topChunks
         .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
         .filter((text) => text.trim())
@@ -358,7 +366,7 @@ export const generateAnswer = onRequest(
     }
 
     try {
-      const {query, conversationHistory = [], topK = 8, minSimilarityScore = 0.30, stream = true} = req.body;
+      const {query, conversationHistory = [], topK = 5, minSimilarityScore = 0.30, stream = true} = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
         res.status(400).json({
@@ -445,15 +453,11 @@ ${dateInfo}
 
 ${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
 
-IMPORTANT: My knowledge base doesn't have specific documents about this topic, but I should still try to help.
-
 Instructions:
-1. Use your general knowledge about universities, admissions, scholarships, and student services
-2. Provide helpful, accurate general information when possible
-3. Use the current date for time-sensitive queries
-4. If this is truly specific to CMU OASP policies I cannot answer, politely suggest contacting OASP staff
-5. Be helpful and professional
-6. Don't say "I don't have information" - try to provide useful guidance first
+Answer briefly in 1 short paragraph or up to 4 bullets.
+Use general university guidance only when helpful.
+Use the current date for time-sensitive questions.
+For CMU OASP-specific details not in context, suggest contacting OASP staff.
 
 Answer:`;
 
@@ -599,7 +603,7 @@ async function generateGeminiResponse(
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 4096,
+          maxOutputTokens: MAX_RESPONSE_TOKENS,
           topP: 0.95,
           topK: 40,
         },
@@ -654,7 +658,7 @@ async function* generateGeminiResponseStream(
           contents: [{parts: [{text: prompt}]}],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 4096,
+            maxOutputTokens: MAX_RESPONSE_TOKENS,
             topP: 0.95,
             topK: 40,
           },
@@ -743,9 +747,9 @@ function filterAndRankContext(
   const filtered = results.filter((r) => r.similarity_score >= qualityThreshold);
 
   const contexts = filtered
-    .slice(0, 5)
+    .slice(0, 3)
     .map((doc) => ({
-      content: doc.content,
+      content: limitText(doc.content, MAX_CONTEXT_CHARS),
       title: doc.ib_title,
       score: doc.similarity_score,
     }));
@@ -759,14 +763,12 @@ function buildConversationContext(
 ): string {
   if (!conversationHistory || conversationHistory.length === 0) return "";
 
-  const recentHistory = conversationHistory.slice(-10);
+  const recentHistory = conversationHistory.slice(-4);
   const contextParts: string[] = [];
 
   for (const message of recentHistory) {
     const role = message.sender === "user" ? "User" : "Assistant";
-    const content = message.content.length > 500 ?
-      message.content.substring(0, 500) + "..." :
-      message.content;
+    const content = limitText(message.content, MAX_HISTORY_CHARS);
 
     contextParts.push(`${role}: ${content}`);
   }
@@ -786,7 +788,7 @@ function buildContextAwarePrompt(
   });
 
   const historySection = conversationHistory ?
-    `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n` :
+    `Recent conversation:\n${conversationHistory}\n\n` :
     "";
 
   const now = new Date();
@@ -797,51 +799,21 @@ function buildContextAwarePrompt(
     day: "numeric",
   })}, ${now.toLocaleTimeString("en-US")}`;
 
-  return `You are OASP Assist, the official AI assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
+  return `You are OASP Assist for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
 
 ${dateInfo}
 
 ${historySection}Current question: "${query}"
 
-Knowledge Base Documents:
+Knowledge base:
 ${knowledgeSection}
 
-CRITICAL INSTRUCTIONS:
-1. **Real-time Awareness**:
-   - You know the current date and time shown above
-   - Use this information to provide context-aware responses about deadlines, dates, and time-sensitive matters
-   - Calculate relative dates (e.g., "in 2 weeks", "next month") based on current date
-
-2. **Context Awareness**:
-   - If this is a follow-up question (indicated by conversation history), reference previous discussion
-   - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
-   - Maintain continuity in your responses based on what was discussed before
-
-3. **Intelligent Fallback**:
-   - If the knowledge base has SOME relevant information, provide it comprehensively
-   - If the knowledge base lacks specific details but you can infer or provide general guidance, do so
-   - ONLY suggest contacting OASP if the question requires truly specific information not available
-
-4. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
-
-5. **Accuracy**: Prioritize information from the knowledge base, but use general knowledge when appropriate for:
-   - Date calculations and calendar information
-   - General university processes and procedures
-   - Common academic terminology and concepts
-
-6. **Structure**: Organize complex answers with clear explanations, including:
-   - Step-by-step procedures when applicable
-   - Specific requirements, dates, and deadlines
-   - All relevant details (fees, contacts, locations, etc.)
-
-7. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
-
-8. **NO UNNECESSARY DISCLAIMERS**:
-   - Don't say "I don't have information" if you can provide helpful general guidance
-   - Don't suggest contacting OASP for information you can reasonably answer
-   - Be helpful and resourceful with the information available
-
-If this is a follow-up question, acknowledge the previous context naturally in your response.
+Instructions:
+Answer in 80 words or less unless the user asks for details.
+Use the knowledge base first; use general knowledge only for dates, common terms, or general university steps.
+Use recent conversation only to resolve follow-up questions.
+If CMU OASP-specific details are missing, say so briefly and suggest contacting OASP staff.
+Be friendly, professional, and direct.
 
 Answer:`;
 }
@@ -878,14 +850,11 @@ Available Information:
 ${knowledgeSection}
 
 Instructions:
-1. **Real-time Context**: You know today's date - use it to provide relevant time-based information
-2. If this is a follow-up question, use conversation history to understand the full context
-3. Provide whatever specific information IS available from the documents
-4. Be thorough with what you CAN answer
-5. If you can provide helpful general guidance even without specific details, do so
-6. Use your knowledge of university processes to supplement available information when appropriate
-7. Only suggest contacting OASP if truly critical specific information is genuinely unavailable
-8. Maintain natural conversation flow if there's prior context
+Answer in 80 words or less unless the user asks for details.
+Use available information first.
+Use recent conversation only for follow-up context.
+Use today's date for time-sensitive questions.
+For missing CMU OASP-specific details, suggest contacting OASP staff.
 
 Answer:`;
 }
