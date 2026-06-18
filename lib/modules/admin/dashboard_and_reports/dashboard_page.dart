@@ -3,6 +3,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/admin_dashb
 import 'package:capstone_project/modules/admin/dashboard_and_reports/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/export_button.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_section.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_service.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/paginated_list.dart';
@@ -260,6 +261,7 @@ class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad; //  ADD THIS
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final DateTime timestamp;
   final Map<String, dynamic>? quickStats;
 
@@ -267,6 +269,7 @@ class DashboardCache {
     this.inq,
     this.ud,
     this.ad, //  ADD THIS
+    this.externalToolsUsage,
     required this.timestamp,
     this.quickStats,
   });
@@ -307,6 +310,7 @@ class _DashboardModulestate extends State<DashboardPage> {
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
   AdminDashboardData? ad; //  ADD THIS
+  ExternalToolsUsageSummary? externalToolsUsage;
   String? userName;
   Map<String, int>? quickStats;
 
@@ -337,16 +341,15 @@ class _DashboardModulestate extends State<DashboardPage> {
       // Phase 1: Load critical data first (username + quick stats)
       await _loadCriticalData();
 
-      // Phase 2: Hide skeleton and show cached/fresh data
+      // Phase 2: Load full cached/fresh data before showing the dashboard
+      await _loadFullData();
+
       if (mounted) {
         setState(() {
           showSkeleton = false;
           isInitialLoad = false;
         });
       }
-
-      // Phase 3: Load full data in background
-      await _loadFullData();
     } catch (e) {
       print('Error loading dashboard: $e');
       if (mounted) {
@@ -381,6 +384,7 @@ class _DashboardModulestate extends State<DashboardPage> {
           inq = cached.inq;
           ud = cached.ud;
           ad = cached.ad; //  LOAD FROM CACHE
+          externalToolsUsage = cached.externalToolsUsage;
           quickStats = cached.quickStats as Map<String, int>?;
         });
       }
@@ -412,6 +416,7 @@ class _DashboardModulestate extends State<DashboardPage> {
           selectedTimeFrame,
           customDateRange,
         ),
+        _fetchExternalToolsUsage(),
       ]);
 
       if (!mounted) return;
@@ -419,6 +424,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       final adminData = results[0] as AdminDashboardData;
       final userDemoData = results[1] as UserDemographicsReportsData;
       final inquiryReportData = results[2] as InquiryReportsData;
+      final externalUsageData = results[3] as ExternalToolsUsageSummary?;
 
       //   Use inquiryReportData directly instead of creating from adminData
       final inquiryData = InquiryReportsData(
@@ -446,6 +452,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         inq: inquiryData,
         ud: userDemoData,
         ad: adminData,
+        externalToolsUsage: externalUsageData,
         timestamp: DateTime.now(),
       );
 
@@ -453,6 +460,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         inq = inquiryData;
         ud = userDemoData;
         ad = adminData;
+        externalToolsUsage = externalUsageData;
 
         //  DEBUG PRINTS
         print(' Inquiry Data Updated:');
@@ -474,6 +482,18 @@ class _DashboardModulestate extends State<DashboardPage> {
       await _fetchAndCacheData();
     } catch (e) {
       print('Background refresh failed: $e');
+    }
+  }
+
+  Future<ExternalToolsUsageSummary?> _fetchExternalToolsUsage() async {
+    try {
+      return await fetchExternalToolsUsageFromFirestore(
+        timeFrame: selectedTimeFrame,
+        customDateRange: customDateRange,
+      );
+    } catch (e) {
+      print('Error loading external tools usage: $e');
+      return null;
     }
   }
 
@@ -715,6 +735,7 @@ class _DashboardModulestate extends State<DashboardPage> {
             inq: inq,
             ud: ud,
             ad: ad,
+            externalToolsUsage: externalToolsUsage,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -728,6 +749,7 @@ class _DashboardModulestate extends State<DashboardPage> {
             inq: inq,
             ud: ud,
             ad: ad,
+            externalToolsUsage: externalToolsUsage,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -741,6 +763,7 @@ class _DashboardModulestate extends State<DashboardPage> {
             inq: inq,
             ud: ud,
             ad: ad,
+            externalToolsUsage: externalToolsUsage,
             userName: userName!,
             quickStats: quickStats,
             customDateRange: customDateRange,
@@ -948,6 +971,7 @@ class DesktopDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -962,6 +986,7 @@ class DesktopDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -978,6 +1003,7 @@ class DesktopDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -994,6 +1020,7 @@ class TabletDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -1008,6 +1035,7 @@ class TabletDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -1024,6 +1052,7 @@ class TabletDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -1040,6 +1069,7 @@ class MobileDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -1054,6 +1084,7 @@ class MobileDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -1070,6 +1101,7 @@ class MobileDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -1086,6 +1118,7 @@ Widget dashboardContents(
   InquiryReportsData? inq,
   UserDemographicsReportsData? ud,
   AdminDashboardData? ad,
+  ExternalToolsUsageSummary? externalToolsUsage,
   String userName,
   Map<String, int>? quickStats,
   DateTimeRange? customDateRange,
@@ -1318,6 +1351,7 @@ Widget dashboardContents(
                 GeminiBillingSection(
                   timeFrame: selectedTimeFrame,
                   customDateRange: customDateRange,
+                  initialData: externalToolsUsage,
                 ),
               ],
             );
@@ -1426,6 +1460,7 @@ Widget dashboardContents(
                 GeminiBillingSection(
                   timeFrame: selectedTimeFrame,
                   customDateRange: customDateRange,
+                  initialData: externalToolsUsage,
                 ),
               ],
             );

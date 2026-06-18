@@ -5,10 +5,12 @@ import 'gemini_billing_service.dart';
 class GeminiBillingSection extends StatefulWidget {
   final String timeFrame;
   final DateTimeRange? customDateRange;
+  final ExternalToolsUsageSummary? initialData;
   const GeminiBillingSection({
     super.key,
     required this.timeFrame,
     this.customDateRange,
+    this.initialData,
   });
 
   @override
@@ -16,44 +18,21 @@ class GeminiBillingSection extends StatefulWidget {
 }
 
 class _GeminiBillingSectionState extends State<GeminiBillingSection> {
-  GeminiBillingSummary? _data;
-  bool _loading = true;
-  String? _error;
+  ExternalToolsUsageSummary? _data;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final data = await fetchGeminiBillingFromFirestore(
-        timeFrame: widget.timeFrame,
-        customDateRange: widget.customDateRange,
-      );
-      setState(() {
-        _data = data;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+    _data = widget.initialData;
   }
 
   @override
   void didUpdateWidget(GeminiBillingSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.timeFrame != widget.timeFrame ||
-        oldWidget.customDateRange != widget.customDateRange) {
-      _load();
+    if (oldWidget.initialData != widget.initialData) {
+      setState(() {
+        _data = widget.initialData;
+      });
     }
   }
 
@@ -87,7 +66,7 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Gemini API Billing',
+                      'External Tools Usage',
                       style: TextStyle(
                         fontSize: isMobile ? 16 : 18,
                         fontWeight: FontWeight.bold,
@@ -110,11 +89,7 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
           ],
         ),
         const SizedBox(height: 20),
-        if (_loading)
-          const _BillingSkeleton()
-        else if (_error != null)
-          _BillingError(error: _error!, onRetry: _load)
-        else if (_data == null)
+        if (_data == null)
           const _BillingEmpty()
         else
           _BillingBody(
@@ -132,7 +107,7 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
 
 // Pass timeFrame into _BillingBody
 class _BillingBody extends StatelessWidget {
-  final GeminiBillingSummary data;
+  final ExternalToolsUsageSummary data;
   final bool isMobile;
   final String timeFrame; // ADD
   final DateTimeRange? customDateRange; // ADD
@@ -169,7 +144,7 @@ class _BillingBody extends StatelessWidget {
               child: _BillingStatCard(
                 label: 'Total Cost',
                 value: data.formattedTotalCost,
-                sub: '${formatTokenCount(data.totalTokens)} tokens',
+                sub: '${formatTokenCount(data.gemini.totalTokens)} Gemini tokens',
                 icon: Icons.attach_money,
                 color: const Color(0xFF1A73E8),
               ),
@@ -178,7 +153,7 @@ class _BillingBody extends StatelessWidget {
             Expanded(
               child: _BillingStatCard(
                 label: 'Input Tokens',
-                value: formatTokenCount(data.totalInputTokens),
+                value: formatTokenCount(data.gemini.totalInputTokens),
                 sub: 'for ${_periodLabel(timeFrame, customDateRange)}',
                 icon: Icons.login,
                 color: Colors.orange,
@@ -188,7 +163,7 @@ class _BillingBody extends StatelessWidget {
             Expanded(
               child: _BillingStatCard(
                 label: 'Output Tokens',
-                value: formatTokenCount(data.totalOutputTokens),
+                value: formatTokenCount(data.gemini.totalOutputTokens),
                 sub: 'for ${_periodLabel(timeFrame, customDateRange)}',
                 icon: Icons.logout,
                 color: Colors.purple,
@@ -199,6 +174,10 @@ class _BillingBody extends StatelessWidget {
 
         const SizedBox(height: 20),
 
+        _ExternalToolsCard(tools: data.tools),
+
+        const SizedBox(height: 20),
+
         // ── Daily trend + Model side by side ──────────────────
         isMobile
             ? Column(
@@ -206,7 +185,7 @@ class _BillingBody extends StatelessWidget {
                 SizedBox(
                   height: 280,
                   child: _DailyTrendCard(
-                    trend: data.dailyTrend,
+                    trend: data.gemini.dailyTrend,
                     timeFrame: timeFrame,
                     customDateRange: customDateRange,
                   ),
@@ -214,7 +193,10 @@ class _BillingBody extends StatelessWidget {
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 300,
-                  child: _ModelCard(models: data.byModel, timeFrame: timeFrame),
+                  child: _ModelCard(
+                    models: data.gemini.byModel,
+                    timeFrame: timeFrame,
+                  ),
                 ),
               ],
             )
@@ -225,7 +207,7 @@ class _BillingBody extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: _DailyTrendCard(
-                      trend: data.dailyTrend,
+                      trend: data.gemini.dailyTrend,
                       timeFrame: timeFrame,
                       customDateRange: customDateRange,
                     ),
@@ -233,7 +215,7 @@ class _BillingBody extends StatelessWidget {
                   const SizedBox(width: 20),
                   Expanded(
                     child: _ModelCard(
-                      models: data.byModel,
+                      models: data.gemini.byModel,
                       timeFrame: timeFrame,
                     ),
                   ),
@@ -338,6 +320,150 @@ class _BillingStatCard extends StatelessWidget {
 }
 
 // ── Daily trend — matches buildSystemLogsCard container style ─────
+
+class _ExternalToolsCard extends StatelessWidget {
+  final List<ExternalToolStat> tools;
+
+  const _ExternalToolsCard({required this.tools});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.hub_outlined,
+                  color: Colors.teal[700],
+                  size: isMobile ? 20 : 24,
+                ),
+              ),
+              SizedBox(width: isMobile ? 10 : 12),
+              Expanded(
+                child: Text(
+                  'Firebase, Genkit, and Pinecone',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[900],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 14 : 18),
+          isMobile
+              ? Column(
+                children:
+                    tools
+                        .map(
+                          (tool) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ExternalToolRow(tool: tool),
+                          ),
+                        )
+                        .toList(),
+              )
+              : Row(
+                children:
+                    tools
+                        .map(
+                          (tool) => Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: _ExternalToolRow(tool: tool),
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExternalToolRow extends StatelessWidget {
+  final ExternalToolStat tool;
+
+  const _ExternalToolRow({required this.tool});
+
+  @override
+  Widget build(BuildContext context) {
+    final isFirebase = tool.name == 'Firebase';
+    final detail =
+        isFirebase
+            ? '${tool.readCount} reads  ${tool.writeCount} writes  ${tool.deleteCount} deletes'
+            : '${tool.usageCount} usage logs';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  tool.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey[900],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                tool.formattedCost,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A73E8),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _DailyTrendCard extends StatefulWidget {
   final List<GeminiDailyPoint> trend;

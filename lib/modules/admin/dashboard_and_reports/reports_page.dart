@@ -1,5 +1,7 @@
 import 'package:capstone_project/modules/admin/dashboard_and_reports/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/export_button.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_section.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_service.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/paginated_list.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/chatbot_usage_charts.dart';
@@ -37,6 +39,7 @@ class _ReportsPageState extends State<ReportsPage> {
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
   AdminDashboardData? ad;
+  ExternalToolsUsageSummary? externalToolsUsage;
   String? userName;
 
   DateTimeRange? customDateRange;
@@ -47,12 +50,14 @@ class _ReportsPageState extends State<ReportsPage> {
   bool isLoadingInquiry = false;
   bool isLoadingChatbot = false;
   bool isLoadingDemographics = false;
+  bool isLoadingExternalTools = false;
   bool isRefreshing = false;
 
   // Track which data has been loaded
   bool inquiryDataLoaded = false;
   bool chatbotDataLoaded = false;
   bool demographicsDataLoaded = false;
+  bool externalToolsDataLoaded = false;
 
   DateTime startDate = DateTime.now();
   String timeFrame = "This Month";
@@ -87,19 +92,22 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!inquiryDataLoaded) {
           setState(() => isLoadingInquiry = true);
           try {
-            final data = await _firebaseService.getInquiryReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
-
-            final escalatedData = await _firebaseService.getAdminDashboardData(
-              selectedTimeFrame,
-              customDateRange,
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getInquiryReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _firebaseService.getAdminDashboardData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              inq = data;
-              ad = escalatedData;
+              inq = results[0] as InquiryReportsData;
+              ad = results[1] as AdminDashboardData;
+              _setExternalToolsUsage(results[2] as ExternalToolsUsageSummary?);
               isLoadingInquiry = false;
               inquiryDataLoaded = true;
             });
@@ -115,13 +123,17 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!chatbotDataLoaded) {
           setState(() => isLoadingChatbot = true);
           try {
-            final data = await _firebaseService.getChatbotUsageReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getChatbotUsageReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              cb = data;
+              cb = results[0] as ChatbotUsageReportsData;
+              _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
               isLoadingChatbot = false;
               chatbotDataLoaded = true;
             });
@@ -137,13 +149,17 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!demographicsDataLoaded) {
           setState(() => isLoadingDemographics = true);
           try {
-            final data = await _firebaseService.getUserDemographicsReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getUserDemographicsReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              ud = data;
+              ud = results[0] as UserDemographicsReportsData;
+              _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
               isLoadingDemographics = false;
               demographicsDataLoaded = true;
             });
@@ -154,7 +170,46 @@ class _ReportsPageState extends State<ReportsPage> {
           }
         }
         break;
+
+      case 'External Tools Usage':
+        if (!externalToolsDataLoaded) {
+          setState(() => isLoadingExternalTools = true);
+          try {
+            final data = await _fetchExternalToolsUsageIfNeeded();
+            if (!mounted) return;
+            setState(() {
+              _setExternalToolsUsage(data);
+              isLoadingExternalTools = false;
+            });
+          } catch (e) {
+            print('Error loading external tools data: $e');
+            if (!mounted) return;
+            setState(() => isLoadingExternalTools = false);
+          }
+        }
+        break;
     }
+  }
+
+  Future<ExternalToolsUsageSummary?> _fetchExternalToolsUsageIfNeeded({
+    bool force = false,
+  }) async {
+    if (!force && externalToolsDataLoaded) return externalToolsUsage;
+    try {
+      return await fetchExternalToolsUsageFromFirestore(
+        timeFrame: selectedTimeFrame,
+        customDateRange: customDateRange,
+      );
+    } catch (e) {
+      print('Error loading external tools data: $e');
+      return null;
+    }
+  }
+
+  void _setExternalToolsUsage(ExternalToolsUsageSummary? data) {
+    if (data == null) return;
+    externalToolsUsage = data;
+    externalToolsDataLoaded = true;
   }
 
   //  When report type changes, load only that data
@@ -194,6 +249,8 @@ class _ReportsPageState extends State<ReportsPage> {
     setState(() {
       selectedTimeFrame = newValue;
       customDateRange = null;
+      externalToolsDataLoaded = false;
+      externalToolsUsage = null;
 
       // Invalidate loaded data flags to force reload
       switch (selectedReportType) {
@@ -218,6 +275,8 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() {
         customDateRange = null;
         selectedTimeFrame = 'This Month';
+        externalToolsDataLoaded = false;
+        externalToolsUsage = null;
 
         // Invalidate current report data
         switch (selectedReportType) {
@@ -237,6 +296,8 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() {
         customDateRange = range;
         selectedTimeFrame = 'Custom';
+        externalToolsDataLoaded = false;
+        externalToolsUsage = null;
 
         // Invalidate current report data
         switch (selectedReportType) {
@@ -266,37 +327,58 @@ class _ReportsPageState extends State<ReportsPage> {
       // Only refresh the selected report type
       switch (selectedReportType) {
         case 'Inquiry Trends':
-          final data = await _firebaseService.getInquiryReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getInquiryReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            inq = data;
+            inq = results[0] as InquiryReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
             isRefreshing = false;
           });
           break;
 
         case 'Chatbot Usage':
-          final data = await _firebaseService.getChatbotUsageReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getChatbotUsageReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            cb = data;
+            cb = results[0] as ChatbotUsageReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
             isRefreshing = false;
           });
           break;
 
         case 'User Demographics':
-          final data = await _firebaseService.getUserDemographicsReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getUserDemographicsReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            ud = data;
+            ud = results[0] as UserDemographicsReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
+            isRefreshing = false;
+          });
+          break;
+
+        case 'External Tools Usage':
+          final data = await _fetchExternalToolsUsageIfNeeded(force: true);
+          if (!mounted) return;
+          setState(() {
+            _setExternalToolsUsage(data);
             isRefreshing = false;
           });
           break;
@@ -394,6 +476,8 @@ class _ReportsPageState extends State<ReportsPage> {
         return isLoadingChatbot;
       case 'User Demographics':
         return isLoadingDemographics;
+      case 'External Tools Usage':
+        return isLoadingExternalTools;
       default:
         return false;
     }
@@ -418,6 +502,7 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
+        externalToolsUsage: externalToolsUsage,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -437,6 +522,7 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
+        externalToolsUsage: externalToolsUsage,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -456,6 +542,7 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
+        externalToolsUsage: externalToolsUsage,
         userName: userName!,
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
@@ -620,6 +707,7 @@ class DesktopDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -640,6 +728,7 @@ class DesktopDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -683,6 +772,7 @@ class DesktopDashboard extends StatelessWidget {
                 cb,
                 selectedTimeFrame,
                 ud,
+                externalToolsUsage,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
@@ -709,6 +799,7 @@ class TabletDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -729,6 +820,7 @@ class TabletDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -773,6 +865,7 @@ class TabletDashboard extends StatelessWidget {
                 cb,
                 selectedTimeFrame,
                 ud,
+                externalToolsUsage,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
@@ -799,6 +892,7 @@ class MobileDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -819,6 +913,7 @@ class MobileDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -863,6 +958,7 @@ class MobileDashboard extends StatelessWidget {
                 cb,
                 selectedTimeFrame,
                 ud,
+                externalToolsUsage,
                 startDate,
                 timeFrame,
                 timeCategoryCounts,
@@ -939,6 +1035,7 @@ class ReportsHelper {
     ChatbotUsageReportsData? cb,
     String selectedTimeFrame,
     UserDemographicsReportsData? ud,
+    ExternalToolsUsageSummary? externalToolsUsage,
     DateTime startDate,
     String timeFrame,
     Map<String, Map<String, int>> timeCategoryCounts,
@@ -974,6 +1071,14 @@ class ReportsHelper {
           context: context,
           isMobile: isMobile,
         );
+      case 'External Tools Usage':
+        return [
+          GeminiBillingSection(
+            timeFrame: selectedTimeFrame,
+            customDateRange: customDateRange,
+            initialData: externalToolsUsage,
+          ),
+        ];
       default:
         return buildInquiryTrendsReport(
           inq,
@@ -2510,7 +2615,9 @@ Widget buildHeader(
               ? 'inquiry'
               : selectedReportType == 'Chatbot Usage'
               ? 'chatbot'
-              : 'demographics';
+              : selectedReportType == 'User Demographics'
+              ? 'demographics'
+              : 'external';
 
       final subtitle =
           selectedTimeFrame == 'Custom' && customDateRange != null
@@ -2687,7 +2794,12 @@ Widget _buildControlsRow(
         Row(
           children: [
             CustomDropdownButton(
-              items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+              items: [
+                'Inquiry Trends',
+                'Chatbot Usage',
+                'User Demographics',
+                'External Tools Usage',
+              ],
               initialValue: selectedReportType,
               onChanged: onReportTypeChanged,
             ),
@@ -2714,18 +2826,19 @@ Widget _buildControlsRow(
           ),
         ],
         const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ExportButton(
-            pageType: pageType,
-            timeFrame: selectedTimeFrame,
-            userName: userName,
-            inq: inq,
-            cb: cb,
-            ud: ud,
-            ad: ad,
+        if (pageType != 'external')
+          SizedBox(
+            width: double.infinity,
+            child: ExportButton(
+              pageType: pageType,
+              timeFrame: selectedTimeFrame,
+              userName: userName,
+              inq: inq,
+              cb: cb,
+              ud: ud,
+              ad: ad,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -2733,7 +2846,12 @@ Widget _buildControlsRow(
   return Row(
     children: [
       CustomDropdownButton(
-        items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+        items: [
+          'Inquiry Trends',
+          'Chatbot Usage',
+          'User Demographics',
+          'External Tools Usage',
+        ],
         initialValue: selectedReportType,
         onChanged: onReportTypeChanged,
       ),
@@ -2758,15 +2876,16 @@ Widget _buildControlsRow(
         ),
       ],
       const SizedBox(width: 8),
-      ExportButton(
-        pageType: pageType,
-        timeFrame: selectedTimeFrame,
-        userName: userName,
-        inq: inq,
-        cb: cb,
-        ud: ud,
-        ad: ad,
-      ),
+      if (pageType != 'external')
+        ExportButton(
+          pageType: pageType,
+          timeFrame: selectedTimeFrame,
+          userName: userName,
+          inq: inq,
+          cb: cb,
+          ud: ud,
+          ad: ad,
+        ),
     ],
   );
 }
@@ -2791,6 +2910,8 @@ String _getReportDescription(
       return "Chatbot performance metrics and usage statistics $timeFrameText.";
     case 'User Demographics':
       return "User demographics and engagement patterns $timeFrameText.";
+    case 'External Tools Usage':
+      return "Gemini API billing and Firebase, Genkit, and Pinecone usage $timeFrameText.";
     default:
       return "Here's a complete reports and analytics of OASP Assist $timeFrameText.";
   }

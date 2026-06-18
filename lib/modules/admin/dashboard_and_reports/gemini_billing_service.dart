@@ -61,39 +61,70 @@ class GeminiBillingSummary {
   int get totalTokens => totalInputTokens + totalOutputTokens;
 }
 
+class ExternalToolStat {
+  final String name;
+  double costUsd;
+  int usageCount;
+  int readCount;
+  int writeCount;
+  int deleteCount;
+
+  ExternalToolStat({
+    required this.name,
+    this.costUsd = 0,
+    this.usageCount = 0,
+    this.readCount = 0,
+    this.writeCount = 0,
+    this.deleteCount = 0,
+  });
+
+  String get formattedCost => formatBillingCost(costUsd);
+}
+
+class ExternalToolsUsageSummary {
+  final GeminiBillingSummary gemini;
+  final List<ExternalToolStat> tools;
+
+  const ExternalToolsUsageSummary({required this.gemini, required this.tools});
+
+  double get totalCostUsd =>
+      gemini.totalCostUsd + tools.fold(0.0, (sum, tool) => sum + tool.costUsd);
+  int get totalUsage =>
+      gemini.totalTokens + tools.fold(0, (sum, tool) => sum + tool.usageCount);
+  int get totalReads => tools.fold(0, (sum, tool) => sum + tool.readCount);
+  int get totalWrites => tools.fold(0, (sum, tool) => sum + tool.writeCount);
+  int get totalDeletes => tools.fold(0, (sum, tool) => sum + tool.deleteCount);
+  String get formattedTotalCost => formatBillingCost(totalCostUsd);
+}
+
 // ── Firestore query ───────────────────────────────────────────────
+
+Future<ExternalToolsUsageSummary> fetchExternalToolsUsageFromFirestore({
+  required String timeFrame,
+  DateTimeRange? customDateRange,
+}) async {
+  final gemini = await fetchGeminiBillingFromFirestore(
+    timeFrame: timeFrame,
+    customDateRange: customDateRange,
+  );
+  final range = _resolveRange(timeFrame, customDateRange);
+
+  final tools = await Future.wait([
+    _fetchFirebaseUsage(range.start, range.end),
+    _fetchUsageCollection('genkit_usage', 'Genkit', range.start, range.end),
+    _fetchUsageCollection('pinecone_usage', 'Pinecone', range.start, range.end),
+  ]);
+
+  return ExternalToolsUsageSummary(gemini: gemini, tools: tools);
+}
 
 Future<GeminiBillingSummary> fetchGeminiBillingFromFirestore({
   required String timeFrame,
   DateTimeRange? customDateRange,
 }) async {
-  final now = DateTime.now();
-
-  DateTime rangeStart;
-  DateTime rangeEnd = now;
-
-  switch (timeFrame) {
-    case 'Today':
-      rangeStart = DateTime(now.year, now.month, now.day);
-      break;
-    case 'This Week':
-      rangeStart = now.subtract(Duration(days: now.weekday - 1));
-      rangeStart = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
-      break;
-    case 'This Year':
-      rangeStart = DateTime(now.year, 1, 1);
-      break;
-    case 'Custom':
-      rangeStart = customDateRange?.start ?? DateTime(now.year, now.month, 1);
-      rangeEnd = customDateRange?.end ?? now;
-      break;
-    case 'All':
-      rangeStart = DateTime(2000, 1, 1);
-      break;
-    case 'This Month':
-    default:
-      rangeStart = DateTime(now.year, now.month, 1);
-  }
+  final range = _resolveRange(timeFrame, customDateRange);
+  final rangeStart = range.start;
+  final rangeEnd = range.end;
 
   final startStr = _dateStr(rangeStart);
   final endStr = _dateStr(rangeEnd);
@@ -156,6 +187,159 @@ Future<GeminiBillingSummary> fetchGeminiBillingFromFirestore({
     dailyTrend: dailyTrend,
     byModel: sortedModels,
   );
+}
+
+Future<ExternalToolStat> _fetchUsageCollection(
+  String collection,
+  String name,
+  DateTime start,
+  DateTime end,
+) async {
+  final stat = ExternalToolStat(name: name);
+  QuerySnapshot<Map<String, dynamic>> snapshot;
+  try {
+    snapshot = await FirebaseFirestore.instance.collection(collection).get();
+  } catch (_) {
+    return stat;
+  }
+  var matchedDocs = 0;
+
+  for (final doc in snapshot.docs) {
+    final d = doc.data();
+    if (!_isUsageDocInRange(d, start, end)) continue;
+    matchedDocs++;
+    stat.costUsd += _numValue(d, ['costUsd', 'cost', 'billingCostUsd']);
+    stat.usageCount += _intValue(d, ['usage', 'usageCount', 'requests', 'calls']);
+    stat.readCount += _intValue(d, ['reads', 'readCount']);
+    stat.writeCount += _intValue(d, ['writes', 'writeCount', 'upserts']);
+    stat.deleteCount += _intValue(d, ['deletes', 'deleteCount']);
+  }
+
+  if (stat.usageCount == 0) stat.usageCount = matchedDocs;
+  return stat;
+}
+
+Future<ExternalToolStat> _fetchFirebaseUsage(DateTime start, DateTime end) async {
+  final stat = await _fetchUsageCollection('firebase_usage', 'Firebase', start, end);
+  QuerySnapshot<Map<String, dynamic>> snapshot;
+  try {
+    snapshot = await FirebaseFirestore.instance
+        .collection('logs')
+        .where('time', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('time', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .get();
+  } catch (_) {
+    return stat;
+  }
+
+  for (final doc in snapshot.docs) {
+    final d = doc.data();
+    final action = (d['action'] ?? d['operation'] ?? d['type'] ?? '')
+        .toString()
+        .toLowerCase();
+
+    if (action.contains('read') || action.contains('view')) stat.readCount++;
+    if (action.contains('write') ||
+        action.contains('create') ||
+        action.contains('add') ||
+        action.contains('update')) {
+      stat.writeCount++;
+    }
+    if (action.contains('delete') || action.contains('remove')) stat.deleteCount++;
+  }
+
+  stat.usageCount += stat.readCount + stat.writeCount + stat.deleteCount;
+  return stat;
+}
+
+class _BillingRange {
+  final DateTime start;
+  final DateTime end;
+
+  const _BillingRange({required this.start, required this.end});
+}
+
+_BillingRange _resolveRange(
+  String timeFrame,
+  DateTimeRange? customDateRange,
+) {
+  final now = DateTime.now();
+  DateTime rangeStart;
+  DateTime rangeEnd = now;
+
+  switch (timeFrame) {
+    case 'Today':
+      rangeStart = DateTime(now.year, now.month, now.day);
+      break;
+    case 'This Week':
+      rangeStart = now.subtract(Duration(days: now.weekday - 1));
+      rangeStart = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+      break;
+    case 'This Year':
+      rangeStart = DateTime(now.year, 1, 1);
+      break;
+    case 'Custom':
+      rangeStart = customDateRange?.start ?? DateTime(now.year, now.month, 1);
+      rangeEnd = customDateRange?.end ?? now;
+      break;
+    case 'All':
+      rangeStart = DateTime(2000, 1, 1);
+      break;
+    case 'This Month':
+    default:
+      rangeStart = DateTime(now.year, now.month, 1);
+  }
+
+  return _BillingRange(
+    start: DateTime(rangeStart.year, rangeStart.month, rangeStart.day),
+    end: DateTime(
+      rangeEnd.year,
+      rangeEnd.month,
+      rangeEnd.day,
+      23,
+      59,
+      59,
+      999,
+    ),
+  );
+}
+
+double _numValue(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key];
+    if (value is num) return value.toDouble();
+    final parsed = double.tryParse(value?.toString() ?? '');
+    if (parsed != null) return parsed;
+  }
+  return 0;
+}
+
+int _intValue(Map<String, dynamic> data, List<String> keys) {
+  for (final key in keys) {
+    final value = data[key];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    final parsed = int.tryParse(value?.toString() ?? '');
+    if (parsed != null) return parsed;
+  }
+  return 0;
+}
+
+bool _isUsageDocInRange(Map<String, dynamic> data, DateTime start, DateTime end) {
+  final value =
+      data['time'] ?? data['createdAt'] ?? data['timestamp'] ?? data['date'];
+
+  DateTime? date;
+  if (value is Timestamp) {
+    date = value.toDate();
+  } else if (value is DateTime) {
+    date = value;
+  } else if (value != null) {
+    date = DateTime.tryParse(value.toString());
+  }
+
+  if (date == null) return true;
+  return !date.isBefore(start) && !date.isAfter(end);
 }
 
 String _dateStr(DateTime d) =>
