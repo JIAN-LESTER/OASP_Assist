@@ -81,7 +81,7 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
   String? _contentError;
   String? _categoryError;
 
-  final categories = ['General'];
+  final categories = ['Admission', 'Scholarship', 'Placement', 'General'];
 
   @override
   void initState() {

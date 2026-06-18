@@ -11,7 +11,6 @@ import {logGeminiUsage} from "./geminiUsage";
 // Define secrets
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-const GOOGLE_VISION_API_KEY = defineSecret("GOOGLE_VISION_API_KEY"); //   For OCR
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
 
@@ -335,73 +334,6 @@ function extractSchedulesFromOCR(ocrText: string): ScheduleEntry[] {
   return schedules;
 }
 
-async function extractTextFromImage(imageUrl: string): Promise<string> {
-  try {
-    const visionApiKey = GOOGLE_VISION_API_KEY.value();
-
-    // Download image
-    const imageResponse = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 30000,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; OASP-Bot/1.0)",
-      },
-    });
-
-    const imageBuffer = Buffer.from(
-      new Uint8Array(imageResponse.data as ArrayBuffer)
-    );
-    const base64Image = imageBuffer.toString("base64");
-
-    // Call Google Cloud Vision API
-    const visionResponse = await axios.post(
-      `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
-      {
-        requests: [
-          {
-            image: {
-              content: base64Image,
-            },
-            features: [
-              {
-                type: "TEXT_DETECTION",
-                maxResults: 1,
-              },
-            ],
-          },
-        ],
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      }
-    );
-
-    const visionData = visionResponse.data as any;
-    await logGeminiUsage({
-      userId: null,
-      conversationId: null,
-      model: "cloud-vision",
-      inputTokens: 1,
-      outputTokens: 0,
-    }).catch(() => undefined);
-
-    const annotations = visionData?.responses?.[0]?.textAnnotations;
-
-    if (annotations && annotations.length > 0) {
-      const extractedText = annotations[0].description;
-      return extractedText;
-    }
-
-    return "";
-  } catch (error: any) {
-    return ""; // Return empty string on error, don't fail the entire process
-  }
-}
-
-
 async function verifyAuthToken(
   authHeader: string | undefined
 ): Promise<string | null> {
@@ -598,7 +530,6 @@ export const syncFacebookPosts = onSchedule(
     memory: "1GiB",
     secrets: [
       COHERE_API_KEY, GEMINI_API_KEY,
-      GOOGLE_VISION_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -623,22 +554,10 @@ async function syncFacebookPostsLogic(): Promise<any> {
 
     let processed = 0;
     let failed = 0;
-    let withOCR = 0;
 
     for (const post of posts) {
       try {
-        const hasImage = !!post.full_picture;
         await processPost(post, COHERE_API_KEY.value());
-
-        if (hasImage) {
-          const postDoc = await db
-            .collection("announcements")
-            .doc(post.id)
-            .get();
-          if (postDoc.exists && postDoc.data()?.has_image_text) {
-            withOCR++;
-          }
-        }
 
         processed++;
       } catch (postError: any) {
@@ -650,11 +569,10 @@ async function syncFacebookPostsLogic(): Promise<any> {
     return {
       success: true,
       message:
-        `Successfully synced ${processed} posts from the start of the month (${withOCR} with image text extraction)` +
+        `Successfully synced ${processed} posts from the start of the month` +
         (failed > 0 ? ` (${failed} failed)` : ""),
       count: processed,
       failed: failed,
-      withOCR: withOCR,
       total: posts.length,
       dateFilter: "Start of current month",
     };
@@ -674,7 +592,6 @@ export const manualSyncFacebookPosts = onCall(
     memory: "1GiB",
     secrets: [
       COHERE_API_KEY, GEMINI_API_KEY,
-      GOOGLE_VISION_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -704,7 +621,6 @@ export const manualSyncFacebookPostsHttp = onRequest(
     memory: "1GiB",
     secrets: [
       COHERE_API_KEY, GEMINI_API_KEY,
-      GOOGLE_VISION_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -2350,9 +2266,6 @@ async function processPost(
   const postRef = db.collection("announcements").doc(postId);
   const doc = await postRef.get();
 
-  const settings = await getAutoCreateSettings();
-  const ocrEnabled = settings.enabled;
-
   // Extract image URLs from the Facebook post
   const allImageUrls = extractAllImagesFromPost(post);
 
@@ -2424,23 +2337,7 @@ async function processPost(
     }
 
 
-    let combinedOcrText = docData?.ocr_text || "";
-    const ocrResults: string[] = [];
-
-
-    if (!imagesAlreadyStored && uploadedImageUrls.length > 0 && ocrEnabled) {
-      for (let i = 0; i < allImageUrls.length; i++) {
-        try {
-          const ocrText = await extractTextFromImage(allImageUrls[i]);
-          if (ocrText && ocrText.trim().length > 0) {
-            ocrResults.push(ocrText);
-          }
-        } catch (err: any) {
-        }
-      }
-      combinedOcrText = combineOcrResults(ocrResults);
-    } else if (!ocrEnabled) {
-    }
+    const combinedOcrText = docData?.ocr_text || "";
 
 
     const updatePayload: Record<string, any> = {
@@ -2460,15 +2357,6 @@ async function processPost(
       updatePayload.image_count = uploadedImageUrls.length;
       updatePayload.full_picture = uploadedImageUrls[0] || "";
       updatePayload.stored_in_storage = true;
-
-      if (ocrResults.length > 0) {
-        updatePayload.ocr_text = combinedOcrText;
-        updatePayload.has_image_text = true;
-        updatePayload.ocr_processed_count = ocrResults.length;
-        updatePayload.ocr_skipped_by_settings = false;
-      } else if (!ocrEnabled) {
-        updatePayload.ocr_skipped_by_settings = true;
-      }
     }
 
     await postRef.update(updatePayload);
@@ -2491,10 +2379,7 @@ async function processPost(
 
 
       if (needsCategoryDoc || needsInfoBank) {
-        const messageForAnalysis =
-          combinedOcrText.length > 0 ?
-            `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}` :
-            originalMessage;
+        const messageForAnalysis = originalMessage;
 
         await createCategoryAndInfoBank(
           postId,
@@ -2513,35 +2398,9 @@ async function processPost(
   }
 
 
-  let combinedOcrText = "";
-  const ocrResults: string[] = [];
-
-  if (allImageUrls.length > 0) {
-    if (!ocrEnabled) {
-    } else {
-      for (let i = 0; i < allImageUrls.length; i++) {
-        try {
-          const ocrText = await extractTextFromImage(allImageUrls[i]);
-          if (ocrText && ocrText.trim().length > 0) {
-            ocrResults.push(ocrText);
-          } else {
-          }
-        } catch (err: any) {
-        }
-      }
-      combinedOcrText = combineOcrResults(ocrResults);
-    }
-  }
-
-  const hasImageText = ocrResults.length > 0;
-
-  // Combine message with OCR text for analysis
-  let messageForAnalysis = originalMessage;
-  if (hasImageText) {
-    messageForAnalysis = originalMessage ?
-      `${originalMessage}\n\n[Text from ${ocrResults.length} image(s)]:\n${combinedOcrText}` :
-      combinedOcrText;
-  }
+  const combinedOcrText = "";
+  const hasImageText = false;
+  const messageForAnalysis = originalMessage;
 
   if (!messageForAnalysis || messageForAnalysis.trim().length === 0) {
     return;
@@ -2578,10 +2437,10 @@ async function processPost(
     notification_sent: false,
     ocr_text: combinedOcrText || "",
     has_image_text: hasImageText,
-    ocr_processed_count: ocrResults.length,
-    ocr_success_count: ocrResults.length,
+    ocr_processed_count: 0,
+    ocr_success_count: 0,
     total_image_count: allImageUrls.length,
-    ocr_skipped_by_settings: allImageUrls.length > 0 && !ocrEnabled,
+    ocr_skipped_by_settings: allImageUrls.length > 0,
   });
 
 
@@ -2605,19 +2464,64 @@ async function createCategoryAndInfoBank(
   ocrText: string,
   imageCount: number
 ): Promise<void> {
-  void createAdmissionFromAnnouncement;
-  void createScholarshipFromAnnouncement;
-  void createPlacementFromAnnouncement;
-  return;
-}
-function combineOcrResults(ocrResults: string[]): string {
-  if (ocrResults.length === 0) return "";
+  const settings = await getAutoCreateSettings();
+  const categoryLower = category.toLowerCase() as "admission" | "scholarship" | "placement";
 
-  return ocrResults
-    .filter((text) => text.trim().length > 0)
-    .join("\n\n---IMAGE SEPARATOR---\n\n");
-}
+  if (!settings.enabled) {
+    return;
+  }
 
+  if (
+    ["admission", "scholarship", "placement"].includes(categoryLower) &&
+    !settings.categories[categoryLower]
+  ) {
+    return;
+  }
+
+  try {
+    if (categoryLower === "admission") {
+      await createAdmissionFromAnnouncement(
+        postId,
+        messageForAnalysis,
+        deadlineTimestamp,
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+    } else if (categoryLower === "scholarship") {
+      await createScholarshipFromAnnouncement(
+        postId,
+        messageForAnalysis,
+        deadlineTimestamp,
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+    } else if (categoryLower === "placement") {
+      await createPlacementFromAnnouncement(
+        postId,
+        messageForAnalysis,
+        deadlineTimestamp,
+        cohereKey,
+        ocrText,
+        imageCount
+      );
+    }
+  } catch (categoryError: any) {
+    try {
+      await db.collection("category_creation_errors").add({
+        postId,
+        category: categoryLower,
+        errorMessage: categoryError.message,
+        errorStack: categoryError.stack,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch {
+    }
+
+    throw categoryError;
+  }
+}
 async function softDeleteCategoryDocument(
   announcementId: string,
   category: string
@@ -2657,7 +2561,7 @@ export const reprocessExistingAnnouncements = onCall(
   {
     cors: true,
     timeoutSeconds: 540,
-    secrets: [COHERE_API_KEY, GEMINI_API_KEY, GOOGLE_VISION_API_KEY],
+    secrets: [COHERE_API_KEY, GEMINI_API_KEY],
   },
   async (request) => {
     try {

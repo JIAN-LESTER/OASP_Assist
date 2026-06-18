@@ -17,7 +17,7 @@ import 'package:capstone_project/models/info_bank.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
-void showUploadDocumentModal(BuildContext context) {
+void showUploadDocumentModal(BuildContext context, {String? initialCategory}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -25,7 +25,7 @@ void showUploadDocumentModal(BuildContext context) {
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return const UploadDocumentModal();
+      return UploadDocumentModal(initialCategory: initialCategory);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
@@ -45,7 +45,9 @@ void showUploadDocumentModal(BuildContext context) {
 }
 
 class UploadDocumentModal extends StatelessWidget {
-  const UploadDocumentModal({super.key});
+  final String? initialCategory;
+
+  const UploadDocumentModal({super.key, this.initialCategory});
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +116,7 @@ class UploadDocumentModal extends StatelessWidget {
               isMobile: isMobile,
               isTablet: isTablet,
               isDesktop: isDesktop,
+              initialCategory: initialCategory,
             ),
           ),
         ),
@@ -126,12 +129,14 @@ class UploadDocumentContent extends StatefulWidget {
   final bool isMobile;
   final bool isTablet;
   final bool isDesktop;
+  final String? initialCategory;
 
   const UploadDocumentContent({
     Key? key,
     required this.isMobile,
     required this.isTablet,
     required this.isDesktop,
+    this.initialCategory,
   }) : super(key: key);
 
   @override
@@ -159,7 +164,21 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   int? _fileSizeInBytes;
   String? _fileSizeWarning;
 
-  final List<String> _predefinedCategories = ['General'];
+  final List<String> _predefinedCategories = [
+    'Admission',
+    'Scholarship',
+    'Placement',
+    'General',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final initialCategory = widget.initialCategory;
+    if (initialCategory != null && initialCategory.trim().isNotEmpty) {
+      _categoryController.text = initialCategory;
+    }
+  }
 
   @override
   void dispose() {

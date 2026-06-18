@@ -49,6 +49,8 @@ export {
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
 
+  batchSyncCategoriesToInfoBank,
+
 } from "./announcement";
 
 // Facebook Token Management Functions

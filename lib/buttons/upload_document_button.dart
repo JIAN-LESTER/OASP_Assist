@@ -86,7 +86,51 @@ class UploadDocumentButton extends StatelessWidget {
     );
   }
 
- 
+  void _showOptionsModal(BuildContext context) {
+    HapticFeedback.mediumImpact();
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Upload Document',
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return UploadDocumentModal(initialCategory: _categoryForFormType());
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.1),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          ),
+        );
+      },
+    ).then((result) {
+      if (result == true && onUploadComplete != null) {
+        onUploadComplete!();
+      }
+    });
+  }
+
+  String? _categoryForFormType() {
+    switch (formType?.toLowerCase()) {
+      case 'admission':
+        return 'Admission';
+      case 'scholarship':
+        return 'Scholarship';
+      case 'placement':
+        return 'Placement';
+      default:
+        return null;
+    }
+  }
 }
 
 // Alternative compact version for tight spaces
