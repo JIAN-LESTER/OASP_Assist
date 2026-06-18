@@ -597,6 +597,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       selectedTimeFrame = newValue;
       customDateRange = null;
       isLazyLoading = true;
+      showSkeleton = true;
     });
 
     try {
@@ -617,6 +618,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
+          showSkeleton = false;
         });
       }
     }
@@ -630,6 +632,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         customDateRange = null;
         selectedTimeFrame = 'This Month';
         isLazyLoading = true;
+        showSkeleton = true;
       });
     } else {
       // User selected a custom date range
@@ -637,6 +640,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         customDateRange = range;
         selectedTimeFrame = 'Custom';
         isLazyLoading = true;
+        showSkeleton = true;
       });
     }
 
@@ -664,6 +668,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
+          showSkeleton = false;
         });
       }
     }
@@ -844,11 +849,15 @@ class _DashboardModulestate extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 12),
                     const SkeletonStatCard(),
+                    SizedBox(width: 12),
+                    Expanded(child: SkeletonStatCard()),
                   ],
                 );
               } else {
                 return const Row(
                   children: [
+                    Expanded(child: SkeletonStatCard()),
+                    SizedBox(width: 20),
                     Expanded(child: SkeletonStatCard()),
                     SizedBox(width: 20),
                     Expanded(child: SkeletonStatCard()),
@@ -1508,12 +1517,18 @@ void _showMessagesDialog(
           title: 'Total Messages',
           headerColor: Colors.blue,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collectionGroup('messages')
                 .where('sender', isEqualTo: 'user')
-                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1554,13 +1569,19 @@ void _showAnsweredMessagesDialog(
           title: 'Answered Messages',
           headerColor: Colors.green,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collectionGroup('messages')
                 .where('sender', isEqualTo: 'user')
                 .where('isAnswered', isEqualTo: true)
-                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1602,7 +1623,10 @@ void _showUsersDialog(
           headerColor: Colors.red,
           dataFetcher: (page, pageSize) async {
             Query query = FirebaseFirestore.instance.collection('users');
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
 
             if (timeFrame != 'All' || customDateRange != null) {
@@ -1840,11 +1864,17 @@ void _showEscalatedMessagesDialog(
           title: 'Escalated Messages',
           headerColor: Colors.orange,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collection('escalations')
-                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1952,55 +1982,59 @@ class _ModernStatCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: lightColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: color, size: isMobile ? 18 : 20),
-                  ),
-                  if (onTap != null)
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: _kPageBg,
-                        borderRadius: BorderRadius.circular(6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: lightColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: color,
+                              size: isMobile ? 18 : 20,
+                            ),
+                          ),
+                          if (onTap != null)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: _kPageBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 11,
+                                color: _kTextSecondary,
+                              ),
+                            ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 11,
-                        color: _kTextSecondary,
+                      SizedBox(height: isMobile ? 12 : 16),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: isMobile ? 19 : 23,
+                          fontWeight: FontWeight.w700,
+                          color: _kTextPrimary,
+                          letterSpacing: -0.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                ],
-              ),
-              SizedBox(height: isMobile ? 12 : 16),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: isMobile ? 19 : 23,
-                  fontWeight: FontWeight.w700,
-                  color: _kTextPrimary,
-                  letterSpacing: -0.5,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: _kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: _kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -2126,11 +2160,11 @@ class _DashboardHeaderCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-            Icon(
-              Icons.info_outline_rounded,
-              size: 14,
-              color: _kTextSecondary,
-            ),
+              Icon(
+                Icons.info_outline_rounded,
+                size: 14,
+                color: _kTextSecondary,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -2185,9 +2219,9 @@ class _DashboardHeaderCard extends StatelessWidget {
                 'Admin',
                 style: TextStyle(
                   fontSize: 11,
-                color: _kAccent,
-                fontWeight: FontWeight.w600,
-              ),
+                  color: _kAccent,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
