@@ -749,8 +749,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       ),
       StepItem(
         number: "3",
-        title: "Explore Services",
-        description: "Browse resources and access OASP Assist features.",
+        title: "View Announcements",
+        description: "Browse updates and access OASP Assist features.",
         icon: Icons.explore_rounded,
       ),
     ];

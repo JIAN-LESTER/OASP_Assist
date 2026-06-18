@@ -1,4 +1,5 @@
-﻿/* eslint-disable no-useless-catch */
+﻿/* eslint-disable no-empty */
+/* eslint-disable no-useless-catch */
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
@@ -62,7 +63,6 @@ async function getAutoCreateSettings(): Promise<{
     return { enabled: true, categories: { admission: true, scholarship: true, placement: true } };
   }
 }
-
 
 
 function extractAllImagesFromPost(post: FacebookPost): string[] {
@@ -2605,66 +2605,10 @@ async function createCategoryAndInfoBank(
   ocrText: string,
   imageCount: number
 ): Promise<void> {
-  const settings = await getAutoCreateSettings();
-  const categoryLower = category.toLowerCase() as "admission" | "scholarship" | "placement";
-
-  if (!settings.enabled) {
-    return;
-  }
-
-  if (
-    ["admission", "scholarship", "placement"].includes(categoryLower) &&
-    !settings.categories[categoryLower]
-  ) {
-    return;
-  }
-
-
-  try {
-    if (categoryLower === "admission") {
-      await createAdmissionFromAnnouncement(
-        postId,
-        messageForAnalysis,
-        deadlineTimestamp,
-        cohereKey,
-        ocrText,
-        imageCount
-      );
-    } else if (categoryLower === "scholarship") {
-      await createScholarshipFromAnnouncement(
-        postId,
-        messageForAnalysis,
-        deadlineTimestamp,
-        cohereKey,
-        ocrText,
-        imageCount
-      );
-    } else if (categoryLower === "placement") {
-      await createPlacementFromAnnouncement(
-        postId,
-        messageForAnalysis,
-        deadlineTimestamp,
-        cohereKey,
-        ocrText,
-        imageCount
-      );
-    } else {
-    }
-  } catch (categoryError: any) {
-    try {
-      await db.collection("category_creation_errors").add({
-        postId,
-        category: categoryLower,
-        errorMessage: categoryError.message,
-        errorStack: categoryError.stack,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } catch (logError) {
-    }
-
-
-    throw categoryError;
-  }
+  void createAdmissionFromAnnouncement;
+  void createScholarshipFromAnnouncement;
+  void createPlacementFromAnnouncement;
+  return;
 }
 function combineOcrResults(ocrResults: string[]): string {
   if (ocrResults.length === 0) return "";
@@ -2707,7 +2651,6 @@ async function softDeleteCategoryDocument(
 // ============================================================================
 // EXPORTED FUNCTIONS
 // ============================================================================
-
 
 
 export const reprocessExistingAnnouncements = onCall(

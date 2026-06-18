@@ -991,10 +991,10 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
       },
 
       {
-        'icon': Icons.school_outlined,
-        'title': 'OASP Services',
+        'icon': Icons.announcement_outlined,
+        'title': 'OASP Updates',
         'description':
-            'Comprehensive access to admission, scholarship, and placement information in one place.',
+            'Access announcements, AI assistance, and staff support in one place.',
       },
       {
         'icon': Icons.support_agent_outlined,

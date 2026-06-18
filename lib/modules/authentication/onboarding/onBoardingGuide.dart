@@ -360,21 +360,21 @@ class _OnboardingGuideState extends State<OnboardingGuide>
                     child: Column(
                       children: [
                         _buildWelcomeFeature(
-                          Icons.school,
-                          'Admission Information',
-                          'View admission requirements',
+                          Icons.chat_outlined,
+                          'Chat with OASP Assist',
+                          'Ask questions and get guided help',
                         ),
                         const SizedBox(height: 12),
                         _buildWelcomeFeature(
-                          Icons.card_giftcard,
-                          'Scholarship List',
-                          'Browse available scholarships',
+                          Icons.announcement_outlined,
+                          'Announcements',
+                          'View latest OASP updates',
                         ),
                         const SizedBox(height: 12),
                         _buildWelcomeFeature(
-                          Icons.work,
-                          'Placement Information',
-                          'Career placement details',
+                          Icons.notifications_outlined,
+                          'Notifications',
+                          'Stay updated on replies and announcements',
                         ),
                       ],
                     ),
@@ -877,7 +877,6 @@ class _OnboardingOverlay extends StatelessWidget {
             _buildBulletPoint('Home - Your dashboard'),
             _buildBulletPoint('Chat with OASP Assist - AI assistant'),
             _buildBulletPoint('Announcements - Latest updates'),
-            _buildBulletPoint('Services - Admission, Scholarships, Placement'),
           ],
           const SizedBox(height: 20),
 

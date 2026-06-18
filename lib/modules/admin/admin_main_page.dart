@@ -12,10 +12,6 @@ import 'package:capstone_project/modules/admin/logs/message_logs.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/reports_page.dart';
 
 import 'package:capstone_project/modules/admin/logs/system_logs_page.dart';
-import 'package:capstone_project/modules/admin/service_information/admission/admission_management.dart'
-    show AdmissionManagementPage;
-import 'package:capstone_project/modules/admin/service_information/placement/placement_management.dart';
-import 'package:capstone_project/modules/admin/service_information/scholarship/scholarship_management.dart';
 import 'package:capstone_project/modules/admin/user_management/user_management_page.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
@@ -98,9 +94,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
     UserManagementPage(onNavigateToPage: _navigateToPage),
     const UserActivityLogsPage(),
     const AdminMessageLogsPage(),
-    const AdmissionManagementPage(),
-    const ScholarshipManagementPage(),
-    const PlacementManagementPage(),
     const CollegeManagementPage(),
     const ProgramManagementPage(),
   ];
@@ -115,9 +108,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Users',
     'System Activity Logs',
     'Message Logs',
-    'Admission',
-    'Scholarship',
-    'Placement',
     'Colleges',
     'Programs',
   ];

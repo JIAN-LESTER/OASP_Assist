@@ -308,32 +308,9 @@ class UniversalUIComponents {
                 MenuItem(
                   icon: Icons.account_balance_outlined,
                   title: "Colleges",
-                  index: 12,
-                ),
-                MenuItem(icon: Icons.book, title: "Programs", index: 13),
-              ],
-            ),
-            MenuItem(
-              icon: Icons.miscellaneous_services_outlined,
-              title: 'Services',
-              index: -2,
-              isExpandable: true,
-              subItems: [
-                MenuItem(
-                  icon: Icons.school_outlined,
-                  title: 'Admission',
                   index: 9,
                 ),
-                MenuItem(
-                  icon: Icons.card_giftcard_outlined,
-                  title: 'Scholarship',
-                  index: 10,
-                ),
-                MenuItem(
-                  icon: Icons.work_outline,
-                  title: 'Placement',
-                  index: 11,
-                ),
+                MenuItem(icon: Icons.book, title: "Programs", index: 10),
               ],
             ),
             MenuItem(
@@ -374,29 +351,6 @@ class UniversalUIComponents {
               icon: Icons.announcement_outlined,
               title: 'Announcements',
               index: 2,
-            ),
-            MenuItem(
-              icon: Icons.miscellaneous_services_outlined,
-              title: 'Services',
-              index: -1,
-              isExpandable: true,
-              subItems: [
-                MenuItem(
-                  icon: Icons.school_outlined,
-                  title: 'Admission Information',
-                  index: 3,
-                ),
-                MenuItem(
-                  icon: Icons.card_giftcard_outlined,
-                  title: 'Scholarship List',
-                  index: 4,
-                ),
-                MenuItem(
-                  icon: Icons.work_outline,
-                  title: 'Placement Information',
-                  index: 5,
-                ),
-              ],
             ),
           ],
           showNewChatButton: true,
@@ -502,27 +456,6 @@ class UniversalUIComponents {
           ),
         );
 
-        // Add horizontal line and New Chat + Chat History after Services for user role
-        if (userRole == UserRole.user && item.title == 'Services') {
-          // Add horizontal line separator
-          menuItems.add(
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Divider(color: Colors.grey[300], thickness: 1, height: 1),
-            ),
-          );
-
-          // Add New Chat and Chat History section
-          menuItems.add(
-            _buildNewChatAndHistorySection(
-              context,
-              selectedConversationId,
-              onConversationSelected,
-              setDrawerState,
-              onNewChat,
-            ),
-          );
-        }
       } else {
         menuItems.add(
           _buildRegularMenuItem(
@@ -535,6 +468,25 @@ class UniversalUIComponents {
           ),
         );
       }
+    }
+
+    if (userRole == UserRole.user) {
+      menuItems.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Divider(color: Colors.grey[300], thickness: 1, height: 1),
+        ),
+      );
+
+      menuItems.add(
+        _buildNewChatAndHistorySection(
+          context,
+          selectedConversationId,
+          onConversationSelected,
+          setDrawerState,
+          onNewChat,
+        ),
+      );
     }
 
     //  CRITICAL  Wrap in SingleChildScrollView to prevent overflow
@@ -617,7 +569,6 @@ class UniversalUIComponents {
 
   // 🔹 Add this at the top of your drawer widget (or as static map if inside a class)
   static final Map<String, bool> _expandedState = {
-    'Services': false,
     'Logs': false,
     'User Management': false,
   };
@@ -700,12 +651,10 @@ class UniversalUIComponents {
               initiallyExpanded: isExpanded,
               onExpansionChanged: (expanded) {
                 // Close ALL groups first
-                _expandedState['Services'] = false;
                 _expandedState['Logs'] = false;
                 _expandedState['User Management'] = false;
 
                 PersistentDrawerState.setUserManagementExpanded(false);
-                PersistentDrawerState.setServicesExpanded(false);
                 PersistentDrawerState.setLogsExpanded(false);
 
                 // Then open the clicked one if expanding
@@ -714,8 +663,6 @@ class UniversalUIComponents {
 
                   if (item.title == 'User Management') {
                     PersistentDrawerState.setUserManagementExpanded(true);
-                  } else if (item.title == 'Services') {
-                    PersistentDrawerState.setServicesExpanded(true);
                   } else if (item.title == 'Logs') {
                     PersistentDrawerState.setLogsExpanded(true);
                   }
@@ -825,19 +772,11 @@ class UniversalUIComponents {
 
   static int? _getGroupIndexForItem(int itemIndex) {
     // Admin role
-    if (itemIndex == 6 || itemIndex == 12 || itemIndex == 13) {
+    if (itemIndex == 6 || itemIndex == 9 || itemIndex == 10) {
       return -1; // User Management group
-    }
-    if (itemIndex == 9 || itemIndex == 10 || itemIndex == 11) {
-      return -2; // Services group
     }
     if (itemIndex == 7 || itemIndex == 8) {
       return -3; // Logs group
-    }
-
-    // User role
-    if (itemIndex == 3 || itemIndex == 4 || itemIndex == 5) {
-      return -1; // Services group for user
     }
 
     return null; // Not in any group
@@ -990,9 +929,6 @@ class UniversalUIComponents {
       if (itemGroupIndex != -1) {
         PersistentDrawerState.setUserManagementExpanded(false);
       }
-      if (itemGroupIndex != -2) {
-        PersistentDrawerState.setServicesExpanded(false);
-      }
       if (itemGroupIndex != -3) {
         PersistentDrawerState.setLogsExpanded(false);
       }
@@ -1000,8 +936,6 @@ class UniversalUIComponents {
       // Keep the current item's group open
       if (itemGroupIndex == -1) {
         PersistentDrawerState.setUserManagementExpanded(true);
-      } else if (itemGroupIndex == -2) {
-        PersistentDrawerState.setServicesExpanded(true);
       } else if (itemGroupIndex == -3) {
         PersistentDrawerState.setLogsExpanded(true);
       }
@@ -1010,9 +944,6 @@ class UniversalUIComponents {
       if (itemGroupIndex != -1) {
         _expandedState['User Management'] = false;
       }
-      if (itemGroupIndex != -2) {
-        _expandedState['Services'] = false;
-      }
       if (itemGroupIndex != -3) {
         _expandedState['Logs'] = false;
       }
@@ -1020,8 +951,6 @@ class UniversalUIComponents {
       // Keep current group open in mobile drawer
       if (itemGroupIndex == -1) {
         _expandedState['User Management'] = true;
-      } else if (itemGroupIndex == -2) {
-        _expandedState['Services'] = true;
       } else if (itemGroupIndex == -3) {
         _expandedState['Logs'] = true;
       }
@@ -1582,7 +1511,7 @@ class UniversalUIComponents {
     List<Widget> items = [];
 
     for (final menuItem in menuConfig.items) {
-      // Handle expandable items (Services, Logs)
+      // Handle expandable items
       if (menuItem.isExpandable && menuItem.subItems != null) {
         items.add(
           buildPersistentDrawerGroup(
@@ -1593,7 +1522,7 @@ class UniversalUIComponents {
             selectedIndex: selectedIndex,
             onTap: onItemTap,
             isExpanded: isExpanded,
-            isServicesExpanded: PersistentDrawerState.getExpansionState(
+            isGroupExpanded: PersistentDrawerState.getExpansionState(
               menuItem.index,
             ),
             children:
@@ -1612,33 +1541,6 @@ class UniversalUIComponents {
           ),
         );
 
-        // Add New Chat and History section after Services for user role
-        if (userRole == UserRole.user && menuItem.title == 'Services') {
-          if (isExpanded) {
-            items.add(
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: Divider(
-                  color: Colors.grey[300],
-                  thickness: 1,
-                  height: 1,
-                ),
-              ),
-            );
-          }
-
-          items.add(
-            _buildPersistentNewChatAndHistory(
-              context,
-              isExpanded,
-              onConversationSelected: onConversationSelected,
-              onNewChat: onNewChat, //  PASS IT HERE
-            ),
-          );
-        }
       } else {
         // Handle regular (non-expandable) items
         items.add(
@@ -1653,6 +1555,26 @@ class UniversalUIComponents {
           ),
         );
       }
+    }
+
+    if (userRole == UserRole.user) {
+      if (isExpanded) {
+        items.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Divider(color: Colors.grey[300], thickness: 1, height: 1),
+          ),
+        );
+      }
+
+      items.add(
+        _buildPersistentNewChatAndHistory(
+          context,
+          isExpanded,
+          onConversationSelected: onConversationSelected,
+          onNewChat: onNewChat,
+        ),
+      );
     }
 
     return items;

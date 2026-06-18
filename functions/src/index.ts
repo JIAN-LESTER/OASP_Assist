@@ -31,10 +31,6 @@ export {
   generateCohereResponse,
   checkPineconeHealth,
 
-  analyzeCohereAdmission,
-  analyzeCohereScholarship,
-  analyzeCoherePlacement,
-
 } from "./documentCrud";
 
 // User Management Functions
@@ -52,9 +48,6 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
-
-  batchSyncCategoriesToInfoBank,
-
 
 } from "./announcement";
 

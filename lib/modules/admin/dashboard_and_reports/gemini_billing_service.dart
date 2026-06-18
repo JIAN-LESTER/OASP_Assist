@@ -81,14 +81,58 @@ class ExternalToolStat {
   String get formattedCost => formatBillingCost(costUsd);
 }
 
+class FirebaseOperationPoint {
+  final String label;
+  int reads;
+  int writes;
+  int deletes;
+  double readCostUsd;
+  double writeCostUsd;
+  double deleteCostUsd;
+
+  FirebaseOperationPoint({
+    required this.label,
+    this.reads = 0,
+    this.writes = 0,
+    this.deletes = 0,
+    this.readCostUsd = 0,
+    this.writeCostUsd = 0,
+    this.deleteCostUsd = 0,
+  });
+
+  int get totalOps => reads + writes + deletes;
+  double get totalCostUsd => readCostUsd + writeCostUsd + deleteCostUsd;
+}
+
+class FirebaseUsageSummary {
+  final ExternalToolStat stat;
+  final List<FirebaseOperationPoint> trend;
+
+  const FirebaseUsageSummary({required this.stat, required this.trend});
+
+  double get readCostUsd =>
+      trend.fold(0.0, (sum, point) => sum + point.readCostUsd);
+  double get writeCostUsd =>
+      trend.fold(0.0, (sum, point) => sum + point.writeCostUsd);
+  double get deleteCostUsd =>
+      trend.fold(0.0, (sum, point) => sum + point.deleteCostUsd);
+}
+
 class ExternalToolsUsageSummary {
   final GeminiBillingSummary gemini;
+  final FirebaseUsageSummary firebase;
   final List<ExternalToolStat> tools;
 
-  const ExternalToolsUsageSummary({required this.gemini, required this.tools});
+  const ExternalToolsUsageSummary({
+    required this.gemini,
+    required this.firebase,
+    required this.tools,
+  });
 
   double get totalCostUsd =>
       gemini.totalCostUsd + tools.fold(0.0, (sum, tool) => sum + tool.costUsd);
+  double get firebaseTotalCostUsd => firebase.stat.costUsd;
+  double get llmTotalCostUsd => gemini.totalCostUsd;
   int get totalUsage =>
       gemini.totalTokens + tools.fold(0, (sum, tool) => sum + tool.usageCount);
   int get totalReads => tools.fold(0, (sum, tool) => sum + tool.readCount);
@@ -109,13 +153,18 @@ Future<ExternalToolsUsageSummary> fetchExternalToolsUsageFromFirestore({
   );
   final range = _resolveRange(timeFrame, customDateRange);
 
+  final firebase = await _fetchFirebaseUsage(range.start, range.end, timeFrame);
   final tools = await Future.wait([
-    _fetchFirebaseUsage(range.start, range.end),
+    Future.value(firebase.stat),
     _fetchUsageCollection('genkit_usage', 'Genkit', range.start, range.end),
     _fetchUsageCollection('pinecone_usage', 'Pinecone', range.start, range.end),
   ]);
 
-  return ExternalToolsUsageSummary(gemini: gemini, tools: tools);
+  return ExternalToolsUsageSummary(
+    gemini: gemini,
+    firebase: firebase,
+    tools: tools,
+  );
 }
 
 Future<GeminiBillingSummary> fetchGeminiBillingFromFirestore({
@@ -219,8 +268,40 @@ Future<ExternalToolStat> _fetchUsageCollection(
   return stat;
 }
 
-Future<ExternalToolStat> _fetchFirebaseUsage(DateTime start, DateTime end) async {
+Future<FirebaseUsageSummary> _fetchFirebaseUsage(
+  DateTime start,
+  DateTime end,
+  String timeFrame,
+) async {
   final stat = await _fetchUsageCollection('firebase_usage', 'Firebase', start, end);
+  final trendMap = <String, FirebaseOperationPoint>{};
+
+  void addOperation(
+    DateTime date,
+    String operation, {
+    double costUsd = 0,
+    int count = 1,
+  }) {
+    final label = _operationTrendLabel(date, start, end, timeFrame);
+    final point = trendMap.putIfAbsent(
+      label,
+      () => FirebaseOperationPoint(label: label),
+    );
+
+    if (operation == 'read') {
+      point.reads += count;
+      point.readCostUsd += costUsd;
+    } else if (operation == 'write') {
+      point.writes += count;
+      point.writeCostUsd += costUsd;
+    } else if (operation == 'delete') {
+      point.deletes += count;
+      point.deleteCostUsd += costUsd;
+    }
+  }
+
+  await _addFirebaseUsageCollectionTrend(trendMap, start, end, timeFrame);
+
   QuerySnapshot<Map<String, dynamic>> snapshot;
   try {
     snapshot = await FirebaseFirestore.instance
@@ -229,27 +310,183 @@ Future<ExternalToolStat> _fetchFirebaseUsage(DateTime start, DateTime end) async
         .where('time', isLessThanOrEqualTo: Timestamp.fromDate(end))
         .get();
   } catch (_) {
-    return stat;
+    return FirebaseUsageSummary(
+      stat: stat,
+      trend: _sortedOperationTrend(trendMap, start, end, timeFrame),
+    );
   }
 
   for (final doc in snapshot.docs) {
     final d = doc.data();
+    final timestamp = d['time'];
+    final date = timestamp is Timestamp ? timestamp.toDate() : DateTime.now();
     final action = (d['action'] ?? d['operation'] ?? d['type'] ?? '')
         .toString()
         .toLowerCase();
 
-    if (action.contains('read') || action.contains('view')) stat.readCount++;
+    if (action.contains('read') || action.contains('view')) {
+      stat.readCount++;
+      addOperation(date, 'read');
+    }
     if (action.contains('write') ||
         action.contains('create') ||
         action.contains('add') ||
         action.contains('update')) {
       stat.writeCount++;
+      addOperation(date, 'write');
     }
-    if (action.contains('delete') || action.contains('remove')) stat.deleteCount++;
+    if (action.contains('delete') || action.contains('remove')) {
+      stat.deleteCount++;
+      addOperation(date, 'delete');
+    }
   }
 
   stat.usageCount += stat.readCount + stat.writeCount + stat.deleteCount;
-  return stat;
+  _allocateFirebaseCosts(stat, trendMap);
+
+  return FirebaseUsageSummary(
+    stat: stat,
+    trend: _sortedOperationTrend(trendMap, start, end, timeFrame),
+  );
+}
+
+Future<void> _addFirebaseUsageCollectionTrend(
+  Map<String, FirebaseOperationPoint> trendMap,
+  DateTime start,
+  DateTime end,
+  String timeFrame,
+) async {
+  QuerySnapshot<Map<String, dynamic>> snapshot;
+  try {
+    snapshot = await FirebaseFirestore.instance.collection('firebase_usage').get();
+  } catch (_) {
+    return;
+  }
+
+  for (final doc in snapshot.docs) {
+    final d = doc.data();
+    if (!_isUsageDocInRange(d, start, end)) continue;
+
+    final date = _usageDocDate(d) ?? start;
+    final label = _operationTrendLabel(date, start, end, timeFrame);
+    final point = trendMap.putIfAbsent(
+      label,
+      () => FirebaseOperationPoint(label: label),
+    );
+
+    final reads = _intValue(d, ['reads', 'readCount']);
+    final writes = _intValue(d, ['writes', 'writeCount', 'upserts']);
+    final deletes = _intValue(d, ['deletes', 'deleteCount']);
+
+    point.reads += reads;
+    point.writes += writes;
+    point.deletes += deletes;
+    point.readCostUsd += _numValue(d, ['readCostUsd', 'readsCostUsd']);
+    point.writeCostUsd += _numValue(d, ['writeCostUsd', 'writesCostUsd']);
+    point.deleteCostUsd += _numValue(d, ['deleteCostUsd', 'deletesCostUsd']);
+
+  }
+}
+
+void _allocateFirebaseCosts(
+  ExternalToolStat stat,
+  Map<String, FirebaseOperationPoint> trendMap,
+) {
+  final assignedCost = trendMap.values.fold(
+    0.0,
+    (sum, point) => sum + point.totalCostUsd,
+  );
+  final remainingCost = stat.costUsd - assignedCost;
+  final totalOps = trendMap.values.fold(0, (sum, point) => sum + point.totalOps);
+  if (remainingCost <= 0 || totalOps <= 0) return;
+
+  for (final point in trendMap.values) {
+    point.readCostUsd += remainingCost * (point.reads / totalOps);
+    point.writeCostUsd += remainingCost * (point.writes / totalOps);
+    point.deleteCostUsd += remainingCost * (point.deletes / totalOps);
+  }
+}
+
+List<FirebaseOperationPoint> _sortedOperationTrend(
+  Map<String, FirebaseOperationPoint> trendMap,
+  DateTime start,
+  DateTime end,
+  String timeFrame,
+) {
+  final labels = _operationTrendLabels(start, end, timeFrame);
+  return labels
+      .map(
+        (label) =>
+            trendMap[label] ?? FirebaseOperationPoint(label: label),
+      )
+      .toList();
+}
+
+List<String> _operationTrendLabels(
+  DateTime start,
+  DateTime end,
+  String timeFrame,
+) {
+  if (timeFrame == 'This Year') {
+    return List.generate(12, (i) => _monthName(i + 1));
+  }
+
+  if (timeFrame == 'All') {
+    return List.generate(end.year - start.year + 1, (i) => '${start.year + i}');
+  }
+
+  if (timeFrame == 'This Month') {
+    return List.generate(5, (i) => 'Week ${i + 1}');
+  }
+
+  final days = end.difference(start).inDays + 1;
+  if (timeFrame == 'Custom' && days > 31 && days <= 365) {
+    final labels = <String>[];
+    var current = DateTime(start.year, start.month);
+    final last = DateTime(end.year, end.month);
+    while (!current.isAfter(last)) {
+      labels.add('${_monthName(current.month)} ${current.year}');
+      current = DateTime(current.year, current.month + 1);
+    }
+    return labels;
+  }
+
+  if (timeFrame == 'Custom' && days > 365) {
+    return List.generate(end.year - start.year + 1, (i) => '${start.year + i}');
+  }
+
+  return List.generate(days, (i) {
+    final date = start.add(Duration(days: i));
+    return '${date.month}/${date.day}';
+  });
+}
+
+String _operationTrendLabel(
+  DateTime date,
+  DateTime start,
+  DateTime end,
+  String timeFrame,
+) {
+  if (timeFrame == 'This Year') return _monthName(date.month);
+  if (timeFrame == 'All') return '${date.year}';
+  if (timeFrame == 'This Month') return 'Week ${((date.day - 1) ~/ 7) + 1}';
+
+  final days = end.difference(start).inDays + 1;
+  if (timeFrame == 'Custom' && days > 31 && days <= 365) {
+    return '${_monthName(date.month)} ${date.year}';
+  }
+  if (timeFrame == 'Custom' && days > 365) return '${date.year}';
+
+  return '${date.month}/${date.day}';
+}
+
+DateTime? _usageDocDate(Map<String, dynamic> data) {
+  final value =
+      data['time'] ?? data['createdAt'] ?? data['timestamp'] ?? data['date'];
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value != null) return DateTime.tryParse(value.toString());
+  return null;
 }
 
 class _BillingRange {
@@ -344,6 +581,24 @@ bool _isUsageDocInRange(Map<String, dynamic> data, DateTime start, DateTime end)
 
 String _dateStr(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+String _monthName(int month) {
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return months[month - 1];
+}
 
     String formatGeminiBottomTitle(String date, String timeFrame, DateTimeRange? customRange) {
   switch (timeFrame) {

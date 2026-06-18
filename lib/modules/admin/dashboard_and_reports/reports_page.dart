@@ -1077,6 +1077,8 @@ class ReportsHelper {
             timeFrame: selectedTimeFrame,
             customDateRange: customDateRange,
             initialData: externalToolsUsage,
+            showHeader: false,
+            showReportDetails: true,
           ),
         ];
       default:

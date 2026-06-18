@@ -5,9 +5,6 @@ import 'package:capstone_project/modules/user/announcement/user_announcement.dar
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
 
 import 'package:capstone_project/modules/user/home/home.dart';
-import 'package:capstone_project/modules/user/service_information/admission_info.dart';
-import 'package:capstone_project/modules/user/service_information/placement_info.dart';
-import 'package:capstone_project/modules/user/service_information/scholarship_list.dart';
 import 'package:capstone_project/modules/authentication/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -109,10 +106,10 @@ class _UserMainPageState extends State<UserMainPage>
 
     // Initialize controllers
     final validatedInitialTab = widget.initialTabIndex ?? 0;
-    _currentIndex = validatedInitialTab.clamp(0, 5); // Pages are 0-5
+    _currentIndex = validatedInitialTab.clamp(0, 2); // Pages are 0-2
     _selectedIndex = _currentIndex;
     _tabController = TabController(
-      length: 6, //  Make sure this matches your pages list length
+      length: 3, //  Make sure this matches your pages list length
       vsync: this,
       initialIndex: _currentIndex,
     );
@@ -282,7 +279,7 @@ class _UserMainPageState extends State<UserMainPage>
 
             //  Validate tab index
             if (initialTab != null) {
-              _selectedIndex = initialTab.clamp(0, 5);
+              _selectedIndex = initialTab.clamp(0, 2);
             }
           });
 
@@ -305,7 +302,7 @@ class _UserMainPageState extends State<UserMainPage>
           });
         } else if (initialTab != null) {
           //  Validate and clamp tab index
-          final validatedTab = initialTab.clamp(0, 5);
+          final validatedTab = initialTab.clamp(0, 2);
 
           setState(() {
             _selectedIndex = validatedTab;
@@ -490,9 +487,6 @@ class _UserMainPageState extends State<UserMainPage>
     'Home',
     'Chat with OASP Assist',
     'Announcements',
-    'Admission Information',
-    'Scholarship List',
-    'Placement Information',
   ];
 
   String _navigationLoadingTextForIndex(int index) {
@@ -805,9 +799,6 @@ class _UserMainPageState extends State<UserMainPage>
         audioButtonKey: _audioButtonKey,
       ),
       const UserAnnouncementPage(),
-      const AdmissionInfo(),
-      const ScholarshipList(),
-      const PlacementInfo(),
     ];
 
     return FutureBuilder<void>(
@@ -1721,16 +1712,6 @@ class _UserMainPageState extends State<UserMainPage>
                       isSmall: isSmall,
                     ),
                   ),
-                  Expanded(
-                    child: _buildNavItem(
-                      icon: Icons.apps,
-                      label: 'Services',
-                      index: 3,
-                      isSelected: _selectedIndex >= 3,
-                      isVerySmall: isVerySmall,
-                      isSmall: isSmall,
-                    ),
-                  ),
                 ],
               ),
             );
@@ -1771,11 +1752,7 @@ class _UserMainPageState extends State<UserMainPage>
     return InkWell(
       onTap: () {
         HapticFeedback.mediumImpact();
-        if (index == 3) {
-          _showServicesMenu();
-        } else {
-          _onNavigationItemTap(index);
-        }
+        _onNavigationItemTap(index);
       },
       child: Container(
         padding: EdgeInsets.symmetric(
@@ -1827,141 +1804,6 @@ class _UserMainPageState extends State<UserMainPage>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _showServicesMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Services',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B5E20),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildServiceTile(
-                  icon: Icons.school,
-                  title: 'Admission Information',
-                  subtitle: 'View admission requirements',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(3);
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildServiceTile(
-                  icon: Icons.card_giftcard,
-                  title: 'Scholarship List',
-                  subtitle: 'Browse available scholarships',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(4);
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildServiceTile(
-                  icon: Icons.work,
-                  title: 'Placement Information',
-                  subtitle: 'Career placement details',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(5);
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildServiceTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: UniversalUIComponents.primaryGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: UniversalUIComponents.primaryGreen,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-            ],
-          ),
         ),
       ),
     );

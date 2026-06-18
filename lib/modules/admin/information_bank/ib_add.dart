@@ -10,10 +10,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 
 import 'package:capstone_project/utils/snackbar_util.dart';
 
-import 'package:capstone_project/models/admissions.dart';
-import 'package:capstone_project/models/placement.dart';
-import 'package:capstone_project/models/scholarships.dart';
-import 'package:capstone_project/services/cohere_service.dart';
+
 import 'package:capstone_project/services/file_service2.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
@@ -144,7 +141,6 @@ class UploadDocumentContent extends StatefulWidget {
 class _UploadDocumentContentState extends State<UploadDocumentContent> {
   final FileService _fileService = FileService();
   final TextEditingController _titleController = TextEditingController();
-  final CohereService _cohereService = CohereService();
   final TextEditingController _categoryController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   final TextRecognizer _textRecognizer = TextRecognizer();
@@ -163,12 +159,7 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   int? _fileSizeInBytes;
   String? _fileSizeWarning;
 
-  final List<String> _predefinedCategories = [
-    'Admission',
-    'Scholarship',
-    'Placement',
-    'General',
-  ];
+  final List<String> _predefinedCategories = ['General'];
 
   @override
   void dispose() {
@@ -592,195 +583,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             isFromUpload: true,
           );
 
-          switch (category) {
-            case 'Admission':
-              print(" Analyzing admission document...");
-              final admissionCohere = await _cohereService.analyzeAdmission(
-                extractedText,
-              );
-
-              print(" Admission analysis result: $admissionCohere");
-
-              List<String>? contactsList;
-              try {
-                if (admissionCohere['contacts'] is List<Map<String, dynamic>>) {
-                  List<Map<String, dynamic>> contactsData =
-                      admissionCohere['contacts'] as List<Map<String, dynamic>>;
-                  if (contactsData.isNotEmpty) {
-                    contactsList =
-                        contactsData.map((contact) {
-                          String type = contact['type']?.toString() ?? '';
-                          String value = contact['value']?.toString() ?? '';
-                          return '$type: $value';
-                        }).toList();
-                  }
-                }
-              } catch (e) {
-                print(" Error processing contacts: $e");
-                contactsList = null;
-              }
-
-              List<String> stepsList = <String>[];
-              try {
-                if (admissionCohere['steps'] is List<String>) {
-                  stepsList = admissionCohere['steps'] as List<String>;
-                } else if (admissionCohere['steps'] is List) {
-                  stepsList =
-                      (admissionCohere['steps'] as List)
-                          .map((e) => e.toString())
-                          .toList();
-                }
-              } catch (e) {
-                print(" Error processing steps: $e");
-                stepsList = <String>[];
-              }
-
-              final admissions = Admissions(
-                id: documentId,
-                steps: stepsList,
-                requirements: admissionCohere['requirements'],
-                title: title,
-                content: extractedText,
-                contact: contactsList,
-                academicYear: admissionCohere['academicYear'],
-                links: admissionCohere['links'],
-                source: selectedFileName,
-                createdAt: DateTime.now(),
-              );
-
-              await _fileService.saveToAdmission(
-                admissions,
-                sourceDocumentId: documentId,
-              );
-              break;
-
-            case 'Scholarship':
-              print(" Analyzing scholarship document...");
-              final scholarshipCohere = await _cohereService.analyzeScholarship(
-                extractedText,
-              );
-
-          if (scholarshipCohere['scholarships'] is List &&
-              scholarshipCohere['scholarships'].isNotEmpty) {
-            List<dynamic> scholarshipDataList =
-                scholarshipCohere['scholarships'];
-            List<Scholarship> scholarships = [];
-
-            for (int i = 0; i < scholarshipDataList.length; i++) {
-              final scholarshipData = scholarshipDataList[i];
-              final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
-
-              final scholarship = Scholarship(
-                scholarshipID: scholarshipId,
-                sourceId: scholarshipId,
-                name: scholarshipData['name'] ?? 'Unnamed Scholarship',
-                description:
-                    scholarshipData['description'] ??
-                    'No description available',
-                scholarshipProvider:
-                    scholarshipData['scholarshipProvider'] ??
-                    'Unknown Provider',
-                eligibilityRequirements:
-                    scholarshipData['eligibilityRequirements'] ?? <String>[],
-                privileges: scholarshipData['privileges'] ?? <String>[],
-                deadline: scholarshipCohere['deadline'],
-                applicationLink: scholarshipData['application_link'] ?? '',
-                createdAt: DateTime.now(),
-              );
-
-              scholarships.add(scholarship);
-            }
-
-            await _fileService.saveMultipleScholarships(
-              scholarships,
-              sourceDocumentId: documentId,
-            );
-
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showSuccess(
-                feedbackContext,
-                'Found and saved ${scholarships.length} scholarship(s)!',
-              );
-            }
-          } else {
-            print(" No scholarships found in the document");
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showWarning(
-                feedbackContext,
-                'No scholarships found in the document',
-              );
-            }
-          }
-          break;
-
-            case 'Placement':
-              print(" Analyzing placement document...");
-              final placementCohere = await _cohereService.analyzePlacement(
-                extractedText,
-              );
-
-          if (placementCohere['placements'] is List &&
-              placementCohere['placements'].isNotEmpty) {
-            List<dynamic> placementDataList = placementCohere['placements'];
-            List<Placement> placements = [];
-
-            for (int i = 0; i < placementDataList.length; i++) {
-              final placementData = placementDataList[i];
-              final placementId = i == 0 ? documentId : '${documentId}_$i';
-
-              final placement = Placement(
-                placementID: placementId,
-                isRecruiting: true,
-                partnerCompany:
-                    placementData['partnerCompany'] ?? 'Unnamed Placement',
-                contacts:
-                    placementData['contacts'] is List
-                        ? List<String>.from(
-                          placementData['contacts'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                positions:
-                    placementData['positions'] is List
-                        ? List<String>.from(
-                          placementData['positions'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                createdAt:
-                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
-                    DateTime.now(),
-              );
-
-              placements.add(placement);
-            }
-
-            await _fileService.saveMultiplePlacements(
-              placements,
-              sourceDocumentId: documentId,
-            );
-
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showSuccess(
-                feedbackContext,
-                'Found and saved ${placements.length} placement(s)!',
-              );
-            }
-          } else {
-            print(" No placements found in the document");
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showWarning(
-                feedbackContext,
-                'No placements found in the document',
-              );
-            }
-          }
-          break;
-
-            default:
-          print(
-            " Category '$category' does not require special processing",
-          );
-          break;
-      }
 
           await _logUploadAction(title);
 
