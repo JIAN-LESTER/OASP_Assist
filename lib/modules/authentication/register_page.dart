@@ -924,11 +924,13 @@ class _RegisterPageState extends State<RegisterPage>
         ),
       ],
     );
+    final maxLogoSize = MediaQuery.sizeOf(context).shortestSide * 0.28;
+    final effectiveIconSize = iconSize > maxLogoSize ? maxLogoSize : iconSize;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
         horizontal: horizontalPadding,
-        vertical: 40,
+        vertical: 10,
       ),
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
@@ -936,24 +938,27 @@ class _RegisterPageState extends State<RegisterPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: iconSize,
-              height: iconSize,
+              width: effectiveIconSize,
+              height: effectiveIconSize,
               child: Transform.scale(
-                scale: 1.8,
-                child: Image.asset(
-                  'lib/images/oasp.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.smart_toy_outlined,
-                      color: primaryColor,
-                      size: iconSize * 0.8,
-                    );
-                  },
+                scale: 1.5,
+                child: Transform.translate(
+                  offset: Offset(0, effectiveIconSize * 0.14),
+                  child: Image.asset(
+                    'lib/images/oasp.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.smart_toy_outlined,
+                        color: primaryColor,
+                        size: effectiveIconSize * 0.5,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 5),
             Text(
               "OASP Assist",
               style: TextStyle(

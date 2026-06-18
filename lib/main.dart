@@ -568,7 +568,7 @@ void main() async {
 
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top],
+        overlays: [],
       );
 
       //  Initialize Firebase FIRST

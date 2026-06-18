@@ -547,210 +547,226 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
     super.dispose();
   }
 
-  Widget _buildSnowBody({required Widget child}) {
-    return Stack(
-      children: [
-        GreenSnowAnimation(animation: _snowController, color: primaryColor),
-        child,
-      ],
-    );
-  }
-
   Widget _buildForgotPasswordForm({
-    double maxWidth = double.infinity,
-    double horizontalPadding = 16.0,
-    double iconSize = 80,
-    double fontSizeMultiplier = 1.0,
+    required double maxWidth,
+    required double horizontalPadding,
+    required double iconSize,
+    required double titleFontSize,
+    required double descriptionFontSize,
+    required double cardPadding,
+    bool useFormCard = false,
     double buttonPadding = 16,
     bool showSecurityTips = true,
-    required double availableHeight,
   }) {
-    // Calculate responsive spacing based on available height
-    final baseSpacing = availableHeight * 0.02; // 2% of screen height
-    final sectionSpacing = availableHeight * 0.025; // 2.5% of screen height
-    final largeSpacing = availableHeight * 0.04; // 4% of screen height
+    final fontSizeMultiplier = descriptionFontSize / baseButtonFontSize;
+    final formContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Forgot Your Password?",
+          style: TextStyle(
+            fontFamily: primaryFontFamily,
+            fontSize: titleFontSize * 0.82,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "Enter your email address and we'll send you a link to reset your password.",
+          style: TextStyle(
+            fontFamily: primaryFontFamily,
+            fontSize: descriptionFontSize * 0.95,
+            fontWeight: FontWeight.w400,
+            color: textSecondaryColor,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        _buildGeneralError(fontSizeMultiplier),
+        TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          onSubmitted: (_) => sendPasswordResetEmail(),
+          style: TextStyle(
+            fontFamily: primaryFontFamily,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: textPrimaryColor,
+          ),
+          decoration: InputDecoration(
+            hintText: "Enter your email",
+            hintStyle: TextStyle(
+              color: textSecondaryColor.withOpacity(0.5),
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(Icons.email_outlined, color: textSecondaryColor),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: _emailError != null ? errorColor : Colors.grey[300]!,
+                width: 1.5,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: _emailError != null ? errorColor : Colors.grey[300]!,
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: _emailError != null ? errorColor : Colors.grey.shade400,
+                width: 2,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+          ),
+        ),
+        _buildErrorText(_emailError, fontSizeMultiplier),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              disabledBackgroundColor: Colors.grey[300],
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: buttonPadding),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            onPressed: _isLoading ? null : sendPasswordResetEmail,
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.0,
+                      ),
+                    )
+                    : Text(
+                      "Send Reset Link",
+                      style: TextStyle(
+                        fontFamily: primaryFontFamily,
+                        fontSize: descriptionFontSize,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              "Remember your password? ",
+              style: TextStyle(
+                fontFamily: primaryFontFamily,
+                color: textSecondaryColor,
+                fontSize: descriptionFontSize * 0.9,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Text(
+                "Back to Login",
+                style: TextStyle(
+                  fontFamily: primaryFontFamily,
+                  color: linkColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: descriptionFontSize * 0.9,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+    final maxLogoSize = MediaQuery.sizeOf(context).shortestSide * 0.28;
+    final effectiveIconSize = iconSize > maxLogoSize ? maxLogoSize : iconSize;
 
-    return Container(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: 40,
+      ),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: maxWidth),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top spacing
-            SizedBox(height: largeSpacing),
-
-            // Lock reset icon
-            Icon(Icons.lock_reset, size: iconSize, color: primaryColor),
-
-            SizedBox(height: sectionSpacing),
-
-            // Title
+            SizedBox(
+              width: effectiveIconSize,
+              height: effectiveIconSize,
+              child: Transform.scale(
+                scale: 1.5,
+                child: Transform.translate(
+                  offset: Offset(0, effectiveIconSize * 0.14),
+                  child: Image.asset(
+                    'lib/images/oasp.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.smart_toy_outlined,
+                        color: primaryColor,
+                        size: effectiveIconSize * 0.5,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 5),
             Text(
-              "Forgot Your Password?",
+              "OASP Assist",
               style: TextStyle(
                 fontFamily: primaryFontFamily,
-                fontSize: baseTitleFontSize * fontSizeMultiplier,
-                fontWeight: titleFontWeight,
+                fontSize: titleFontSize,
+                fontWeight: FontWeight.w800,
                 color: textPrimaryColor,
                 letterSpacing: -0.3,
-                height: 1.2,
               ),
               textAlign: TextAlign.center,
             ),
-
-            SizedBox(height: baseSpacing),
-
-            // Subtitle
-            Text(
-              "Enter your email address and we'll send you a link to reset your password.",
-              style: TextStyle(
-                fontFamily: primaryFontFamily,
-                fontSize: baseSubtitleFontSize * fontSizeMultiplier,
-                fontWeight: subtitleFontWeight,
-                color: textSecondaryColor,
-                letterSpacing: 0.1,
-                height: 1.4,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            SizedBox(height: sectionSpacing * 1.5),
-
-            // General error message
-            _buildGeneralError(fontSizeMultiplier),
-
-            // Email Input
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: TextStyle(
-                  fontFamily: primaryFontFamily,
-                  fontSize: baseSubtitleFontSize * fontSizeMultiplier,
-                  fontWeight: subtitleFontWeight,
-                  color: textPrimaryColor,
-                  letterSpacing: 0.1,
-                ),
-                decoration: InputDecoration(
-                  hintText: "Enter your email",
-                  hintStyle: TextStyle(
-                    fontFamily: primaryFontFamily,
-                    fontSize: baseSubtitleFontSize * fontSizeMultiplier,
-                    fontWeight: subtitleFontWeight,
-                    color: textSecondaryColor,
-                    letterSpacing: 0.1,
+            const SizedBox(height: 32),
+            useFormCard
+                ? Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE0F0E4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 30,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
                   ),
-                  prefixIcon: Icon(
-                    Icons.email_outlined,
-                    color: textSecondaryColor,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[400]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: primaryColor, width: 2),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: Colors.grey[400]!),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: buttonPadding,
-                  ),
-                ),
-              ),
-            ),
-            _buildErrorText(_emailError, fontSizeMultiplier),
-
-            SizedBox(height: sectionSpacing),
-
-            // Reset Password Button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    backgroundColor: primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: buttonPadding),
-                    textStyle: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      fontSize: baseButtonFontSize * fontSizeMultiplier,
-                      fontWeight: buttonFontWeight,
-                      letterSpacing: 0.3,
-                      height: 1.2,
-                    ),
-                    elevation: 2,
-                    shadowColor: primaryColor.withOpacity(0.3),
-                  ),
-                  onPressed: _isLoading ? null : sendPasswordResetEmail,
-                  child:
-                      _isLoading
-                          ? SizedBox(
-                            width: 20 * fontSizeMultiplier,
-                            height: 20 * fontSizeMultiplier,
-                            child: const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.0,
-                            ),
-                          )
-                          : const Text("Send Reset Link"),
-                ),
-              ),
-            ),
-
-            SizedBox(height: sectionSpacing),
-
-            // Remember Password Link
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "Remember your password? ",
-                  style: TextStyle(
-                    fontFamily: primaryFontFamily,
-                    color: textSecondaryColor,
-                    fontSize: baseLinkFontSize * fontSizeMultiplier,
-                    fontWeight: subtitleFontWeight,
-                    height: 1.3,
-                    letterSpacing: 0.1,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Text(
-                    "Back to Login",
-                    style: TextStyle(
-                      fontFamily: primaryFontFamily,
-                      color: linkColor,
-                      fontWeight: buttonFontWeight,
-                      fontSize: baseLinkFontSize * fontSizeMultiplier,
-                      letterSpacing: 0.2,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
+                  child: formContent,
+                )
+                : formContent,
             if (showSecurityTips) ...[
-              SizedBox(height: sectionSpacing * 1.5),
-
-              // Security Tips Section (only show on larger screens)
+              const SizedBox(height: 16),
               _buildSecurityTipsSection(fontSizeMultiplier),
             ],
-
-            // Bottom spacing
-            SizedBox(height: largeSpacing),
           ],
         ),
       ),
@@ -875,30 +891,68 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
     );
   }
 
+  Widget _buildDecoratedBody({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFFE7F6EC),
+            Color(0xFFF8FAFC),
+            Color(0xFFEAF1FF),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            right: -70,
+            child: Container(
+              width: 190,
+              height: 190,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor.withOpacity(0.12),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -90,
+            left: -80,
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x223B82F6),
+              ),
+            ),
+          ),
+          GreenSnowAnimation(animation: _snowController, color: primaryColor),
+          child,
+        ],
+      ),
+    );
+  }
+
   // Mobile Screen
   Widget _buildMobileLayout() {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: _buildSnowBody(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: _buildForgotPasswordForm(
-                      availableHeight: constraints.maxHeight,
-                      iconSize: constraints.maxHeight * 0.08,
-                      fontSizeMultiplier: 0.95,
-                      buttonPadding: 18,
-                      showSecurityTips: true,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+    return _buildDecoratedBody(
+      child: Center(
+        child: _buildForgotPasswordForm(
+          maxWidth: double.infinity,
+          horizontalPadding: 20,
+          iconSize: 140,
+          titleFontSize: 26,
+          descriptionFontSize: 14,
+          cardPadding: 20,
+          buttonPadding: 18,
+          useFormCard: true,
+          showSecurityTips: true,
         ),
       ),
     );
@@ -906,54 +960,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
 
   // Tablet Screen
   Widget _buildTabletLayout() {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: _buildSnowBody(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Center(
-                child: SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight * 0.9,
-                    ),
-                    child: Center(
-                      child: Container(
-                        margin: const EdgeInsets.all(32.0),
-                        padding: const EdgeInsets.all(32.0),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.08),
-                              spreadRadius: 2,
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: _buildForgotPasswordForm(
-                          maxWidth: 480,
-                          horizontalPadding: 0,
-                          availableHeight: constraints.maxHeight * 0.8,
-                          iconSize: constraints.maxHeight * 0.1,
-                          fontSizeMultiplier: 1.0,
-                          buttonPadding: 20,
-                          showSecurityTips: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+    return _buildDecoratedBody(
+      child: Center(
+        child: _buildForgotPasswordForm(
+          maxWidth: 500,
+          horizontalPadding: 32,
+          iconSize: 145,
+          titleFontSize: 28,
+          descriptionFontSize: 15,
+          cardPadding: 32,
+          buttonPadding: 18,
+          useFormCard: true,
+          showSecurityTips: true,
         ),
       ),
     );
@@ -961,59 +979,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
 
   // Desktop Screen
   Widget _buildDesktopLayout() {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      body: _buildSnowBody(
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return Center(
-                child: SingleChildScrollView(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight * 0.9,
-                    ),
-                    child: Center(
-                      child: Container(
-                        margin: const EdgeInsets.all(40.0),
-                        padding: const EdgeInsets.only(
-                          left: 50.0,
-                          right: 50.0,
-                          bottom: 40,
-                          top: 20,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 1,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          color: Colors.white,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              spreadRadius: 3,
-                              blurRadius: 20,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: _buildForgotPasswordForm(
-                          maxWidth: 420,
-                          horizontalPadding: 0,
-                          availableHeight: constraints.maxHeight * 0.8,
-                          iconSize: constraints.maxHeight * 0.12,
-                          fontSizeMultiplier: 1.0,
-                          buttonPadding: 22,
-                          showSecurityTips: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
+    return _buildDecoratedBody(
+      child: Center(
+        child: _buildForgotPasswordForm(
+          maxWidth: 480,
+          horizontalPadding: 40,
+          iconSize: 155,
+          titleFontSize: 32,
+          descriptionFontSize: 16,
+          cardPadding: 40,
+          buttonPadding: 18,
+          useFormCard: true,
+          showSecurityTips: true,
         ),
       ),
     );
@@ -1021,10 +998,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveLayout(
-      mobileBody: _buildMobileLayout(),
-      tabletBody: _buildTabletLayout(),
-      desktopBody: _buildDesktopLayout(),
+    return Scaffold(
+      backgroundColor: const Color(0xFFEAF1FF),
+      body: SafeArea(
+        child: ResponsiveLayout(
+          mobileBody: _buildMobileLayout(),
+          tabletBody: _buildTabletLayout(),
+          desktopBody: _buildDesktopLayout(),
+        ),
+      ),
     );
   }
 }
