@@ -427,6 +427,14 @@ List<String> _operationTrendLabels(
   DateTime end,
   String timeFrame,
 ) {
+  if (timeFrame == 'Today') {
+    return List.generate(24, _hourLabel);
+  }
+
+  if (timeFrame == 'This Week') {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  }
+
   if (timeFrame == 'This Year') {
     return List.generate(12, (i) => _monthName(i + 1));
   }
@@ -467,6 +475,8 @@ String _operationTrendLabel(
   DateTime end,
   String timeFrame,
 ) {
+  if (timeFrame == 'Today') return _hourLabel(date.hour);
+  if (timeFrame == 'This Week') return _weekdayName(date.weekday);
   if (timeFrame == 'This Year') return _monthName(date.month);
   if (timeFrame == 'All') return '${date.year}';
   if (timeFrame == 'This Month') return 'Week ${((date.day - 1) ~/ 7) + 1}';
@@ -598,6 +608,18 @@ String _monthName(int month) {
     'Dec',
   ];
   return months[month - 1];
+}
+
+String _weekdayName(int weekday) {
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return weekdays[weekday - 1];
+}
+
+String _hourLabel(int hour) {
+  if (hour == 0) return '12am';
+  if (hour == 12) return '12pm';
+  final displayHour = hour % 12;
+  return '$displayHour${hour < 12 ? 'am' : 'pm'}';
 }
 
     String formatGeminiBottomTitle(String date, String timeFrame, DateTimeRange? customRange) {

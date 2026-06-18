@@ -219,7 +219,6 @@ class _BillingBody extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    flex: 2,
                     child: _DailyTrendCard(
                       trend: data.gemini.dailyTrend,
                       timeFrame: timeFrame,
@@ -512,174 +511,151 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
   String _mode = 'cost';
 
   String _trendSubtitle() {
+    final buckets = _trendBars();
     return switch (widget.timeFrame) {
       'Today' => 'Hourly breakdown',
       'This Week' => 'Last 7 days',
-      'This Month' => '${widget.trend.length} days this month',
-      'This Year' => '${widget.trend.length} days this year',
+      'This Month' => '${buckets.length} weeks this month',
+      'This Year' => '${buckets.length} months this year',
       'All' => 'All recorded days',
       'Custom' => () {
         final r = widget.customDateRange;
         if (r == null) return '${widget.trend.length} days';
-        return '${r.end.difference(r.start).inDays + 1} days selected';
+        return '${buckets.length} ${buckets.length == 1 ? 'period' : 'periods'} selected';
       }(),
       _ => '${widget.trend.length} days',
     };
   }
 
-  String _getBarLabel(String date, int index) {
-    switch (widget.timeFrame) {
-      case 'Today':
-        if (index % 3 != 0) return '';
-        if (index == 0) return '12am';
-        if (index == 12) return '12pm';
-        final h = index % 12;
-        return '${h}${index < 12 ? 'am' : 'pm'}';
-
-      case 'This Week':
-        try {
-          final dt = DateTime.parse(date);
-          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
-              1];
-        } catch (_) {
-          return '';
-        }
-
-      case 'This Month':
-        final day = int.tryParse(date.substring(8)) ?? 0;
-        if (day == 1) return 'W1';
-        if (day == 8) return 'W2';
-        if (day == 15) return 'W3';
-        if (day == 22) return 'W4';
-        return '';
-
-      case 'This Year':
-        try {
-          final m = int.parse(date.substring(5, 7));
-          return [
-            'Jan',
-            'Feb',
-            'Mar',
-            'Apr',
-            'May',
-            'Jun',
-            'Jul',
-            'Aug',
-            'Sep',
-            'Oct',
-            'Nov',
-            'Dec',
-          ][m - 1];
-        } catch (_) {
-          return '';
-        }
-
-      case 'All':
-        try {
-          final dt = DateTime.parse(date);
-          return dt.month == 1 ? '${dt.year}' : '';
-        } catch (_) {
-          return '';
-        }
-
-      case 'Custom':
-        final days =
-            widget.customDateRange?.end
-                .difference(widget.customDateRange!.start)
-                .inDays ??
-            0;
-        if (days == 0) {
-          if (index % 3 != 0) return '';
-          if (index == 0) return '12am';
-          if (index == 12) return '12pm';
-          return '${index % 12}${index < 12 ? 'am' : 'pm'}';
-        } else if (days <= 7) {
-          try {
-            final dt = DateTime.parse(date);
-            return [
-              'Mon',
-              'Tue',
-              'Wed',
-              'Thu',
-              'Fri',
-              'Sat',
-              'Sun',
-            ][dt.weekday - 1];
-          } catch (_) {
-            return date.substring(8);
-          }
-        } else if (days <= 31) {
-          final day = int.tryParse(date.substring(8)) ?? 0;
-          return day % 5 == 1 ? '$day' : '';
-        } else {
-          try {
-            final m = int.parse(date.substring(5, 7));
-            return [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec',
-            ][m - 1];
-          } catch (_) {
-            return '';
-          }
-        }
-
-      default:
-        return date.length >= 10 ? date.substring(8) : date;
+  List<_TrendBarPoint> _trendBars() {
+    if (widget.timeFrame == 'Today') {
+      final current = widget.trend.isEmpty ? null : widget.trend.first;
+      final now = DateTime.now();
+      return List.generate(24, (hour) {
+        final valueCost =
+            hour == now.hour && current != null ? current.costUsd : 0.0;
+        final valueTokens =
+            hour == now.hour && current != null ? current.tokens : 0;
+        return _TrendBarPoint(
+          label: _hourLabel(hour),
+          tooltip: _hourLabel(hour),
+          costUsd: valueCost,
+          tokens: valueTokens,
+          isToday: hour == now.hour,
+        );
+      });
     }
+
+    if (widget.timeFrame == 'This Month') {
+      return _bucketTrend((point) {
+        final dt = DateTime.tryParse(point.date);
+        if (dt == null) return 'Week 1';
+        return 'Week ${((dt.day - 1) ~/ 7) + 1}';
+      }, ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5']);
+    }
+
+    if (widget.timeFrame == 'This Year') {
+      return _bucketTrend((point) {
+        final dt = DateTime.tryParse(point.date);
+        return dt == null ? point.date : _monthLabel(dt.month);
+      }, List.generate(12, (i) => _monthLabel(i + 1)));
+    }
+
+    if (widget.timeFrame == 'Custom') {
+      final range = widget.customDateRange;
+      final days =
+          range == null
+              ? widget.trend.length
+              : range.end.difference(range.start).inDays + 1;
+      if (days > 365) {
+        return _bucketTrend((point) {
+          final dt = DateTime.tryParse(point.date);
+          return dt == null ? point.date : '${dt.year}';
+        }, null);
+      }
+      if (days > 31) {
+        return _bucketTrend((point) {
+          final dt = DateTime.tryParse(point.date);
+          return dt == null ? point.date : '${_monthLabel(dt.month)} ${dt.year}';
+        }, null);
+      }
+    }
+
+    return widget.trend.map((point) {
+      final dt = DateTime.tryParse(point.date);
+      final label =
+          widget.timeFrame == 'This Week' && dt != null
+              ? _weekdayLabel(dt.weekday)
+              : point.date.length >= 10
+                  ? point.date.substring(8)
+                  : point.date;
+      return _TrendBarPoint(
+        label: label,
+        tooltip: label,
+        costUsd: point.costUsd,
+        tokens: point.tokens,
+        isToday: point.date == _dateStr(DateTime.now()),
+      );
+    }).toList();
   }
 
-  String _tooltipDate(String date, String timeFrame) {
-    switch (timeFrame) {
-      case 'This Week':
-        try {
-          final dt = DateTime.parse(date);
-          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
-              1];
-        } catch (_) {
-          return date;
-        }
-      case 'This Year':
-        try {
-          final m = int.parse(date.substring(5, 7));
-          return [
-            'Jan',
-            'Feb',
-            'Mar',
-            'Apr',
-            'May',
-            'Jun',
-            'Jul',
-            'Aug',
-            'Sep',
-            'Oct',
-            'Nov',
-            'Dec',
-          ][m - 1];
-        } catch (_) {
-          return date;
-        }
-      default:
-        return date;
+  List<_TrendBarPoint> _bucketTrend(
+    String Function(GeminiDailyPoint point) labelFor,
+    List<String>? orderedLabels,
+  ) {
+    final buckets = <String, _TrendBarPoint>{};
+    for (final label in orderedLabels ?? const <String>[]) {
+      buckets[label] = _TrendBarPoint(label: label, tooltip: label);
     }
+
+    for (final point in widget.trend) {
+      final label = labelFor(point);
+      final bucket = buckets.putIfAbsent(
+        label,
+        () => _TrendBarPoint(label: label, tooltip: label),
+      );
+      bucket.costUsd += point.costUsd;
+      bucket.tokens += point.tokens;
+      bucket.isToday = bucket.isToday || point.date == _dateStr(DateTime.now());
+    }
+
+    return buckets.values.toList();
+  }
+
+  String _hourLabel(int hour) {
+    if (hour == 0) return '12am';
+    if (hour == 12) return '12pm';
+    return '${hour % 12}${hour < 12 ? 'am' : 'pm'}';
+  }
+
+  String _weekdayLabel(int weekday) {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
+  }
+
+  String _monthLabel(int month) {
+    return [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ][month - 1];
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final today = _dateStr(DateTime.now());
+    final bars = widget.trend.isEmpty ? <_TrendBarPoint>[] : _trendBars();
     final values =
-        widget.trend
+        bars
             .map((d) => _mode == 'cost' ? d.costUsd : d.tokens.toDouble())
             .toList();
     final maxVal =
@@ -767,7 +743,7 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
 
           Expanded(
             child:
-                widget.trend.isEmpty
+                bars.isEmpty
                     ? Center(
                       child: Text(
                         'No usage data yet',
@@ -780,29 +756,12 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: List.generate(
-                            widget.timeFrame == 'Today'
-                                ? 24
-                                : widget.trend.length,
+                            bars.length,
                             (i) {
-                              final d =
-                                  widget.timeFrame == 'Today'
-                                      ? widget.trend.first
-                                      : widget.trend[i];
-                              final now = DateTime.now();
-                              final val =
-                                  (() {
-                                    if (widget.timeFrame == 'Today') {
-                                      // Only the current hour gets the value, rest are 0
-                                      return i == now.hour
-                                          ? (_mode == 'cost'
-                                              ? d.costUsd
-                                              : d.tokens.toDouble())
-                                          : 0.0;
-                                    }
-                                    return _mode == 'cost'
-                                        ? d.costUsd
-                                        : d.tokens.toDouble();
-                                  })();
+                              final d = bars[i];
+                              final val = _mode == 'cost'
+                                  ? d.costUsd
+                                  : d.tokens.toDouble();
 
                               final ratio = maxVal > 0 ? val / maxVal : 0.0;
                               final barH = (ratio * (box.maxHeight - 28)).clamp(
@@ -810,19 +769,11 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                 box.maxHeight - 28,
                               );
 
-                              final isToday =
-                                  widget.timeFrame == 'Today'
-                                      ? i == now.hour
-                                      : d.date == today;
-
-                              final label = _getBarLabel(d.date, i);
-                              final showLabel = label.isNotEmpty;
-
                               return Expanded(
                                 child: Tooltip(
                                   message:
-                                      '${_tooltipDate(d.date, widget.timeFrame)}\n'
-                                      '${_mode == 'cost' ? d.formattedCost : '${formatTokenCount(d.tokens)} tokens'}',
+                                      '${d.tooltip}\n'
+                                      '${_mode == 'cost' ? formatBillingCost(d.costUsd) : '${formatTokenCount(d.tokens)} tokens'}',
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
@@ -833,7 +784,7 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                         ),
                                         decoration: BoxDecoration(
                                           color:
-                                              isToday
+                                              d.isToday
                                                   ? Colors.deepOrange
                                                   : const Color(
                                                     0xFF1A73E8,
@@ -848,9 +799,9 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                       SizedBox(
                                         height: 16,
                                         child:
-                                            showLabel
+                                            d.label.isNotEmpty
                                                 ? Text(
-                                                  label,
+                                                  d.label,
                                                   style: TextStyle(
                                                     fontSize: 8,
                                                     color: Colors.grey[500],
@@ -893,6 +844,22 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
 }
 
 // ── Model breakdown ───────────────────────────────────────────────
+
+class _TrendBarPoint {
+  final String label;
+  final String tooltip;
+  double costUsd;
+  int tokens;
+  bool isToday;
+
+  _TrendBarPoint({
+    required this.label,
+    required this.tooltip,
+    this.costUsd = 0,
+    this.tokens = 0,
+    this.isToday = false,
+  });
+}
 
 class _OperationCostCard extends StatelessWidget {
   final FirebaseUsageSummary firebase;
