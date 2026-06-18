@@ -78,7 +78,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Colors.grey[300]!, Colors.grey[200]!, Colors.grey[300]!],
+              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
               stops:
                   [
                     _animation.value - 0.3,
@@ -99,6 +99,7 @@ class SkeletonStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -131,6 +132,7 @@ class SkeletonChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -161,6 +163,7 @@ class SkeletonLogsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -845,64 +848,104 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    if (isMobile) {
-      //  MOBILE LAYOUT: Dropdown on the left, smaller arrangement
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SkeletonBox(
-                width: 140,
-                height: 38,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(width: 12),
-              SkeletonBox(
-                width: 38,
-                height: 38,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Title centered or left (depending on your style)
-          const SkeletonBox(width: 180, height: 22),
-
-          const SizedBox(height: 8),
-          const SkeletonBox(width: 250, height: 14),
-        ],
-      );
-    }
-
-    // 💻 DESKTOP LAYOUT (unchanged)
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const SkeletonBox(width: 200, height: 24),
-            Row(
-              children: [
-                SkeletonBox(
-                  width: 120,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                const SizedBox(width: 12),
-                SkeletonBox(
-                  width: 40,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.10),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        const SkeletonBox(width: 300, height: 14),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 18 : 24,
+            isMobile ? 18 : 22,
+            isMobile ? 18 : 24,
+            isMobile ? 18 : 22,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isMobile) ...[
+                _buildSkeletonHeaderTitle(isMobile),
+                const SizedBox(height: 16),
+                SkeletonBox(
+                  height: 40,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                const SizedBox(height: 10),
+                SkeletonBox(
+                  height: 40,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ] else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: _buildSkeletonHeaderTitle(isMobile)),
+                    const SizedBox(width: 18),
+                    Row(
+                      children: [
+                        SkeletonBox(
+                          width: 120,
+                          height: 40,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        const SizedBox(width: 8),
+                        SkeletonBox(
+                          width: 104,
+                          height: 40,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+              const Divider(color: _kBorder, height: 1),
+              const SizedBox(height: 14),
+              const SkeletonBox(width: 300, height: 14),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonHeaderTitle(bool isMobile) {
+    return Row(
+      children: [
+        SkeletonBox(
+          width: 42,
+          height: 42,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(
+                width: isMobile ? 190 : 240,
+                height: isMobile ? 20 : 24,
+              ),
+              const SizedBox(height: 8),
+              SkeletonBox(width: isMobile ? 230 : 280, height: 13),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1434,114 +1477,194 @@ class _StaffDashboardHeaderCard extends StatelessWidget {
     final subtitle =
         selectedTimeFrame == 'Custom' && customDateRange != null
             ? 'Showing data from ${_formatDate(customDateRange!.start)} to ${_formatDate(customDateRange!.end)}'
-            : 'Overview of OASP Assist — $selectedTimeFrame';
+            : 'Overview of OASP Assist - $selectedTimeFrame';
 
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 18 : 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kBorder, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          isMobile
-              ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _greetingBlock(greeting),
-                  const SizedBox(height: 16),
-                  _controlsRow(context),
-                ],
-              )
-              : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [_greetingBlock(greeting), _controlsRow(context)],
-              ),
-          const SizedBox(height: 16),
-          const Divider(color: _kBorder, height: 1),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 14,
-                color: _kTextSecondary,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kTextSecondary,
-                    fontWeight: FontWeight.w400,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: _kAccent.withOpacity(0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: isMobile ? 4 : 5,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [_kAccent.withOpacity(0.65), _kAccent],
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 18 : 24,
+                isMobile ? 18 : 22,
+                isMobile ? 18 : 24,
+                isMobile ? 18 : 22,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _greetingBlock(greeting),
+                          const SizedBox(height: 16),
+                          _controlsRow(context),
+                        ],
+                      )
+                      : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: _greetingBlock(greeting)),
+                          const SizedBox(width: 18),
+                          _controlsRow(context),
+                        ],
+                      ),
+                  const SizedBox(height: 16),
+                  const Divider(color: _kBorder, height: 1),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 14,
+                        color: _kTextSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _kTextSecondary,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _greetingBlock(String greeting) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          '$greeting,',
-          style: const TextStyle(
-            fontSize: 13,
-            color: _kTextSecondary,
-            fontWeight: FontWeight.w400,
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _kAccentLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _kAccent.withOpacity(0.18)),
+          ),
+          child: const Icon(
+            Icons.dashboard_customize_rounded,
+            color: _kAccent,
+            size: 20,
           ),
         ),
-        const SizedBox(height: 3),
-        Row(
-          children: [
-            Text(
-              userName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: _kTextPrimary,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-              decoration: BoxDecoration(
-                color: _kAccentLight,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _kAccent.withOpacity(0.45), width: 1),
-              ),
-              child: const Text(
-                'Staff',
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting, $userName',
                 style: TextStyle(
-                  fontSize: 11,
-                  color: _kAccent,
-                  fontWeight: FontWeight.w600,
+                  fontSize: isMobile ? 19 : 22,
+                  fontWeight: FontWeight.w700,
+                  color: _kTextPrimary,
+                  letterSpacing: -0.2,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+              const SizedBox(height: 5),
+              const Text(
+                'Dashboard insights and activity overview',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kTextSecondary,
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _controlsRow(BuildContext context) {
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomDropdownButton(
+            items: [
+              'All',
+              'Today',
+              'This Week',
+              'This Month',
+              'This Year',
+              'Custom',
+            ],
+            initialValue: selectedTimeFrame,
+            onChanged: onTimeFrameChanged,
+          ),
+          if (selectedTimeFrame == 'Custom') ...[
+            const SizedBox(height: 10),
+            DateRangeFilter(
+              selectedDateRange: customDateRange,
+              onDateRangeChanged: onDateRangeChanged,
+            ),
+          ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ExportButton(
+              pageType: 'dashboard',
+              timeFrame: selectedTimeFrame,
+              inq: inq,
+              ud: ud,
+              ad: ad,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         CustomDropdownButton(
