@@ -1007,14 +1007,14 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
 Color _getCategoryColor(String category) {
   switch (category) {
     case 'Admission':
-      return const Color(0xFF3B82F6);
+      return const Color(0xFF10B981);
     case 'Scholarship':
       return const Color(0xFFF59E0B);
     case 'Placement':
-      return const Color(0xFFEF4444);
+      return const Color(0xFF3B82F6);
     case 'General':
     default:
-      return const Color(0xFF2E7D32);
+      return const Color(0xFF6B7280);
   }
 }
 

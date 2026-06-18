@@ -397,9 +397,9 @@ class _CategoryBadge extends StatelessWidget {
   const _CategoryBadge({required this.category});
 
   static const _colors = {
-    'Admission': (Color(0xFFEFF6FF), Color(0xFF1D4ED8)),
+    'Admission': (Color(0xFFECFDF5), Color(0xFF047857)),
     'Scholarship': (Color(0xFFFFFBEB), Color(0xFFB45309)),
-    'Placement': (Color(0xFFF5F3FF), Color(0xFF6D28D9)),
+    'Placement': (Color(0xFFEFF6FF), Color(0xFF1D4ED8)),
     'General': (Color(0xFFF3F4F6), Color(0xFF374151)),
   };
 

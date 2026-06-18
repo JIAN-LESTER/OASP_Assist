@@ -946,13 +946,13 @@ class _MessageCard extends StatelessWidget {
   Color _getCategoryColor(String category) {
     switch (category.toLowerCase()) {
       case 'admission':
-        return Colors.blue;
-      case 'scholarship':
         return Colors.green;
+      case 'scholarship':
+        return Colors.amber;
       case 'placement':
-        return Colors.orange;
+        return Colors.blue;
       default:
-        return Colors.purple;
+        return Colors.grey;
     }
   }
 }

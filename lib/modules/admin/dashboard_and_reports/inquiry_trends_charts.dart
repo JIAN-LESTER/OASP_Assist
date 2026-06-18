@@ -28,13 +28,13 @@ Color _getFAQBarColor(int index, int total) {
 Color _getColorForCategory(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return const Color(0xff3b82f6); // Blue
-    case 'scholarship':
       return const Color(0xff10b981); // Green
+    case 'scholarship':
+      return const Color(0xfff59e0b); // Yellow
     case 'placement':
-      return const Color(0xfff59e0b); // Amber
+      return const Color(0xff3b82f6); // Blue
     case 'general':
-      return const Color(0xff8b5cf6); // Purple
+      return const Color(0xff6b7280); // Gray
     default:
       return const Color(0xff6b7280); // Gray
   }
@@ -1114,13 +1114,13 @@ List<LineChartBarData> _generateLineChartBars(
 Color getColorForCategory(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return const Color(0xff3b82f6);
-    case 'scholarship':
       return const Color(0xff10b981);
-    case 'placement':
+    case 'scholarship':
       return const Color(0xfff59e0b);
+    case 'placement':
+      return const Color(0xff3b82f6);
     case 'general':
-      return const Color(0xff8b5cf6);
+      return const Color(0xff6b7280);
     default:
       return const Color(0xff6b7280);
   }

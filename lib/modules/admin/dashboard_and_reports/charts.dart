@@ -217,10 +217,10 @@ Widget _buildAdaptiveValueText(String value, double baseFontSize, Color color) {
 class DashboardWidgets {
   // Simplified color scheme
   static const _categoryColors = {
-    'admission': Color(0xFF2196F3),
-    'scholarship': Color(0xFF4CAF50),
-    'placement': Color(0xFFFF9800),
-    'general': Color(0xFF9C27B0),
+    'admission': Color(0xFF4CAF50),
+    'scholarship': Color(0xFFFFC107),
+    'placement': Color(0xFF2196F3),
+    'general': Color(0xFF9E9E9E),
   };
 
   static const _programColors = [
@@ -886,13 +886,13 @@ Color getLogColor(String action) {
 Color getColorForCategory(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return Colors.blue[600]!;
-    case 'scholarship':
       return Colors.green[600]!;
+    case 'scholarship':
+      return Colors.amber[600]!;
     case 'placement':
-      return Colors.orange[600]!;
+      return Colors.blue[600]!;
     case 'general':
-      return Colors.purple[600]!;
+      return Colors.grey[600]!;
     case 'academic':
       return Colors.teal[600]!;
     case 'financial':
