@@ -1165,10 +1165,10 @@ double getBottomTitleInterval(
     if (daysDiff == 0) {
       // Hourly: show every 3-4 hours
       return dataLength <= 24 ? 3.0 : 4.0;
-    } else if (daysDiff <= 7) {
-      // Daily: show all days if 7 or fewer
-      return 1.0;
     } else if (daysDiff <= 31) {
+      // Daily: show all days if 31 or fewer
+      return 1.0;
+    } else if (daysDiff <= 90) {
       // Weekly: show all weeks
       return 1.0;
     } else {
@@ -1216,10 +1216,10 @@ String formatBottomTitle(
         return "${hour - 12}PM";
       }
       return date;
-    } else if (daysDiff <= 7) {
+    } else if (daysDiff <= 31) {
       // Daily format: already formatted as "Mon", "Tue", etc.
       return date;
-    } else if (daysDiff <= 31) {
+    } else if (daysDiff <= 90) {
       // Weekly format: "W1", "W2", etc.
 
       return date;
@@ -1258,8 +1258,8 @@ String formatBottomTitle(
 //     final daysDiff = endDate.difference(startDate).inDays;
 
 //     if (daysDiff == 0) return 'by hour';
-//     if (daysDiff <= 7) return 'by day';
-//     if (daysDiff <= 31) return 'by week';
+//     if (daysDiff <= 31) return 'by day';
+//     if (daysDiff <= 90) return 'by week';
 //     return 'by month';
 //   }
 
