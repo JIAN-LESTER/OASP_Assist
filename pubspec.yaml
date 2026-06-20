@@ -47,7 +47,7 @@ dependencies:
   typed_data: ^1.4.0
   permission_handler: ^12.0.1
   image_picker: ^1.2.1
-  google_mlkit_text_recognition: ^0.15.0
+  flutter_launcher_icons: ^0.14.4   
 
 
 
@@ -86,10 +86,19 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
-
   assets:
     - lib/images/google.png
     - lib/images/phone_number.png
     - lib/images/guest.png
     - lib/images/oasp.png
+    - lib/images/oasp_launcher.png
     - .env
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/images/oasp_launcher.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "lib/images/oasp_launcher.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21

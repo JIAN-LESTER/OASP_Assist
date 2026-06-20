@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:capstone_project/utils/snackbar_util.dart';
 
@@ -148,7 +147,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  final TextRecognizer _textRecognizer = TextRecognizer();
 
   String? _selectedFileName;
   String? _extractedText;
@@ -184,7 +182,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   void dispose() {
     _titleController.dispose();
     _categoryController.dispose();
-    _textRecognizer.close();
     super.dispose();
   }
 
@@ -273,87 +270,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 100,
-      );
-
-      if (image != null) {
-        await _processImage(image);
-      }
-    } catch (e) {
-      SnackbarUtil.showError(context, 'Error picking image: $e');
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 100,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-
-      if (photo != null) {
-        await _processImage(photo);
-      }
-    } catch (e) {
-      SnackbarUtil.showError(context, 'Error taking photo: $e');
-    }
-  }
-
-  Future<void> _processImage(XFile image) async {
-    setState(() {
-      _isProcessingImage = true;
-      _fileReady = false;
-      _extractedText = null;
-      _fileError = null; // Clear file error
-    });
-
-    try {
-      final inputImage = InputImage.fromFilePath(image.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(
-        inputImage,
-      );
-
-      String extractedText = recognizedText.text;
-
-      if (extractedText.trim().isEmpty) {
-        SnackbarUtil.showWarning(context, 'No text found in image');
-        setState(() {
-          _isProcessingImage = false;
-          _fileReady = false;
-        });
-        return;
-      }
-
-      final fileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      setState(() {
-        _selectedFileName = fileName;
-        _extractedText = extractedText;
-        _fileReady = true;
-        _isProcessingImage = false;
-        _titleController.text =
-            'Document from Image ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}';
-      });
-
-      SnackbarUtil.showSuccess(
-        context,
-        'Text extracted successfully! Found ${extractedText.split(' ').length} words',
-      );
-    } catch (e) {
-      setState(() {
-        _isProcessingImage = false;
-        _fileReady = false;
-        _extractedText = null;
-      });
-      SnackbarUtil.showError(context, 'Error extracting text from image: $e');
-    }
-  }
-
   void _showUploadOptionsBottomSheet() {
     if (widget.isMobile) {
       showModalBottomSheet(
@@ -423,27 +339,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                       _pickFile();
                     },
                   ),
-                  _buildUploadOption(
-                    icon: Icons.photo_library_outlined,
-                    title: 'Choose from Gallery',
-                    subtitle: 'Extract text from image',
-                    color: Color(0xFF1976D2),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickImageFromGallery();
-                    },
-                  ),
-                  _buildUploadOption(
-                    icon: Icons.camera_alt_outlined,
-                    title: 'Take Photo',
-                    subtitle: 'Capture and extract text',
-                    color: Color(0xFFED6C02),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _takePhoto();
-                    },
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
