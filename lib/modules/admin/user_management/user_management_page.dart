@@ -141,11 +141,11 @@ class _UserManagementPageState extends State<UserManagementPage>
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return ResponsiveLayout(
-      mobileBody: MobileUserManagement(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 4),
+      child: ResponsiveLayout(
+        mobileBody: MobileUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -164,8 +164,8 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      tabletBody: TabletUserManagement(
+        ),
+        tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -183,8 +183,8 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      desktopBody: DesktopUserManagement(
+        ),
+        desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -202,6 +202,7 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
+        ),
       ),
     );
   }
@@ -395,7 +396,7 @@ class MobileUserManagement extends StatelessWidget {
           // Show loading only on first load
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
 
           if (snapshot.hasError) {
@@ -529,7 +530,7 @@ Widget mainContent(
         // Show loading only on first load
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {

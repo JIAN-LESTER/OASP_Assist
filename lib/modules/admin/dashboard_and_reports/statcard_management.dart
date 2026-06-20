@@ -99,6 +99,346 @@ Widget buildCompactStatCard(
   );
 }
 
+Widget buildManagementTableSkeleton({
+  int statCardCount = 4,
+  bool showTabs = false,
+}) {
+  return Scaffold(
+    backgroundColor: const Color(0xFFF0F4F8),
+    body: LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+        final cardCount = statCardCount.clamp(1, 4).toInt();
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showTabs) ...[
+                Row(
+                  children: [
+                    _managementSkeletonBox(width: 120, height: 38),
+                    const SizedBox(width: 12),
+                    _managementSkeletonBox(width: 150, height: 38),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+              _managementSkeletonPageHeader(isMobile),
+              const SizedBox(height: 16),
+              _managementSkeletonStats(cardCount, isMobile),
+              const SizedBox(height: 8),
+              _managementSkeletonActions(isMobile),
+              const SizedBox(height: 16),
+              _managementSkeletonTable(isMobile),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget buildSmoothManagementTransition({
+  required bool isLoading,
+  required Widget loading,
+  required Widget child,
+}) {
+  return AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    child: KeyedSubtree(
+      key: ValueKey(isLoading ? 'management-loading' : 'management-content'),
+      child: isLoading ? loading : child,
+    ),
+  );
+}
+
+Widget _managementSkeletonPageHeader(bool isMobile) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _managementSkeletonBox(width: 220, height: 24),
+        const SizedBox(height: 10),
+        _managementSkeletonBox(width: 180, height: 14),
+        const SizedBox(height: 16),
+        _managementSkeletonBox(width: 150, height: 48, radius: 8),
+      ],
+    );
+  }
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _managementSkeletonBox(width: 230, height: 24),
+          const SizedBox(height: 10),
+          _managementSkeletonBox(width: 190, height: 14),
+        ],
+      ),
+      _managementSkeletonBox(width: 168, height: 48, radius: 8),
+    ],
+  );
+}
+
+Widget _managementSkeletonStats(int count, bool isMobile) {
+  final cards = List.generate(
+    count,
+    (_) => Expanded(
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _managementSkeletonBox(width: 36, height: 36, radius: 10),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _managementSkeletonBox(height: 12),
+            ),
+            const SizedBox(width: 12),
+            _managementSkeletonBox(width: 34, height: 16),
+            const SizedBox(width: 10),
+            Container(
+              width: 3,
+              height: 30,
+              decoration: BoxDecoration(
+                color: const Color(0xFF93C5FD),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  if (isMobile) {
+    return Column(
+      children: [
+        for (var i = 0; i < cards.length; i += 2) ...[
+          Row(
+            children: [
+              cards[i],
+              if (i + 1 < cards.length) ...[
+                const SizedBox(width: 12),
+                cards[i + 1],
+              ],
+            ],
+          ),
+          if (i + 2 < cards.length) const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+
+  return Row(
+    children: [
+      for (var i = 0; i < cards.length; i++) ...[
+        cards[i],
+        if (i != cards.length - 1) const SizedBox(width: 16),
+      ],
+    ],
+  );
+}
+
+Widget _managementSkeletonActions(bool isMobile) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _managementSkeletonBox(width: double.infinity, height: 44, radius: 6),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _managementSkeletonBox(height: 44, radius: 6)),
+            const SizedBox(width: 10),
+            _managementSkeletonBox(width: 116, height: 44, radius: 6),
+          ],
+        ),
+      ],
+    );
+  }
+
+  return Row(
+    children: [
+      Expanded(child: _managementSkeletonBox(height: 44, radius: 6)),
+      const SizedBox(width: 16),
+      _managementSkeletonBox(width: 150, height: 44, radius: 6),
+    ],
+  );
+}
+
+Widget _managementSkeletonTable(bool isMobile) {
+  return Container(
+    padding: EdgeInsets.fromLTRB(
+      isMobile ? 14 : 24,
+      isMobile ? 14 : 24,
+      isMobile ? 14 : 24,
+      0,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2E7D32),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Row(
+            children: [
+              _managementSkeletonBox(
+                width: 18,
+                height: 18,
+                radius: 4,
+                color: Colors.white.withOpacity(0.55),
+              ),
+              const SizedBox(width: 18),
+              Expanded(flex: 2, child: _managementSkeletonHeaderBox()),
+              if (!isMobile) ...[
+                Expanded(child: _managementSkeletonHeaderBox()),
+                Expanded(child: _managementSkeletonHeaderBox()),
+                Expanded(flex: 2, child: _managementSkeletonHeaderBox()),
+              ],
+              Expanded(child: _managementSkeletonHeaderBox()),
+              const SizedBox(width: 48),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Column(
+          children: [
+            for (var i = 0; i < 8; i++) ...[
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: i.isOdd ? const Color(0xFFF6FFFC) : Colors.white,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(
+                  children: [
+                    _managementSkeletonBox(width: 18, height: 18, radius: 4),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _managementSkeletonBox(width: 150, height: 13),
+                          const SizedBox(height: 6),
+                          _managementSkeletonBox(width: 120, height: 11),
+                        ],
+                      ),
+                    ),
+                    if (!isMobile) ...[
+                      Expanded(child: _managementSkeletonBox(width: 92, height: 26, radius: 4)),
+                      Expanded(child: _managementSkeletonBox(width: 46, height: 12)),
+                      Expanded(flex: 2, child: _managementSkeletonBox(width: 260, height: 12)),
+                    ],
+                    Expanded(child: _managementSkeletonBox(width: 52, height: 24, radius: 4)),
+                    _managementSkeletonBox(width: 24, height: 12),
+                  ],
+                ),
+              ),
+              if (i != 7) const SizedBox(height: 6),
+            ],
+          ],
+        ),
+        _managementSkeletonPagination(isMobile),
+      ],
+    ),
+  );
+}
+
+Widget _managementSkeletonHeaderBox() {
+  return Align(
+    alignment: Alignment.centerLeft,
+    child: _managementSkeletonBox(
+      width: 72,
+      height: 13,
+      color: Colors.white.withOpacity(0.75),
+    ),
+  );
+}
+
+Widget _managementSkeletonPagination(bool isMobile) {
+  if (isMobile) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          _managementSkeletonBox(width: 108, height: 14),
+          const Spacer(),
+          _managementSkeletonBox(width: 118, height: 34, radius: 8),
+        ],
+      ),
+    );
+  }
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+    child: Row(
+      children: [
+        _managementSkeletonBox(width: 136, height: 14),
+        const SizedBox(width: 22),
+        _managementSkeletonBox(width: 190, height: 14),
+        const Spacer(),
+        for (var i = 0; i < 5; i++) ...[
+          _managementSkeletonBox(width: 34, height: 34, radius: 8),
+          if (i != 4) const SizedBox(width: 8),
+        ],
+      ],
+    ),
+  );
+}
+
+Widget _managementSkeletonBox({
+  double? width,
+  required double height,
+  double radius = 8,
+  Color color = const Color(0xFFE2E8F0),
+}) {
+  return Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+    ),
+  );
+}
+
 class StatData {
   final String date;
   final int count;

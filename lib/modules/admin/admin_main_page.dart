@@ -14,6 +14,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/reports_pag
 import 'package:capstone_project/modules/admin/logs/system_logs_page.dart';
 import 'package:capstone_project/modules/admin/user_management/user_management_page.dart';
 
+import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
@@ -39,6 +40,7 @@ class AdminMainPage extends StatefulWidget {
 class _AdminMainPageState extends State<AdminMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
+  bool _isNavigating = false;
 
   //  Add state variables to track escalation parameters
   String? _currentEscalationId;
@@ -62,8 +64,17 @@ class _AdminMainPageState extends State<AdminMainPage> {
   }
 
   // Create a method to handle navigation
-  void _navigateToPage(int index) {
+  Future<void> _navigateToPage(int index) async {
+    if (!mounted ||
+        _isNavigating ||
+        index == _selectedIndex ||
+        index < 0 ||
+        index >= _pages.length) {
+      return;
+    }
+
     setState(() {
+      _isNavigating = true;
       _selectedIndex = index;
       //  Clear escalation parameters when navigating away from escalation page
       if (index != 5) {
@@ -71,6 +82,13 @@ class _AdminMainPageState extends State<AdminMainPage> {
         _currentEscalationId = null;
         _shouldAutoOpen = false;
       }
+    });
+
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+
+    setState(() {
+      _isNavigating = false;
     });
   }
 
@@ -112,15 +130,13 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Programs',
   ];
 
+  bool get _shouldShowNavigationOverlay {
+    const inlineLoadingPages = {1, 2, 3, 6, 9, 10};
+    return _isNavigating && !inlineLoadingPages.contains(_selectedIndex);
+  }
+
   void _onNavigationItemTap(int index) {
-    setState(() {
-      _selectedIndex = index;
-      //  Clear escalation parameters when navigating away
-      if (index != 5) {
-        _currentEscalationId = null;
-        _shouldAutoOpen = false;
-      }
-    });
+    _navigateToPage(index);
   }
 
   void _toggleSidebar() {
@@ -152,7 +168,13 @@ class _AdminMainPageState extends State<AdminMainPage> {
         selectedIndex: _selectedIndex,
         onItemTap: _onNavigationItemTap,
       ),
-      body: _pages[_selectedIndex],
+      body: Stack(
+        children: [
+          _pages[_selectedIndex],
+          if (_shouldShowNavigationOverlay)
+            Positioned.fill(child: buildContentLoadingOverlay('Loading...')),
+        ],
+      ),
     );
   }
 
@@ -175,7 +197,17 @@ class _AdminMainPageState extends State<AdminMainPage> {
             onItemTap: _onNavigationItemTap,
             isExpanded: _isSidebarExpanded,
           ),
-          Expanded(child: _pages[_selectedIndex]),
+          Expanded(
+            child: Stack(
+              children: [
+                _pages[_selectedIndex],
+                if (_shouldShowNavigationOverlay)
+                  Positioned.fill(
+                    child: buildContentLoadingOverlay('Loading...'),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -765,26 +765,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Loading announcements...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {
@@ -898,9 +879,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 stream: announcementStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    );
+                    return const SizedBox.shrink();
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1272,7 +1251,7 @@ class _AnnouncementSyncSettingsState extends State<AnnouncementSyncSettings> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

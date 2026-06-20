@@ -75,9 +75,7 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
       stream: _candidateStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          );
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {

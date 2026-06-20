@@ -61,11 +61,11 @@ class LoadingOverlay {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF2E7D32),
-                      ),
-                      strokeWidth: 3,
+                    Image.asset(
+                      'lib/images/oasp.png',
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.contain,
                     ),
                     if (message != null) ...[
                       const SizedBox(height: 16),
@@ -891,12 +891,12 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   const SizedBox(height: 48),
-                  const SizedBox(
+                  SizedBox(
                     width: 40,
                     height: 40,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      strokeWidth: 3,
+                    child: Image.asset(
+                      'lib/images/oasp.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 16),

@@ -146,18 +146,12 @@ class _FaqManagementPageState extends State<FaqManagementPage>
   // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      body: Column(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 4, showTabs: true),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF0F4F8),
+        body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Tab bar ──
@@ -175,6 +169,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -560,7 +555,7 @@ class MobileFaqManagement extends StatelessWidget {
         builder: (context, snapshot) {
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -685,7 +680,7 @@ Widget mainContent(
       builder: (context, snapshot) {
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));

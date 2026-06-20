@@ -118,17 +118,28 @@ class _InformationBankPageState extends State<InformationBankPage>
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 3),
+      child: ResponsiveLayout(
+        mobileBody: MobileInformationBank(
+        selectedCategory: selectedCategory,
+        onCategoryChanged: _onCategoryChanged,
+        searchController: _searchController,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage,
+        onPageChanged: _goToPage,
+        onItemsPerPageChanged: _changeItemsPerPage,
+        ib: ibData,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
         ),
-      );
-    }
-
-    return ResponsiveLayout(
-      mobileBody: MobileInformationBank(
+        tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
         onCategoryChanged: _onCategoryChanged,
         searchController: _searchController,
@@ -144,8 +155,8 @@ class _InformationBankPageState extends State<InformationBankPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      tabletBody: TabletInformationBank(
+        ),
+        desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
         onCategoryChanged: _onCategoryChanged,
         searchController: _searchController,
@@ -161,23 +172,7 @@ class _InformationBankPageState extends State<InformationBankPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      desktopBody: DesktopInformationBank(
-        selectedCategory: selectedCategory,
-        onCategoryChanged: _onCategoryChanged,
-        searchController: _searchController,
-        currentPage: currentPage,
-        itemsPerPage: itemsPerPage,
-        onPageChanged: _goToPage,
-        onItemsPerPageChanged: _changeItemsPerPage,
-        ib: ibData,
-        selectedIds: selectedIds,
-        isSelectionMode: isSelectionMode,
-        onToggleSelection: toggleSelection,
-        onToggleSelectAll: toggleSelectAll,
-        onClearSelection: clearSelection,
-        onBulkDelete: _handleBulkDelete,
-        isAllSelected: isAllSelected,
+        ),
       ),
     );
   }
@@ -353,7 +348,7 @@ class MobileInformationBank extends StatelessWidget {
           // Show loading only on first load
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
 
           if (snapshot.hasError) {
@@ -483,7 +478,7 @@ Widget mainContent(
         // Show loading only on first load
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {

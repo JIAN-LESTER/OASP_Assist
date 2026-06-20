@@ -70,33 +70,34 @@ class _CollegeManagementPageState extends State<CollegeManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return ResponsiveLayout(
-      mobileBody: MobileCollegeManagement(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 2),
+      child: ResponsiveLayout(
+        mobileBody: MobileCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      tabletBody: TabletCollegeManagement(
+        ),
+        tabletBody: TabletCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      desktopBody: DesktopCollegeManagement(
+        ),
+        desktopBody: DesktopCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
+        ),
       ),
     );
   }
@@ -228,9 +229,7 @@ class MobileCollegeManagement extends StatelessWidget {
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
+                            return const SizedBox.shrink();
                           }
                           if (snapshot.hasError) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -317,9 +316,7 @@ Widget mainContent(
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const SizedBox.shrink();
                         }
                         if (snapshot.hasError) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
