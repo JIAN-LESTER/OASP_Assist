@@ -485,10 +485,6 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoadingUser) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return ResponsiveLayout(
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -503,7 +499,7 @@ class _ReportsPageState extends State<ReportsPage> {
         ud: ud,
         ad: ad,
         externalToolsUsage: externalToolsUsage,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -523,7 +519,7 @@ class _ReportsPageState extends State<ReportsPage> {
         ud: ud,
         ad: ad,
         externalToolsUsage: externalToolsUsage,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -543,7 +539,7 @@ class _ReportsPageState extends State<ReportsPage> {
         ud: ud,
         ad: ad,
         externalToolsUsage: externalToolsUsage,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -741,49 +737,55 @@ class DesktopDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isLoading)
-              buildSkeletonHeader(isMobile: false)
-            else
-              buildHeader(
-                selectedTimeFrame,
-                selectedReportType,
-                onTimeFrameChanged,
-                onReportTypeChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                cb,
-                ud,
-                ad,
-              ),
-            const SizedBox(height: 32),
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                externalToolsUsage,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-desktop'),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 32),
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: false)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -836,50 +838,56 @@ class TabletDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isLoading)
-              buildSkeletonHeader(isMobile: false)
-            else
-              buildHeader(
-                selectedTimeFrame,
-                selectedReportType,
-                onTimeFrameChanged,
-                onReportTypeChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                cb,
-                ud,
-                ad,
-              ),
-            const SizedBox(height: 32),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-tablet'),
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 32),
 
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                externalToolsUsage,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: false)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -932,50 +940,56 @@ class MobileDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isLoading)
-              buildSkeletonHeader(isMobile: true)
-            else
-              buildHeader(
-                selectedTimeFrame,
-                selectedReportType,
-                onTimeFrameChanged,
-                onReportTypeChanged,
-                onRefresh,
-                isRefreshing,
-                userName,
-                customDateRange,
-                onDateRangeChanged,
-                inq,
-                cb,
-                ud,
-                ad,
-              ),
-            const SizedBox(height: 24),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-mobile'),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: true)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 24),
 
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: true)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                externalToolsUsage,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: true,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: true)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: true,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );

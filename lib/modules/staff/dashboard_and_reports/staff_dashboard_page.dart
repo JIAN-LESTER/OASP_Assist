@@ -677,103 +677,67 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show skeleton during initial load
-    if (showSkeleton || userName == null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFEDF0F7),
-        body: _buildSkeletonDashboard(),
-      );
-    }
+    final isLoading = showSkeleton || userName == null;
 
-    return Stack(
-      children: [
-        ResponsiveLayout(
-          mobileBody: MobileDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-          tabletBody: TabletDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-          desktopBody: DesktopDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-        ),
-        if (isLazyLoading)
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.3),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: KeyedSubtree(
+        key: ValueKey(isLoading ? 'dashboard-loading' : 'dashboard-content'),
+        child:
+            isLoading
+                ? Scaffold(
+                  backgroundColor: const Color(0xFFEDF0F7),
+                  body: _buildSkeletonDashboard(),
+                )
+                : Stack(
+                  children: [
+                    ResponsiveLayout(
+                      mobileBody: MobileDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ],
-                  ),
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF6366F1),
-                        ),
-                        strokeWidth: 3,
+                      tabletBody: TabletDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                      SizedBox(height: 14),
-                      Text(
-                        'Loading data...',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
+                      desktopBody: DesktopDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
           ),
-      ],
+    
     );
   }
 
