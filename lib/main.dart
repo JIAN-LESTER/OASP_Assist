@@ -844,13 +844,7 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-          ),
-        ),
+        color: const Color(0xFF2E7D32),
         child: Center(
           child: FadeTransition(
             opacity: _fadeAnimation,
