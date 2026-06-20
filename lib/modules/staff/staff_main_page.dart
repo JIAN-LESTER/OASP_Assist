@@ -3,6 +3,7 @@ import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_repor
 import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_dashboard_page.dart';
 import 'package:capstone_project/modules/staff/human_escalation/human_escalation.dart';
 import 'package:capstone_project/modules/staff/logs/staff_message_logs.dart';
+import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,6 +32,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
   bool _handledInitialArgs = false;
+  bool _isNavigating = false;
 
   String? _escalationId;
   String? _conversationId;
@@ -181,11 +183,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
     if (_isLoadingServiceUnit) {
       print(' Service unit still loading...');
       return [
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
+        const SizedBox.shrink(),
       ];
     }
 
@@ -219,8 +221,23 @@ class _StaffMainPageState extends State<StaffMainPage> {
     ];
   }
 
-  void _onNavigationItemTap(int index) {
+  Future<void> _onNavigationItemTap(int index) async {
     print(' Navigation item tapped: $index');
+    if (!mounted ||
+        _isNavigating ||
+        index == _selectedIndex ||
+        index < 0 ||
+        index >= _pageTitles.length) {
+      return;
+    }
+
+    setState(() {
+      _isNavigating = true;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+
     setState(() {
       _selectedIndex = index;
 
@@ -231,6 +248,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
         _shouldAutoOpen = false;
       }
     });
+
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+
+    setState(() {
+      _isNavigating = false;
+    });
   }
 
   void _toggleSidebar() {
@@ -238,6 +262,8 @@ class _StaffMainPageState extends State<StaffMainPage> {
       _isSidebarExpanded = !_isSidebarExpanded;
     });
   }
+
+  bool get _shouldShowNavigationOverlay => _isNavigating && _selectedIndex != 1;
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +290,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
         selectedIndex: _selectedIndex,
         onItemTap: _onNavigationItemTap,
       ),
-      body: _getPages()[_selectedIndex],
+      body: Stack(
+        children: [
+          _getPages()[_selectedIndex],
+          if (_shouldShowNavigationOverlay)
+            Positioned.fill(child: buildContentLoadingOverlay('Loading...')),
+        ],
+      ),
     );
   }
 
@@ -287,7 +319,17 @@ class _StaffMainPageState extends State<StaffMainPage> {
             onItemTap: _onNavigationItemTap,
             isExpanded: _isSidebarExpanded,
           ),
-          Expanded(child: _getPages()[_selectedIndex]),
+          Expanded(
+            child: Stack(
+              children: [
+                _getPages()[_selectedIndex],
+                if (_shouldShowNavigationOverlay)
+                  Positioned.fill(
+                    child: buildContentLoadingOverlay('Loading...'),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );

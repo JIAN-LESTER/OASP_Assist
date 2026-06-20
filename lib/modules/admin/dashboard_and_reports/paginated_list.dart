@@ -107,7 +107,7 @@ class _PaginatedListDialogState extends State<PaginatedListDialog> {
             const SizedBox(height: 16),
             Expanded(
               child: _items.isEmpty && _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const SizedBox.shrink()
                   : _items.isEmpty
                       ? Center(
                           child: Text(

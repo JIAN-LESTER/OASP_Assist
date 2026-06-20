@@ -79,18 +79,7 @@ class RoleBasedRouter extends StatelessWidget {
       future: _getUserDataAndLogEvent(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                  SizedBox(height: 16),
-                  Text('Loading...', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError || !snapshot.hasData) {

@@ -493,10 +493,12 @@ class _UserMainPageState extends State<UserMainPage>
     return 'Loading...';
   }
 
-  void _onNavigationItemTap(int index) async {
+  void _onNavigationItemTap(int index, {bool showOverlay = true}) async {
     print(' Navigation tap to index: $index');
 
-    if (!mounted || _isNavigating) return;
+    if (!mounted || (showOverlay && _isNavigating) || index == _selectedIndex) {
+      return;
+    }
 
     if (index < 0 || index >= _tabController.length) {
       print(' Invalid tab index: $index');
@@ -504,6 +506,15 @@ class _UserMainPageState extends State<UserMainPage>
     }
 
     try {
+      if (showOverlay) {
+        setState(() {
+          _isNavigating = true;
+        });
+
+        await Future.delayed(const Duration(milliseconds: 120));
+        if (!mounted) return;
+      }
+
       if (index == 1) {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -538,11 +549,15 @@ class _UserMainPageState extends State<UserMainPage>
 
         _tabController.animateTo(index, duration: Duration.zero); //  Instant
       }
+
+      if (showOverlay) {
+        await Future.delayed(const Duration(milliseconds: 450));
+      }
     } catch (e) {
       print(' Navigation error: $e');
       if (mounted) _showErrorSnackBar("Navigation failed: $e");
     } finally {
-      if (mounted) {
+      if (showOverlay && mounted) {
         setState(() {
           _isNavigating = false;
         });
@@ -806,7 +821,7 @@ class _UserMainPageState extends State<UserMainPage>
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: SizedBox.shrink(),
           );
         }
 
@@ -876,9 +891,11 @@ class _UserMainPageState extends State<UserMainPage>
       body: Stack(
         children: [
           pages[_selectedIndex],
-          if (_isNavigating || _isLoading)
-            buildContentLoadingOverlay(
-              _navigationLoadingTextForIndex(_selectedIndex),
+          if (_isNavigating)
+            Positioned.fill(
+              child: buildContentLoadingOverlay(
+                _navigationLoadingTextForIndex(_selectedIndex),
+              ),
             ),
         ],
       ),
@@ -926,9 +943,11 @@ class _UserMainPageState extends State<UserMainPage>
               children: [
                 pages[_selectedIndex],
                 //  Only white out the content area
-                if (_isNavigating || _isLoading)
-                  buildContentLoadingOverlay(
-                    _navigationLoadingTextForIndex(_selectedIndex),
+                if (_isNavigating)
+                  Positioned.fill(
+                    child: buildContentLoadingOverlay(
+                      _navigationLoadingTextForIndex(_selectedIndex),
+                    ),
                   ),
               ],
             ),
@@ -1053,11 +1072,7 @@ class _UserMainPageState extends State<UserMainPage>
 
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: UniversalUIComponents.primaryGreen,
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1752,7 +1767,7 @@ class _UserMainPageState extends State<UserMainPage>
     return InkWell(
       onTap: () {
         HapticFeedback.mediumImpact();
-        _onNavigationItemTap(index);
+        _onNavigationItemTap(index, showOverlay: false);
       },
       child: Container(
         padding: EdgeInsets.symmetric(

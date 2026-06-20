@@ -1,4 +1,3 @@
-import 'package:capstone_project/responsive/widgets/menu.dart';
 import 'package:flutter/material.dart';
 
 Widget buildContentLoadingOverlay(String loadingText) {
@@ -22,12 +21,13 @@ Widget buildContentLoadingOverlay(String loadingText) {
                 ),
               ],
             ),
-            child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  UniversalUIComponents.primaryGreen,
-                ),
-                strokeWidth: 3,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'lib/images/oasp.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
               ),
             ),
           ),

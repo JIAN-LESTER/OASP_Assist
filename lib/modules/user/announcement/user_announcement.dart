@@ -269,50 +269,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
 
   Widget _buildMainContent({required bool isDesktop}) {
     if (isLoading) {
-      //  Show beautiful loading state
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-                  strokeWidth: 3,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Loading Announcements',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Please wait a moment',
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     final displayedAnnouncements = filteredAnnouncements;
@@ -438,9 +395,7 @@ class _UserAnnouncementState extends State<UserAnnouncementPage> {
                         .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    );
+                    return const SizedBox.shrink();
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
