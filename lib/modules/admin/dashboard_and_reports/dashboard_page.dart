@@ -727,9 +727,7 @@ class _DashboardModulestate extends State<DashboardPage> {
                   backgroundColor: _kPageBg,
                   body: _buildSkeletonDashboard(),
                 )
-                : Stack(
-                  children: [
-                    ResponsiveLayout(
+                : ResponsiveLayout(
                       mobileBody: MobileDashboard(
                         selectedTimeFrame: selectedTimeFrame,
                         onTimeFrameChanged: _onTimeFrameChanged,
@@ -772,8 +770,6 @@ class _DashboardModulestate extends State<DashboardPage> {
                         customDateRange: customDateRange,
                         onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ),
-                  ],
                 ),
           ),
       

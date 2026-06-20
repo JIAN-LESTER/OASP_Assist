@@ -691,9 +691,7 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
                   backgroundColor: const Color(0xFFEDF0F7),
                   body: _buildSkeletonDashboard(),
                 )
-                : Stack(
-                  children: [
-                    ResponsiveLayout(
+                : ResponsiveLayout(
                       mobileBody: MobileDashboard(
                         selectedTimeFrame: selectedTimeFrame,
                         onTimeFrameChanged: _onTimeFrameChanged,
@@ -733,8 +731,6 @@ class _Dashboardmodulestate extends State<StaffDashboardPage> {
                         customDateRange: customDateRange,
                         onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ),
-                  ],
                 ),
           ),
     

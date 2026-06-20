@@ -131,7 +131,7 @@ class _AdminMainPageState extends State<AdminMainPage> {
   ];
 
   bool get _shouldShowNavigationOverlay {
-    const inlineLoadingPages = {1, 2, 3, 6, 9, 10};
+    const inlineLoadingPages = {0, 1, 2, 3, 6, 7, 8, 9, 10};
     return _isNavigating && !inlineLoadingPages.contains(_selectedIndex);
   }
 

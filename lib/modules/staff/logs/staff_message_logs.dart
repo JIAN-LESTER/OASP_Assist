@@ -479,7 +479,7 @@ Widget mainContent(
                             .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return _buildLogsTableSkeleton();
                       }
 
                       if (snapshot.hasError) {
@@ -594,6 +594,74 @@ Widget _buildTableHeader() {
         ),
       );
     },
+  );
+}
+
+Widget _buildLogsTableSkeleton() {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: ListView.separated(
+          key: const ValueKey('staff-message-logs-skeleton'),
+          padding: EdgeInsets.zero,
+          itemCount: 8,
+          separatorBuilder: (_, __) => const SizedBox(height: 6),
+          itemBuilder:
+              (_, index) => Container(
+                height: isMobile ? 64 : 58,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: index.isOdd ? const Color(0xFFF6FFFC) : Colors.white,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    if (!isMobile) const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _logSkeletonBox(width: 128, height: 13),
+                          const SizedBox(height: 7),
+                          _logSkeletonBox(width: 92, height: 11),
+                        ],
+                      ),
+                    ),
+                    if (!isMobile) ...[
+                      Expanded(flex: 3, child: _logSkeletonBox(width: 240, height: 13)),
+                      Expanded(flex: 4, child: _logSkeletonBox(width: 170, height: 13)),
+                    ],
+                    _logSkeletonBox(width: 26, height: 12),
+                  ],
+                ),
+              ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _logSkeletonBox({
+  double? width,
+  required double height,
+  double radius = 8,
+}) {
+  return Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xFFE2E8F0),
+      borderRadius: BorderRadius.circular(radius),
+    ),
   );
 }
 

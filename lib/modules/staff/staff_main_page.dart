@@ -263,7 +263,10 @@ class _StaffMainPageState extends State<StaffMainPage> {
     });
   }
 
-  bool get _shouldShowNavigationOverlay => _isNavigating && _selectedIndex != 1;
+  bool get _shouldShowNavigationOverlay {
+    const inlineLoadingPages = {0, 1, 4};
+    return _isNavigating && !inlineLoadingPages.contains(_selectedIndex);
+  }
 
   @override
   Widget build(BuildContext context) {
