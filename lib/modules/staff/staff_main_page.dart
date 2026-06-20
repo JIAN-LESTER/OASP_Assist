@@ -3,7 +3,6 @@ import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_repor
 import 'package:capstone_project/modules/staff/dashboard_and_reports/staff_dashboard_page.dart';
 import 'package:capstone_project/modules/staff/human_escalation/human_escalation.dart';
 import 'package:capstone_project/modules/staff/logs/staff_message_logs.dart';
-import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -183,11 +182,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
     if (_isLoadingServiceUnit) {
       print(' Service unit still loading...');
       return [
-        const SizedBox.shrink(),
-        const SizedBox.shrink(),
-        const SizedBox.shrink(),
-        const SizedBox.shrink(),
-        const SizedBox.shrink(),
+        StaffDashboardPage(),
+        const StaffReportsPage(),
+        const _HumanEscalationPageSkeleton(),
+        const StaffAnnouncementPage(),
+        const StaffMessageLogsPage(),
       ];
     }
 
@@ -263,11 +262,6 @@ class _StaffMainPageState extends State<StaffMainPage> {
     });
   }
 
-  bool get _shouldShowNavigationOverlay {
-    const inlineLoadingPages = {0, 1, 4};
-    return _isNavigating && !inlineLoadingPages.contains(_selectedIndex);
-  }
-
   @override
   Widget build(BuildContext context) {
     print('🎨 Building StaffMainPage - selectedIndex: $_selectedIndex');
@@ -296,8 +290,6 @@ class _StaffMainPageState extends State<StaffMainPage> {
       body: Stack(
         children: [
           _getPages()[_selectedIndex],
-          if (_shouldShowNavigationOverlay)
-            Positioned.fill(child: buildContentLoadingOverlay('Loading...')),
         ],
       ),
     );
@@ -326,14 +318,130 @@ class _StaffMainPageState extends State<StaffMainPage> {
             child: Stack(
               children: [
                 _getPages()[_selectedIndex],
-                if (_shouldShowNavigationOverlay)
-                  Positioned.fill(
-                    child: buildContentLoadingOverlay('Loading...'),
-                  ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HumanEscalationPageSkeleton extends StatelessWidget {
+  const _HumanEscalationPageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+    final isDesktop = screenWidth >= 900;
+    final horizontalPadding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
+    final verticalPadding = isDesktop ? 24.0 : (isTablet ? 20.0 : 16.0);
+
+    return Container(
+      color: const Color(0xFFF0F4F8),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              verticalPadding,
+              horizontalPadding,
+              isTablet ? 12 : 8,
+            ),
+            color: Colors.white,
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const _MainSkeletonBox(width: 150, height: 24),
+                    const Spacer(),
+                    _MainSkeletonBox(
+                      width: isTablet ? 44 : 38,
+                      height: isTablet ? 44 : 38,
+                      radius: 10,
+                    ),
+                  ],
+                ),
+                SizedBox(height: isTablet ? 24 : 16),
+                const _MainSkeletonBox(width: double.infinity, height: 48),
+                SizedBox(height: isTablet ? 12 : 8),
+                Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      const Expanded(
+                        child: _MainSkeletonBox(height: 64, radius: 12),
+                      ),
+                      if (i != 2) SizedBox(width: isTablet ? 10 : 6),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.all(horizontalPadding),
+              itemCount: 6,
+              separatorBuilder: (_, __) => SizedBox(height: isTablet ? 12 : 10),
+              itemBuilder:
+                  (_, __) => Container(
+                    padding: EdgeInsets.all(isTablet ? 14 : 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                    ),
+                    child: Row(
+                      children: [
+                        _MainSkeletonBox(
+                          width: isTablet ? 44 : 38,
+                          height: isTablet ? 44 : 38,
+                          radius: 12,
+                        ),
+                        SizedBox(width: isTablet ? 14 : 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _MainSkeletonBox(
+                                width: double.infinity,
+                                height: 14,
+                              ),
+                              SizedBox(height: 8),
+                              _MainSkeletonBox(width: 180, height: 12),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MainSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _MainSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }

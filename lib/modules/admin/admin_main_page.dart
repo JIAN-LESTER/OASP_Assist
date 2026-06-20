@@ -14,7 +14,6 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/reports_pag
 import 'package:capstone_project/modules/admin/logs/system_logs_page.dart';
 import 'package:capstone_project/modules/admin/user_management/user_management_page.dart';
 
-import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/responsive/widgets/menu.dart';
@@ -130,11 +129,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
     'Programs',
   ];
 
-  bool get _shouldShowNavigationOverlay {
-    const inlineLoadingPages = {0, 1, 2, 3, 6, 7, 8, 9, 10};
-    return _isNavigating && !inlineLoadingPages.contains(_selectedIndex);
-  }
-
   void _onNavigationItemTap(int index) {
     _navigateToPage(index);
   }
@@ -171,8 +165,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
       body: Stack(
         children: [
           _pages[_selectedIndex],
-          if (_shouldShowNavigationOverlay)
-            Positioned.fill(child: buildContentLoadingOverlay('Loading...')),
         ],
       ),
     );
@@ -201,10 +193,6 @@ class _AdminMainPageState extends State<AdminMainPage> {
             child: Stack(
               children: [
                 _pages[_selectedIndex],
-                if (_shouldShowNavigationOverlay)
-                  Positioned.fill(
-                    child: buildContentLoadingOverlay('Loading...'),
-                  ),
               ],
             ),
           ),

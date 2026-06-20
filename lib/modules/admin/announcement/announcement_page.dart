@@ -612,7 +612,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return const SizedBox.shrink();
+          return _AnnouncementListSkeleton(isDesktop: isDesktop);
         }
 
         if (snapshot.hasError) {
@@ -726,7 +726,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
                 stream: announcementStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SizedBox.shrink();
+                    return const _AnnouncementSidebarSkeleton();
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1211,6 +1211,113 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
       announcement,
       DeleteConfigs.announcement,
       'announcements',
+    );
+  }
+}
+
+class _AnnouncementListSkeleton extends StatelessWidget {
+  final bool isDesktop;
+
+  const _AnnouncementListSkeleton({required this.isDesktop});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding:
+          isDesktop
+              ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+              : const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 5,
+      separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 24 : 16),
+      itemBuilder: (_, __) => const _AnnouncementSkeletonCard(),
+    );
+  }
+}
+
+class _AnnouncementSidebarSkeleton extends StatelessWidget {
+  const _AnnouncementSidebarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      itemCount: 5,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder:
+          (_, __) => const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+              SizedBox(height: 8),
+              _AnnouncementSkeletonBox(width: 130, height: 12),
+            ],
+          ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonCard extends StatelessWidget {
+  const _AnnouncementSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _AnnouncementSkeletonBox(width: 42, height: 42, radius: 12),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AnnouncementSkeletonBox(width: 160, height: 16),
+                    SizedBox(height: 8),
+                    _AnnouncementSkeletonBox(width: 110, height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 18),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: 220, height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _AnnouncementSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
+      ),
     );
   }
 }
