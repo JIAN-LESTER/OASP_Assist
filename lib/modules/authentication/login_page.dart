@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'app_distribution_qr_button.dart';
 import 'forgot_password_page.dart';
 import 'onboarding/green_snow_animation.dart';
 import 'register_page.dart';
@@ -872,6 +873,7 @@ class _LoginPageState extends State<LoginPage>
                 ),
               ),
             ),
+            const AppDistributionQrButton(),
             if (_isLoading)
               Positioned.fill(
                 child: buildContentLoadingOverlay('Signing in...'),

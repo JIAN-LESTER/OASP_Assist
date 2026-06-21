@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../components/square_tile.dart';
 import '../../responsive/responsive_layout.dart';
+import 'app_distribution_qr_button.dart';
 import 'onboarding/green_snow_animation.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -1078,34 +1079,39 @@ class _RegisterPageState extends State<RegisterPage>
     return Scaffold(
       backgroundColor: const Color(0xFFFFF7ED),
       body: SafeArea(
-        child: ResponsiveLayout(
-          mobileBody: _buildMobileBody(),
-          tabletBody: _buildDecoratedBody(
-            child: Center(
-              child: _buildContent(
-                maxWidth: 500,
-                horizontalPadding: 32,
-                iconSize: 145,
-                titleFontSize: 28,
-                descriptionFontSize: 15,
-                cardPadding: 32,
-                useFormCard: true,
+        child: Stack(
+          children: [
+            ResponsiveLayout(
+              mobileBody: _buildMobileBody(),
+              tabletBody: _buildDecoratedBody(
+                child: Center(
+                  child: _buildContent(
+                    maxWidth: 500,
+                    horizontalPadding: 32,
+                    iconSize: 145,
+                    titleFontSize: 28,
+                    descriptionFontSize: 15,
+                    cardPadding: 32,
+                    useFormCard: true,
+                  ),
+                ),
+              ),
+              desktopBody: _buildDecoratedBody(
+                child: Center(
+                  child: _buildContent(
+                    maxWidth: 480,
+                    horizontalPadding: 40,
+                    iconSize: 155,
+                    titleFontSize: 32,
+                    descriptionFontSize: 16,
+                    cardPadding: 40,
+                    useFormCard: true,
+                  ),
+                ),
               ),
             ),
-          ),
-          desktopBody: _buildDecoratedBody(
-            child: Center(
-              child: _buildContent(
-                maxWidth: 480,
-                horizontalPadding: 40,
-                iconSize: 155,
-                titleFontSize: 32,
-                descriptionFontSize: 16,
-                cardPadding: 40,
-                useFormCard: true,
-              ),
-            ),
-          ),
+            const AppDistributionQrButton(),
+          ],
         ),
       ),
     );
