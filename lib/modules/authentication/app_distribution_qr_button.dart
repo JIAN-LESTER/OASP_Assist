@@ -97,7 +97,7 @@ class AppDistributionQrButton extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Scan this QR code on your Android phone to open the tester release.',
+                    'Scan this QR code on your Android phone to download the application.',
                     style: TextStyle(
                       fontFamily: primaryFontFamily,
                       fontSize: 14,
@@ -127,26 +127,57 @@ class AppDistributionQrButton extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                  if (requireLoginForEmail)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: primaryColor.withOpacity(0.1),
                         ),
-                        elevation: 0,
                       ),
-                      onPressed: () => _handleEmailAction(context),
-                      icon: const Icon(Icons.email_outlined, size: 20),
-                      label: const Text(
-                        'Receive an email instead',
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      child: const Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: primaryColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Log in to receive the app invite by email.',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () => _handleEmailAction(context),
+                        icon: const Icon(Icons.email_outlined, size: 20),
+                        label: const Text(
+                          'Receive an email instead',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
-                  ),
+                    SizedBox(height: 12),
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
