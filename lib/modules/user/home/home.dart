@@ -243,7 +243,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Install the Android tester release.',
+                  'Install the mobile application.',
                   style: TextStyle(
                     fontSize: isMobile ? 12 : 13,
                     color: const Color(0xFF64748B),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 Widget buildContentLoadingOverlay(String loadingText) {
-  return Container(
+  return Material(
     color: Colors.white,
     child: Center(
       child: Column(
