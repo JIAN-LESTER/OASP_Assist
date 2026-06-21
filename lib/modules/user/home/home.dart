@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import '../../authentication/app_distribution_qr_button.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({Key? key}) : super(key: key);
@@ -162,6 +163,7 @@ class _HomeDashboardState extends State<HomeDashboard>
                 slivers: [
                   // Welcome Header
                   SliverToBoxAdapter(child: _buildWelcomeHeader()),
+                  SliverToBoxAdapter(child: _buildDownloadMobileAppSection()),
 
                     // AI Chat Assistant
                   SliverToBoxAdapter(child: _buildChatPreviewSection()),
@@ -186,6 +188,78 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     final name = _cachedUserData?['name'] ?? 'User';
     return _buildHeaderUI(name);
+  }
+
+  Widget _buildDownloadMobileAppSection() {
+    final isMobile = _isMobile(context);
+
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 20,
+        vertical: 8,
+      ),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF2E7D32).withOpacity(0.18),
+              ),
+            ),
+            child: Icon(
+              Icons.phone_android,
+              color: const Color(0xFF2E7D32),
+              size: isMobile ? 22 : 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Download Mobile App',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Install the Android tester release.',
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const AppDistributionQrButton(
+            positioned: false,
+            requireLoginForEmail: false,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildHeaderLoadingSkeleton() {
