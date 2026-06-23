@@ -200,6 +200,64 @@ export const generateCohereResponse = onCall(
 // PINECONE FUNCTIONS
 // ============================================================================
 
+type PineconeUsageOperation = "upsert" | "delete" | "query" | "fetch";
+
+async function writePineconeUsage({
+  userId,
+  operation,
+  count,
+  namespace,
+  source,
+}: {
+  userId: string | null;
+  operation: PineconeUsageOperation;
+  count: number;
+  namespace?: string | null;
+  source?: string | null;
+}) {
+  const safeCount = Math.max(0, Number(count) || 0);
+
+  await admin.firestore().collection("pinecone_usage").add({
+    userId: userId ?? null,
+    tool: "Pinecone",
+    index: "oasp-assist-gemini",
+    operation,
+    source: source ?? "document_upload",
+    namespace: namespace ?? null,
+    usageCount: safeCount,
+    calls: 1,
+    writes: operation === "upsert" ? safeCount : 0,
+    upserts: operation === "upsert" ? safeCount : 0,
+    deletes: operation === "delete" ? safeCount : 0,
+    costUsd: 0,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    date: new Date().toISOString().substring(0, 10),
+  });
+}
+
+export const logPineconeUsage = onCall(
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const {
+      operation = "upsert",
+      count = 1,
+      namespace,
+      source = "document_upload",
+    } = request.data ?? {};
+
+    await writePineconeUsage({
+      userId: request.auth.uid ?? null,
+      operation,
+      count,
+      namespace,
+      source,
+    });
+
+    return {success: true};
+  }
+);
+
 export const queryPinecone = onCall(
   {secrets: [PINECONE_API_KEY]},
   async (request) => {
@@ -246,7 +304,7 @@ export const insertPineconeDocument = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {id, embedding, metadata} = request.data;
+    const {id, embedding, metadata, namespace} = request.data;
     if (!id || !embedding || !metadata) {
       throw new Error("ID, embedding, and metadata required");
     }
@@ -260,6 +318,14 @@ export const insertPineconeDocument = onCall(
         values: embedding,
         metadata,
       }]);
+
+      await writePineconeUsage({
+        userId: request.auth.uid ?? null,
+        operation: "upsert",
+        count: 1,
+        namespace,
+        source: "document_upload",
+      }).catch(() => undefined);
 
       return {success: true, id};
     } catch (error: any) {
@@ -278,7 +344,7 @@ export const insertPineconeDocumentBatch = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {documents} = request.data;
+    const {documents, namespace} = request.data;
 
     if (!documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Documents array required");
@@ -308,6 +374,14 @@ export const insertPineconeDocumentBatch = onCall(
         totalInserted += batch.length;
         console.log(` Inserted batch: ${totalInserted}/${vectors.length}`);
       }
+
+      await writePineconeUsage({
+        userId: request.auth.uid ?? null,
+        operation: "upsert",
+        count: totalInserted,
+        namespace,
+        source: "document_batch_upload",
+      }).catch(() => undefined);
 
       return {
         success: true,

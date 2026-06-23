@@ -19,6 +19,7 @@ export {
   queryPinecone,
   insertPineconeDocument,
   insertPineconeDocumentBatch,
+  logPineconeUsage,
 
   deletePineconeDocuments,
 
