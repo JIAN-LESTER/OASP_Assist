@@ -1,9 +1,11 @@
 import 'package:capstone_project/modules/user/user_main_page.dart';
+import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:provider/provider.dart';
 import '../../authentication/app_distribution_qr_button.dart';
 
 class HomeDashboard extends StatefulWidget {
@@ -42,6 +44,14 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     // Start batch loading immediately
     _batchLoadData();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      chatProvider.loadUserMessageCount();
+      chatProvider.listenToUserMessageCount();
+    });
   }
 
   Future<void> _batchLoadData() async {
@@ -522,6 +532,11 @@ class _HomeDashboardState extends State<HomeDashboard>
                     ],
                   ),
                 ),
+                Consumer<ChatProvider>(
+                  builder: (context, chatProvider, _) {
+                    return _buildMessageLimitBadge(chatProvider, isMobile);
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -545,6 +560,58 @@ class _HomeDashboardState extends State<HomeDashboard>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMessageLimitBadge(ChatProvider chatProvider, bool isMobile) {
+    final used = chatProvider.userDailyMessageCount;
+    final limit = ChatProvider.MAX_DAILY_MESSAGES;
+    final remaining = (limit - used).clamp(0, limit);
+    final isLimitReached = remaining == 0;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 10 : 12,
+        vertical: isMobile ? 7 : 8,
+      ),
+      decoration: BoxDecoration(
+        color:
+            isLimitReached
+                ? const Color(0xFFFFF1F2)
+                : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color:
+              isLimitReached
+                  ? const Color(0xFFFCA5A5)
+                  : const Color(0xFFBBF7D0),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.message_outlined,
+            size: isMobile ? 15 : 16,
+            color:
+                isLimitReached
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFF15803D),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$used/$limit',
+            style: TextStyle(
+              fontSize: isMobile ? 12 : 13,
+              fontWeight: FontWeight.w800,
+              color:
+                  isLimitReached
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF15803D),
+            ),
+          ),
+        ],
       ),
     );
   }
