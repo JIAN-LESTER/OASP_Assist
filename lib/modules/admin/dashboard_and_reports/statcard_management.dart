@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:capstone_project/services/firebase_usage_logger.dart';
 
 Widget buildCompactStatCard(
   String title,
@@ -584,6 +585,20 @@ class StatDataManagement {
     _cacheTimestamps[cacheKey] = DateTime.now();
   }
 
+  Future<void> _logDisplayedReads(
+    String source,
+    Map<String, List<QueryDocumentSnapshot>> groups,
+  ) async {
+    for (final entry in groups.entries) {
+      if (entry.value.isEmpty) continue;
+      await FirebaseUsageLogger.logRead(
+        collection: entry.key,
+        count: entry.value.length,
+        source: source,
+      );
+    }
+  }
+
   // ==================== INFORMATION BANK ====================
   Future<InformationBankData> getInformationBankData() async {
     const cacheKey = 'information_bank';
@@ -597,6 +612,12 @@ class StatDataManagement {
         _getInformationBank(),
         _getLatestInformationBank(),
       ]);
+      await _logDisplayedReads('information_bank_statcard', {
+        'information_bank': [
+          ...results[0],
+          ...results[1],
+        ],
+      });
 
       final data = _processInformationBankData(
         ib: results[0],
@@ -660,6 +681,13 @@ class StatDataManagement {
         _getLatestFAQ(),
         _getMostAskedFAQ(),
       ]);
+      await _logDisplayedReads('faq_statcard', {
+        'faqs': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+        ],
+      });
 
       final data = _processFAQsData(
         faqs: results[0],
@@ -739,6 +767,14 @@ class StatDataManagement {
         _getNewUsers(startOfMonth),
         _getUsersLoggedInToday(startOfDay),
       ]);
+      await _logDisplayedReads('user_statcard', {
+        'users': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+          ...results[3],
+        ],
+      });
 
       final data = _processUserData(
         users: results[0],
@@ -787,6 +823,10 @@ class StatDataManagement {
     try {
       final users = await _getUsersOptimized();
       final programs = await _getPrograms();
+      await _logDisplayedReads('program_statcard', {
+        'users': users,
+        'programs': programs,
+      });
       final data = _processProgramData(users: users, programs: programs);
 
       _programCache[cacheKey] = data;
@@ -827,6 +867,9 @@ class StatDataManagement {
 
     try {
       final admissions = await _getAdmissions();
+      await _logDisplayedReads('admission_statcard', {
+        'admissions': admissions,
+      });
       final data = _processAdmissionData(admissions: admissions);
 
       _admissionCache[cacheKey] = data;
@@ -866,6 +909,9 @@ class StatDataManagement {
 
     try {
       final scholarships = await _getScholarships();
+      await _logDisplayedReads('scholarship_statcard', {
+        'scholarships': scholarships,
+      });
       final data = _processScholarshipData(scholarships: scholarships);
 
       _scholarshipCache[cacheKey] = data;
@@ -926,6 +972,9 @@ class StatDataManagement {
 
     try {
       final placements = await _getJobPlacements();
+      await _logDisplayedReads('placement_statcard', {
+        'placements': placements,
+      });
       final data = _processPlacementData(placements: placements);
 
       _placementCache[cacheKey] = data;

@@ -86,3 +86,9 @@ export {
 export {
   sendAppDistributionInvite,
 } from "./appDistributionInvite";
+
+export {
+  logFirebaseRead,
+  logTopLevelFirebaseUsage,
+  logNestedFirebaseUsage,
+} from "./firebaseUsage";

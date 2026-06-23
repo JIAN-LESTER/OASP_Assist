@@ -4,6 +4,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/escalation_
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/staff_dashboard_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/user_demographics_data.dart';
+import 'package:capstone_project/services/firebase_usage_logger.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -97,6 +98,20 @@ class FirebaseService {
     _cacheTimestamps[cacheKey] = DateTime.now();
   }
 
+  Future<void> _logDisplayedReads(
+    String source,
+    Map<String, List<QueryDocumentSnapshot>> groups,
+  ) async {
+    for (final entry in groups.entries) {
+      if (entry.value.isEmpty) continue;
+      await FirebaseUsageLogger.logRead(
+        collection: entry.key,
+        count: entry.value.length,
+        source: source,
+      );
+    }
+  }
+
   bool _isUserLookupCacheValid() {
     if (_userLookupCache == null || _userLookupCacheTime == null) return false;
     final now = DateTime.now();
@@ -167,6 +182,22 @@ class FirebaseService {
       if (faqs.isEmpty) {
         faqs = await _getTopFAQsAllTime();
       }
+      await _logDisplayedReads('inquiry_reports', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+        ],
+        'escalations': [
+          ...results[3],
+          ...results[4],
+          ...results[8],
+          ...results[9],
+        ],
+        'faqs': faqs,
+        'logs': results[6],
+        'message_logs': results[7],
+      });
       final data = _processInquiryReportsData(
         totalMessages: results[0],
         userMessages: results[1],
@@ -215,6 +246,14 @@ class FirebaseService {
         _getUnansweredMessages(startDate, endDate),
         _getUsersWithLimitData(startDate, endDate), // NEW
       ]);
+      await _logDisplayedReads('chatbot_usage_reports', {
+        'conversations': results[0],
+        'messages': [
+          ...results[1],
+          ...results[2],
+        ],
+        'users': results[3],
+      });
 
       final data = _processChatbotUsageReportsData(
         conversations: results[0],
@@ -259,6 +298,15 @@ class FirebaseService {
         _getMessages(startDate, endDate, 'user'),
         _getAllUsersWithTimestamps(), // For user growth over time
       ]);
+      await _logDisplayedReads('user_demographics_reports', {
+        'users': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+          ...results[4],
+        ],
+        'messages': results[3],
+      });
 
       final data = _processUserDemographicsReportsData(
         users: results[0], // Users in timeframe
@@ -308,6 +356,20 @@ class FirebaseService {
         _getLogs(startDate, endDate),
         _getMessageLogs(startDate, endDate),
       ]);
+      await _logDisplayedReads('admin_dashboard', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+        ],
+        'users': results[2],
+        'escalations': [
+          ...results[3],
+          ...results[4],
+          ...results[5],
+        ],
+        'logs': results[6],
+        'message_logs': results[7],
+      });
 
       final data = _processAdminDashboardData(
         userMessages: results[0],
@@ -359,6 +421,19 @@ class FirebaseService {
         _getAllEscalations(startDate, endDate),
         _getMessageLogs(startDate, endDate),
       ]);
+      await _logDisplayedReads('staff_dashboard', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+        ],
+        'escalations': [
+          ...results[2],
+          ...results[3],
+          ...results[4],
+          ...results[5],
+        ],
+        'message_logs': results[6],
+      });
 
       final data = _processStaffDashboardData(
         userMessages: results[0],

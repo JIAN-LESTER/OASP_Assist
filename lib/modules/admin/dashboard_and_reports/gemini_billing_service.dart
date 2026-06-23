@@ -328,20 +328,9 @@ Future<FirebaseUsageSummary> _fetchFirebaseUsage(
       stat.readCount++;
       addOperation(date, 'read');
     }
-    if (action.contains('write') ||
-        action.contains('create') ||
-        action.contains('add') ||
-        action.contains('update')) {
-      stat.writeCount++;
-      addOperation(date, 'write');
-    }
-    if (action.contains('delete') || action.contains('remove')) {
-      stat.deleteCount++;
-      addOperation(date, 'delete');
-    }
   }
 
-  stat.usageCount += stat.readCount + stat.writeCount + stat.deleteCount;
+  stat.usageCount = stat.readCount + stat.writeCount + stat.deleteCount;
   _allocateFirebaseCosts(stat, trendMap);
 
   return FirebaseUsageSummary(

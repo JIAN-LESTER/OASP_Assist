@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
+import 'package:capstone_project/services/firebase_usage_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -827,6 +828,11 @@ class UserConstant {
           .collection('faqs')
           .get()
           .timeout(Duration(seconds: 10));
+      await FirebaseUsageLogger.logRead(
+        collection: 'faqs',
+        count: snapshot.docs.length,
+        source: 'faq_display',
+      );
 
       final Map<String, List<Map<String, String>>> groupedFAQs = {};
 
