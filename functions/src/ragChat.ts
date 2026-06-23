@@ -34,6 +34,7 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
   // https://ai.google.dev/pricing
   const PRICES: Record<string, {input: number; output: number}> = {
     "gemini-2.5-flash": {input: 0.30, output: 2.50},
+    "gemini-2.5-flash-lite": {input: 0.10, output: 0.40},
     "gemini-embedding-001": {input: 0.15, output: 0.00},
     "gemini-2.0-flash": {input: 0.10, output: 0.40},
     "gemini-1.5-flash": {input: 0.075, output: 0.30},
@@ -61,7 +62,7 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
   });
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const MAX_CONTEXT_CHARS = 600;
 const MAX_HISTORY_CHARS = 140;
 const FAQ_SIMILARITY_THRESHOLD = 0.88;
