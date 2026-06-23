@@ -1252,26 +1252,34 @@ $question
   ) {
     try {
       double highestSimilarity = 0.0;
+      double secondHighestSimilarity = 0.0;
       Map<String, dynamic>? bestMatch;
+      int validFaqCount = 0;
 
       print('🔍 Checking ${FAQCache.cache.length} FAQs for match');
       print('🔍 Question: "$question"');
 
       for (var entry in FAQCache.cache.entries) {
         final data = entry.value;
+        final faqQuestion = data['question'] as String?;
 
-        // FIX: Accept both 'embedding' (auto-promoted) and 'geminiEmbedding'
-        // (predefined/server-generated) so no FAQ is silently skipped.
-        final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
+        if (faqQuestion == null || faqQuestion.trim().isEmpty) {
+          print('⚠️ FAQ missing question');
+          continue;
+        }
+
+        final rawEmbedding =
+            data['contextEmbedding'] ??
+            data['faqContextEmbedding'];
 
         if (rawEmbedding == null) {
-          print('⚠️ FAQ missing embedding: ${data['question']}');
+          print('⚠️ FAQ missing embedding: $faqQuestion');
           continue;
         }
 
         final answer = data['answer'] as String?;
         if (answer == null || answer.trim().isEmpty) {
-          print('⚠️ FAQ has empty answer: ${data['question']}');
+          print('⚠️ FAQ has empty answer: $faqQuestion');
           continue;
         }
 
@@ -1281,7 +1289,7 @@ $question
             (rawEmbedding as List).map((e) => (e as num).toDouble()),
           );
         } catch (e) {
-          print('⚠️ Invalid embedding format for: ${data['question']}');
+          print('⚠️ Invalid embedding format for: $faqQuestion');
           continue;
         }
 
@@ -1297,24 +1305,41 @@ $question
         }
 
         final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
-
+        validFaqCount++;
         print(
-          '📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."',
+          '📊 FAQ: "${faqQuestion.substring(0, min(50, faqQuestion.length))}..."',
         );
         print('   Answer length: ${answer.length} chars');
         print('   Category: ${data['category'] ?? 'N/A'}');
         print('   Similarity: ${similarity.toStringAsFixed(4)}');
 
-        if (similarity > 0.75 && similarity > highestSimilarity) {
+        if (similarity > highestSimilarity) {
+          secondHighestSimilarity = highestSimilarity;
           highestSimilarity = similarity;
-          bestMatch = {
-            'question': data['question'],
-            'answer': answer,
-            'category': data['category'] ?? 'General',
-            'similarity': similarity,
-          };
-          print('   🎯 NEW BEST MATCH!');
+          if (similarity >= 0.88) {
+            bestMatch = {
+              'question': faqQuestion,
+              'answer': answer,
+              'category': data['category'] ?? 'General',
+              'similarity': similarity,
+            };
+            print('   🎯 NEW BEST MATCH!');
+          }
+        } else if (similarity > secondHighestSimilarity) {
+          secondHighestSimilarity = similarity;
         }
+      }
+
+      if (bestMatch != null &&
+          validFaqCount > 1 &&
+          highestSimilarity < 0.92 &&
+          highestSimilarity - secondHighestSimilarity < 0.03) {
+        print(
+          '❌ FAQ match rejected as ambiguous '
+          '(best=${highestSimilarity.toStringAsFixed(4)}, '
+          'second=${secondHighestSimilarity.toStringAsFixed(4)})',
+        );
+        return null;
       }
 
       if (bestMatch != null) {
@@ -1422,9 +1447,9 @@ $question
             continue;
           }
 
-          // FIX: Accept both field names; normalise to 'embedding' in cache
-          // so _findBestFAQMatch always finds it under 'embedding'.
-          final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
+          final rawEmbedding =
+              data['contextEmbedding'] ??
+              data['faqContextEmbedding'];
 
           if (rawEmbedding == null ||
               rawEmbedding is! List ||
@@ -1448,10 +1473,8 @@ $question
             continue;
           }
 
-          // Normalise: always store under 'embedding' key in memory cache.
           final normalisedData = Map<String, dynamic>.from(data);
           normalisedData['embedding'] = rawEmbedding;
-          normalisedData.remove('geminiEmbedding');
 
           validFAQs[doc.id] = normalisedData;
           print(

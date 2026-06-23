@@ -143,12 +143,12 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String? _questionError;
   String? _answerError;
 
-  Future<List<double>> _generateEmbedding(String question) async {
+  Future<List<double>> _generateEmbedding(String text) async {
     final callable = FirebaseFunctions.instance.httpsCallable(
-      'generateCohereEmbedding',
+      'generateEmbedding',
     );
 
-    final result = await callable.call({'text': question});
+    final result = await callable.call({'text': text});
 
     return (result.data['embedding'] as List)
         .map((e) => (e as num).toDouble())
@@ -204,7 +204,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
         try {
           List<double>? embedding;
           try {
-            embedding = await _generateEmbedding(question);
+            embedding = await _generateEmbedding('Q: $question\nA: $answer');
           } catch (e) {
             print(' Failed to generate embedding: $e');
           }
@@ -220,7 +220,10 @@ class _AddFaqContentState extends State<AddFaqContent> {
 
           if (embedding != null) {
             faqData['embedding'] = embedding;
-            faqData['embeddingModel'] = 'embed-multilingual-v3.0';
+            faqData['geminiEmbedding'] = embedding;
+            faqData['contextEmbedding'] = embedding;
+            faqData['faqContextEmbedding'] = embedding;
+            faqData['embeddingModel'] = 'gemini-embedding-001';
             faqData['embeddingDimensions'] = embedding.length;
           }
 

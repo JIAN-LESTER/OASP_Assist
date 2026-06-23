@@ -62,13 +62,19 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
 }
 
 const GEMINI_MODEL = "gemini-2.5-flash";
-const MAX_CONTEXT_CHARS = 900;
-const MAX_HISTORY_CHARS = 220;
-const MAX_RESPONSE_TOKENS = 700;
+const MAX_CONTEXT_CHARS = 600;
+const MAX_HISTORY_CHARS = 140;
+const FAQ_SIMILARITY_THRESHOLD = 0.88;
+const FAQ_STRONG_SIMILARITY = 0.92;
+const FAQ_SIMILARITY_MARGIN = 0.03;
 
 function limitText(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return `${text.substring(0, maxChars).trim()}...`;
+}
+
+function buildFAQContext(question: string, answer: string): string {
+  return limitText(`Q: ${question}\nA: ${answer}`, 700);
 }
 
 export const generateCohereEmbedding = onCall(
@@ -207,7 +213,7 @@ async function findMatchingFAQ(
   _query: string,
   queryEmbedding: number[],
   geminiApiKey: string,
-  similarityThreshold = 0.75
+  similarityThreshold = FAQ_SIMILARITY_THRESHOLD
 ): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
   try {
     const faqSnapshot = await db
@@ -218,6 +224,8 @@ async function findMatchingFAQ(
 
     let bestMatch: any = null;
     let highestSimilarity = 0;
+    let secondHighestSimilarity = 0;
+    let validFaqCount = 0;
 
     for (const doc of faqSnapshot.docs) {
       const data = doc.data();
@@ -227,16 +235,20 @@ async function findMatchingFAQ(
       if (!faqQuestion || !faqAnswer) continue;
 
       let faqEmbedding: number[];
-      const storedEmbedding = data.embedding ?? data.geminiEmbedding;
+      const storedEmbedding = data.contextEmbedding ?? data.faqContextEmbedding;
 
       if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
         faqEmbedding = storedEmbedding as number[];
       } else {
-        faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
+        faqEmbedding = await generateGeminiEmbedding(
+          buildFAQContext(faqQuestion, faqAnswer),
+          geminiApiKey,
+          "search_document"
+        );
 
         await doc.ref.update({
-          embedding: faqEmbedding,
-          geminiEmbedding: faqEmbedding,
+          contextEmbedding: faqEmbedding,
+          faqContextEmbedding: faqEmbedding,
           embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
@@ -246,16 +258,31 @@ async function findMatchingFAQ(
       }
 
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
+      validFaqCount++;
 
-      if (similarity > highestSimilarity && similarity >= similarityThreshold) {
+      if (similarity > highestSimilarity) {
+        secondHighestSimilarity = highestSimilarity;
         highestSimilarity = similarity;
-        bestMatch = {
-          question: faqQuestion,
-          answer: faqAnswer,
-          category: data.category || "General",
-          similarity: similarity,
-        };
+        if (similarity >= similarityThreshold) {
+          bestMatch = {
+            question: faqQuestion,
+            answer: faqAnswer,
+            category: data.category || "General",
+            similarity: similarity,
+          };
+        }
+      } else if (similarity > secondHighestSimilarity) {
+        secondHighestSimilarity = similarity;
       }
+    }
+
+    if (
+      bestMatch &&
+      validFaqCount > 1 &&
+      highestSimilarity < FAQ_STRONG_SIMILARITY &&
+      highestSimilarity - secondHighestSimilarity < FAQ_SIMILARITY_MARGIN
+    ) {
+      return null;
     }
 
     return bestMatch;
@@ -439,27 +466,12 @@ export const generateAnswer = onRequest(
       // NO DOCUMENTS FOUND - AI FALLBACK
       if (results.length === 0) {
         const conversationContext = buildConversationContext(conversationHistory);
-        const now = new Date();
-        const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })}`;
+        const dateInfo = new Date().toISOString().substring(0, 10);
 
-        const fallbackPrompt = `You are OASP Assist for Central Mindanao University.
-
-${dateInfo}
-
-${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
-
-Instructions:
-Answer briefly in 1 short paragraph or up to 4 bullets.
-Use general university guidance only when helpful.
-Use the current date for time-sensitive questions.
-For CMU OASP-specific details not in context, suggest contacting OASP staff.
-
-Answer:`;
+        const fallbackPrompt = `OASP Assist, CMU. Date: ${dateInfo}
+${conversationContext ? `History:\n${conversationContext}\n` : ""}Q: ${query}
+Rules: Use general guidance only. If OASP-specific info is missing, say contact OASP staff.
+A:`;
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -603,7 +615,6 @@ async function generateGeminiResponse(
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: MAX_RESPONSE_TOKENS,
           topP: 0.95,
           topK: 40,
         },
@@ -658,7 +669,6 @@ async function* generateGeminiResponseStream(
           contents: [{parts: [{text: prompt}]}],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: MAX_RESPONSE_TOKENS,
             topP: 0.95,
             topK: 40,
           },
@@ -747,7 +757,7 @@ function filterAndRankContext(
   const filtered = results.filter((r) => r.similarity_score >= qualityThreshold);
 
   const contexts = filtered
-    .slice(0, 3)
+    .slice(0, 2)
     .map((doc) => ({
       content: limitText(doc.content, MAX_CONTEXT_CHARS),
       title: doc.ib_title,
@@ -763,7 +773,7 @@ function buildConversationContext(
 ): string {
   if (!conversationHistory || conversationHistory.length === 0) return "";
 
-  const recentHistory = conversationHistory.slice(-4);
+  const recentHistory = conversationHistory.slice(-3);
   const contextParts: string[] = [];
 
   for (const message of recentHistory) {
@@ -791,31 +801,14 @@ function buildContextAwarePrompt(
     `Recent conversation:\n${conversationHistory}\n\n` :
     "";
 
-  const now = new Date();
-  const dateInfo = `Current Date and Time: ${now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })}, ${now.toLocaleTimeString("en-US")}`;
+  const dateInfo = new Date().toISOString().substring(0, 10);
 
-  return `You are OASP Assist for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
-
-${dateInfo}
-
-${historySection}Current question: "${query}"
-
-Knowledge base:
+  return `OASP Assist, CMU. Date: ${dateInfo}
+${historySection}Q: ${query}
+KB:
 ${knowledgeSection}
-
-Instructions:
-Answer in 80 words or less unless the user asks for details.
-Use the knowledge base first; use general knowledge only for dates, common terms, or general university steps.
-Use recent conversation only to resolve follow-up questions.
-If CMU OASP-specific details are missing, say so briefly and suggest contacting OASP staff.
-Be friendly, professional, and direct.
-
-Answer:`;
+Rules: Use KB first. Use history only for follow-ups. If OASP-specific details are missing, say contact OASP staff.
+A:`;
 }
 
 function buildPartialInfoPrompt(
@@ -832,31 +825,14 @@ function buildPartialInfoPrompt(
     `Recent conversation (use for context):\n${conversationHistory}\n\n` :
     "";
 
-  const now = new Date();
-  const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })}`;
+  const dateInfo = new Date().toISOString().substring(0, 10);
 
-  return `You are OASP Assist for Central Mindanao University.
-
-${dateInfo}
-
-${historySection}Question: "${query}"
-
-Available Information:
+  return `OASP Assist, CMU. Date: ${dateInfo}
+${historySection}Q: ${query}
+Info:
 ${knowledgeSection}
-
-Instructions:
-Answer in 80 words or less unless the user asks for details.
-Use available information first.
-Use recent conversation only for follow-up context.
-Use today's date for time-sensitive questions.
-For missing CMU OASP-specific details, suggest contacting OASP staff.
-
-Answer:`;
+Rules: Use provided info first. If OASP-specific details are missing, say contact OASP staff.
+A:`;
 }
 
 

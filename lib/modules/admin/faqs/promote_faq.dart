@@ -1,5 +1,6 @@
 import 'package:capstone_project/models/faq_candidate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import 'faq_candidate_tab.dart';
@@ -92,6 +93,21 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
     setState(() => _isPromoting = true);
 
     try {
+      List<double>? contextEmbedding;
+      try {
+        final callable = FirebaseFunctions.instance.httpsCallable(
+          'generateEmbedding',
+        );
+        final result = await callable.call({'text': 'Q: $question\nA: $answer'});
+        contextEmbedding =
+            (result.data['embedding'] as List)
+                .map((e) => (e as num).toDouble())
+                .toList();
+      } catch (e) {
+        print(' Failed to generate context embedding: $e');
+      }
+
+      final faqEmbedding = contextEmbedding ?? widget.candidate.embedding;
       final db = FirebaseFirestore.instance;
       final batch = db.batch();
 
@@ -103,8 +119,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
         'category': _selectedCategory,
         'isPredefined': false,
         'createdAt': Timestamp.now(),
-        'embedding': widget.candidate.embedding,
-        'geminiEmbedding': widget.candidate.embedding,
+        'embedding': faqEmbedding,
+        'geminiEmbedding': faqEmbedding,
+        if (contextEmbedding != null) 'contextEmbedding': contextEmbedding,
+        if (contextEmbedding != null) 'faqContextEmbedding': contextEmbedding,
         'similarityCount': widget.candidate.occurrenceCount,
         'lastAsked': widget.candidate.lastSeen,
       });
