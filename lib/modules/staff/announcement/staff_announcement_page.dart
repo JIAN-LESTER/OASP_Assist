@@ -375,8 +375,9 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                 // header
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Search field
                       Expanded(child: _buildSearchField()),
@@ -393,6 +394,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                                   setState(() => selectedCategory = value),
                         ),
                       ),
+                      const SizedBox(width: 16),
                       _buildRefreshButton(isDesktop: true),
                     ],
                   ),
