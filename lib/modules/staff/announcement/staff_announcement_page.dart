@@ -607,7 +607,9 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
       color: Colors.green[600],
       child: ListView.builder(
         padding:
-            isDesktop ? const EdgeInsets.fromLTRB(0, 0, 0, 32) : EdgeInsets.zero,
+            isDesktop
+                ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+                : const EdgeInsets.symmetric(horizontal: 20),
         itemCount: displayedAnnouncements.length,
         itemBuilder: (context, index) {
           return Padding(
@@ -1779,7 +1781,9 @@ class _AnnouncementListSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       padding:
-          isDesktop ? const EdgeInsets.fromLTRB(0, 0, 0, 32) : EdgeInsets.zero,
+          isDesktop
+              ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+              : const EdgeInsets.symmetric(horizontal: 20),
       itemCount: 5,
       separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 24 : 16),
       itemBuilder: (_, __) => const _AnnouncementSkeletonCard(),

@@ -1360,7 +1360,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           const SizedBox(height: 18),
           _buildSummaryItem(
             icon: Icons.account_balance,
-            label: 'Course',
+            label: 'College',
             value: _selectedCourse,
             fontSize: fontSize,
           ),
@@ -1411,7 +1411,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
           const SizedBox(height: 18),
           _buildSummaryItem(
             icon: Icons.account_balance,
-            label: 'Course',
+            label: 'College',
             value: _selectedCourse,
             fontSize: fontSize,
           ),
@@ -1900,7 +1900,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             ),
             const SizedBox(height: 16),
             _buildModernDropdown(
-              label: 'Course',
+              label: 'College',
               value: _selectedCourse,
               items: _courses.keys.toList(),
               onChanged:
@@ -1990,7 +1990,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             ),
             const SizedBox(height: 16),
             _buildModernDropdown(
-              label: 'Course',
+              label: 'College',
               value: _selectedCourse,
               items: _courses.keys.toList(),
               onChanged:
