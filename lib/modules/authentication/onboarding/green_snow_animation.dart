@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 class GreenSnowAnimation extends StatelessWidget {
   final Animation<double> animation;
   final Color color;
+  final int flakeCount;
 
   const GreenSnowAnimation({
     Key? key,
     required this.animation,
     required this.color,
+    this.flakeCount = 46,
   }) : super(key: key);
 
   @override
@@ -19,10 +21,13 @@ class GreenSnowAnimation extends StatelessWidget {
         child: AnimatedBuilder(
           animation: animation,
           builder: (context, _) {
-            return CustomPaint(
-              painter: _GreenSnowPainter(
-                progress: animation.value,
-                color: color,
+            return RepaintBoundary(
+              child: CustomPaint(
+                painter: _GreenSnowPainter(
+                  progress: animation.value,
+                  color: color,
+                  flakeCount: flakeCount,
+                ),
               ),
             );
           },
@@ -35,19 +40,19 @@ class GreenSnowAnimation extends StatelessWidget {
 class _GreenSnowPainter extends CustomPainter {
   final double progress;
   final Color color;
+  final int flakeCount;
 
   const _GreenSnowPainter({
     required this.progress,
     required this.color,
+    required this.flakeCount,
   });
-
-  static const int _flakeCount = 46;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..style = PaintingStyle.fill;
 
-    for (var i = 0; i < _flakeCount; i++) {
+    for (var i = 0; i < flakeCount; i++) {
       final seed = i * 37.0;
       final baseX = ((seed * 19) % 100) / 100;
       final baseY = ((seed * 23) % 100) / 100;
@@ -64,6 +69,8 @@ class _GreenSnowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GreenSnowPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.flakeCount != flakeCount;
   }
 }

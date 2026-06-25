@@ -793,7 +793,11 @@ class _LoginPageState extends State<LoginPage>
               ),
             ),
           ),
-          GreenSnowAnimation(animation: _snowController, color: primaryColor),
+          GreenSnowAnimation(
+            animation: _snowController,
+            color: primaryColor,
+            flakeCount: 18,
+          ),
           child,
         ],
       ),

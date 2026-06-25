@@ -932,7 +932,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
               ),
             ),
           ),
-          GreenSnowAnimation(animation: _snowController, color: primaryColor),
+          GreenSnowAnimation(
+            animation: _snowController,
+            color: primaryColor,
+            flakeCount: 18,
+          ),
           child,
         ],
       ),
