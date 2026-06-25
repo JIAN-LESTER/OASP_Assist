@@ -76,6 +76,24 @@ class ChatProvider extends ChangeNotifier {
     return todayReset;
   }
 
+  DateTime _nextChatWindowStart() {
+    final now = DateTime.now();
+    final todayReset = DateTime(now.year, now.month, now.day, 8);
+
+    if (now.isBefore(todayReset)) {
+      return todayReset;
+    }
+
+    return DateTime(now.year, now.month, now.day + 1, 8);
+  }
+
+  bool _shouldResetMessageCount(DateTime? lastReset, [int? count]) {
+    if (lastReset == null) return (count ?? _userDailyMessageCount) > 0;
+    return lastReset.isBefore(_currentChatWindowStart());
+  }
+
+  Timer? _messageResetTimer;
+
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
 
   int _userDailyMessageCount = 0;
@@ -104,6 +122,7 @@ class ChatProvider extends ChangeNotifier {
     if (userId == null) return;
 
     _userMessageCountSubscription?.cancel();
+    _scheduleMessageResetTimer();
 
     _userMessageCountSubscription = _firestore
         .collection('users')
@@ -116,6 +135,15 @@ class ChatProvider extends ChangeNotifier {
               final newCount = data['dailyMessageCount'] ?? 0;
               final newResetDate =
                   (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+              if (_shouldResetMessageCount(newResetDate, newCount)) {
+                final now = DateTime.now();
+                _userDailyMessageCount = 0;
+                _userLastResetDate = now;
+                _saveCurrentUserMessageReset(now);
+                notifyListeners();
+                return;
+              }
 
               if (newCount != _userDailyMessageCount ||
                   newResetDate != _userLastResetDate) {
@@ -142,6 +170,48 @@ class ChatProvider extends ChangeNotifier {
         );
   }
 
+  void _scheduleMessageResetTimer() {
+    _messageResetTimer?.cancel();
+
+    final nextReset = _nextChatWindowStart();
+    final delay = nextReset.difference(DateTime.now());
+
+    _messageResetTimer = Timer(delay, () async {
+      await _resetCurrentUserMessageCountIfNeeded();
+      if (!_isDisposed) {
+        _scheduleMessageResetTimer();
+      }
+    });
+  }
+
+  Future<void> _resetCurrentUserMessageCountIfNeeded() async {
+    if (!_shouldResetMessageCount(_userLastResetDate)) return;
+
+    final now = DateTime.now();
+    _userDailyMessageCount = 0;
+    _userLastResetDate = now;
+
+    await _saveCurrentUserMessageReset(now);
+
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveCurrentUserMessageReset(DateTime resetAt) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('users').doc(userId).set({
+        'dailyMessageCount': 0,
+        'lastMessageResetDate': Timestamp.fromDate(resetAt),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('❌ Error saving message reset: $e');
+    }
+  }
+
   void setScrollCallback(VoidCallback callback) {
     _onMessageAdded = callback;
   }
@@ -161,16 +231,11 @@ class ChatProvider extends ChangeNotifier {
       return true;
     }
 
-    if (_userLastResetDate != null) {
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-      final shouldReset =
-          now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
-
-      if (shouldReset) {
-        print('ℹ️ Reset time reached - allowing message');
-        return true;
-      }
+    if (_shouldResetMessageCount(_userLastResetDate)) {
+      _userDailyMessageCount = 0;
+      _userLastResetDate = now;
+      print('ℹ️ Reset time reached - allowing message');
+      return true;
     }
 
     final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
@@ -400,6 +465,7 @@ class ChatProvider extends ChangeNotifier {
     _escalationSubscription?.cancel();
     _userMessageCountSubscription?.cancel();
     _userEscalationCountSubscription?.cancel();
+    _messageResetTimer?.cancel();
 
     _messages.clear();
     _streamingContent.clear();
@@ -429,7 +495,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> resetAllUserMessageCounts() async {
     try {
       final now = DateTime.now();
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+      final resetTime = _currentChatWindowStart();
 
       final usersSnapshot = await _firestore.collection('users').get();
       final batch = _firestore.batch();
@@ -472,6 +538,7 @@ class ChatProvider extends ChangeNotifier {
     if (userId == null) return;
 
     try {
+      _scheduleMessageResetTimer();
       final userDoc = await _firestore.collection('users').doc(userId).get();
 
       if (userDoc.exists) {
@@ -479,6 +546,13 @@ class ChatProvider extends ChangeNotifier {
         _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
         _userLastResetDate =
             (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+        if (_shouldResetMessageCount(_userLastResetDate)) {
+          final now = DateTime.now();
+          _userDailyMessageCount = 0;
+          _userLastResetDate = now;
+          await _saveCurrentUserMessageReset(now);
+        }
 
         print(
           '✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
@@ -531,17 +605,9 @@ class ChatProvider extends ChangeNotifier {
       final currentCount = data['dailyMessageCount'] ?? 0;
       final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-      bool shouldReset = false;
-
-      if (lastReset == null) {
-        shouldReset = true;
-      } else {
-        if (lastReset.isBefore(resetTime) && now.isAfter(resetTime)) {
-          shouldReset = true;
-        }
-      }
+      final shouldReset =
+          lastReset == null ||
+          _shouldResetMessageCount(lastReset, currentCount);
 
       if (shouldReset) {
         await userRef.update({
