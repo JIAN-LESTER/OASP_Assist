@@ -175,8 +175,9 @@ class _HomeDashboardState extends State<HomeDashboard>
                   SliverToBoxAdapter(child: _buildWelcomeHeader()),
                   SliverToBoxAdapter(child: _buildDownloadMobileAppSection()),
 
-                    // AI Chat Assistant
+                  // AI Chat Assistant
                   SliverToBoxAdapter(child: _buildChatPreviewSection()),
+                  SliverToBoxAdapter(child: _buildMessageLimitSection()),
 
                   // Bottom spacing
                   SliverToBoxAdapter(
@@ -532,11 +533,6 @@ class _HomeDashboardState extends State<HomeDashboard>
                     ],
                   ),
                 ),
-                Consumer<ChatProvider>(
-                  builder: (context, chatProvider, _) {
-                    return _buildMessageLimitBadge(chatProvider, isMobile);
-                  },
-                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -564,55 +560,102 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildMessageLimitBadge(ChatProvider chatProvider, bool isMobile) {
-    final used = chatProvider.userDailyMessageCount;
-    final limit = ChatProvider.MAX_DAILY_MESSAGES;
-    final remaining = (limit - used).clamp(0, limit);
-    final isLimitReached = remaining == 0;
+  Widget _buildMessageLimitSection() {
+    final isMobile = _isMobile(context);
 
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 10 : 12,
-        vertical: isMobile ? 7 : 8,
-      ),
-      decoration: BoxDecoration(
-        color:
-            isLimitReached
-                ? const Color(0xFFFFF1F2)
-                : const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color:
-              isLimitReached
-                  ? const Color(0xFFFCA5A5)
-                  : const Color(0xFFBBF7D0),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.message_outlined,
-            size: isMobile ? 15 : 16,
-            color:
-                isLimitReached
-                    ? const Color(0xFFDC2626)
-                    : const Color(0xFF15803D),
+    return Consumer<ChatProvider>(
+      builder: (context, chatProvider, _) {
+        final used = chatProvider.userDailyMessageCount;
+        final limit = ChatProvider.MAX_DAILY_MESSAGES;
+        final remaining = (limit - used).clamp(0, limit);
+        final isLimitReached = remaining == 0;
+
+        return Container(
+          margin: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
+            vertical: 8,
           ),
-          const SizedBox(width: 6),
-          Text(
-            '$used/$limit',
-            style: TextStyle(
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: FontWeight.w800,
-              color:
-                  isLimitReached
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF15803D),
-            ),
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF2E7D32).withOpacity(0.10),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color:
+                      isLimitReached
+                          ? const Color(0xFFFFF1F2)
+                          : const Color(0xFF2E7D32).withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color:
+                        isLimitReached
+                            ? const Color(0xFFFCA5A5)
+                            : const Color(0xFF2E7D32).withOpacity(0.18),
+                  ),
+                ),
+                child: Icon(
+                  Icons.message_outlined,
+                  color:
+                      isLimitReached
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF2E7D32),
+                  size: isMobile ? 22 : 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Message Limit',
+                      style: TextStyle(
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isLimitReached
+                          ? 'Daily limit reached. Resets at 8:00 AM.'
+                          : '$remaining messages remaining today.',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 13,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '$used/$limit',
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.w800,
+                  color:
+                      isLimitReached
+                          ? const Color(0xFFDC2626)
+                          : const Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
