@@ -149,13 +149,13 @@ class _LoginPageState extends State<LoginPage>
       }
 
       if (!user.emailVerified) {
-        await FirebaseAuth.instance.signOut();
         if (mounted) {
           setState(() => _isLoading = false);
           _setVerificationError(
             'Email not verified. Please check your inbox and verify your email address before signing in.',
           );
         }
+        await FirebaseAuth.instance.signOut();
         return;
       }
 
