@@ -96,7 +96,7 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
     _snowController = AnimationController(
       duration: const Duration(seconds: 12),
       vsync: this,
-    )..repeat();
+    );
     // Initialize keys for each role
     for (var role in _roles) {
       _roleCardKeys[role] = GlobalKey();

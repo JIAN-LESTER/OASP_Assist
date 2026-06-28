@@ -222,7 +222,7 @@ class _RegisterPageState extends State<RegisterPage>
     _snowController = AnimationController(
       duration: const Duration(seconds: 12),
       vsync: this,
-    )..repeat();
+    );
     _fetchPrograms();
   }
 

@@ -826,7 +826,7 @@ class _LoginPageState extends State<LoginPage>
     _snowController = AnimationController(
       duration: const Duration(seconds: 12),
       vsync: this,
-    )..repeat();
+    );
   }
 
   @override

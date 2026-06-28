@@ -533,7 +533,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
     _snowController = AnimationController(
       duration: const Duration(seconds: 12),
       vsync: this,
-    )..repeat();
+    );
   }
 
   @override
