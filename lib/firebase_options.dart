@@ -41,53 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDU84t3Q2F0fpltpaNxcZn6IIH12GFoZ5o',
-    appId: '1:1008880584715:web:4cdd73d822348cb67f5f0e',
-    messagingSenderId: '1008880584715',
-    projectId: 'capstone-project-1703b',
-    authDomain: 'capstone-project-1703b.firebaseapp.com',
-    storageBucket: 'capstone-project-1703b.firebasestorage.app',
-    measurementId: 'G-2EKTRB7T8Y',
+    apiKey: 'AIzaSyDUD3KueYe9JK77bXMLpy5Cx1ZzLdN_zow',
+    appId: '1:13855273820:web:419125e9643d3c0cd94799',
+    messagingSenderId: '13855273820',
+    projectId: 'cmu-oasp-assist',
+    authDomain: 'cmu-oasp-assist.firebaseapp.com',
+    storageBucket: 'cmu-oasp-assist.firebasestorage.app',
+    measurementId: 'G-C4ZGZVLQRW',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAlQvaLh8nosnyr7O3yTM1aCSE1xf93bQY',
-    appId: '1:1008880584715:android:586d0981fcdb06057f5f0e',
-    messagingSenderId: '1008880584715',
-    projectId: 'capstone-project-1703b',
-    storageBucket: 'capstone-project-1703b.firebasestorage.app',
+    apiKey: 'AIzaSyBkSXKcHhlhLUdf97nKJ1zEA0nyPS5VNeM',
+    appId: '1:13855273820:android:ea1cd67d149ffc5cd94799',
+    messagingSenderId: '13855273820',
+    projectId: 'cmu-oasp-assist',
+    storageBucket: 'cmu-oasp-assist.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAl1nyCF4OnKwWTNnt64Gsz9bO0Mdpzzws',
-    appId: '1:1008880584715:ios:987e171471089c577f5f0e',
-    messagingSenderId: '1008880584715',
-    projectId: 'capstone-project-1703b',
-    storageBucket: 'capstone-project-1703b.firebasestorage.app',
-    androidClientId: '1008880584715-5t9ueo6uip9ge1dgf3he4vn6calb6jne.apps.googleusercontent.com',
-    iosClientId: '1008880584715-agrc825q27btck9nv23hg7s59sfc0dcn.apps.googleusercontent.com',
+    apiKey: 'AIzaSyBMwF9lOUgUbjCVxEhHOow0l4G7TDegr60',
+    appId: '1:13855273820:ios:3c398048bab6c282d94799',
+    messagingSenderId: '13855273820',
+    projectId: 'cmu-oasp-assist',
+    storageBucket: 'cmu-oasp-assist.firebasestorage.app',
     iosBundleId: 'com.example.capstoneProject',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAl1nyCF4OnKwWTNnt64Gsz9bO0Mdpzzws',
-    appId: '1:1008880584715:ios:987e171471089c577f5f0e',
-    messagingSenderId: '1008880584715',
-    projectId: 'capstone-project-1703b',
-    storageBucket: 'capstone-project-1703b.firebasestorage.app',
-    androidClientId: '1008880584715-5t9ueo6uip9ge1dgf3he4vn6calb6jne.apps.googleusercontent.com',
-    iosClientId: '1008880584715-agrc825q27btck9nv23hg7s59sfc0dcn.apps.googleusercontent.com',
+    apiKey: 'AIzaSyBMwF9lOUgUbjCVxEhHOow0l4G7TDegr60',
+    appId: '1:13855273820:ios:3c398048bab6c282d94799',
+    messagingSenderId: '13855273820',
+    projectId: 'cmu-oasp-assist',
+    storageBucket: 'cmu-oasp-assist.firebasestorage.app',
     iosBundleId: 'com.example.capstoneProject',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDU84t3Q2F0fpltpaNxcZn6IIH12GFoZ5o',
-    appId: '1:1008880584715:web:f6006b38f583ff137f5f0e',
-    messagingSenderId: '1008880584715',
-    projectId: 'capstone-project-1703b',
-    authDomain: 'capstone-project-1703b.firebaseapp.com',
-    storageBucket: 'capstone-project-1703b.firebasestorage.app',
-    measurementId: 'G-E9J1G333NQ',
+    apiKey: 'AIzaSyDUD3KueYe9JK77bXMLpy5Cx1ZzLdN_zow',
+    appId: '1:13855273820:web:26ee87175cc6dfdbd94799',
+    messagingSenderId: '13855273820',
+    projectId: 'cmu-oasp-assist',
+    authDomain: 'cmu-oasp-assist.firebaseapp.com',
+    storageBucket: 'cmu-oasp-assist.firebasestorage.app',
+    measurementId: 'G-696MW34QVX',
   );
-
 }
