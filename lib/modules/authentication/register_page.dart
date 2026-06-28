@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../components/square_tile.dart';
 import '../../responsive/responsive_layout.dart';
+import '../../services/auth_email_service.dart';
 import 'app_distribution_qr_button.dart';
 import 'onboarding/green_snow_animation.dart';
 
@@ -216,6 +217,63 @@ class _RegisterPageState extends State<RegisterPage>
     return true;
   }
 
+  Future<void> _sendRegistrationVerificationEmail(User user) async {
+    try {
+      await AuthEmailService().sendEmailVerification().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {
+          print(' Email timeout (continuing)');
+        },
+      );
+      return;
+    } catch (e) {
+      print(' Custom email error, trying Firebase fallback: $e');
+    }
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser?.uid != user.uid) {
+      print(' Firebase email fallback skipped: no current user');
+      return;
+    }
+
+    try {
+      await currentUser!.sendEmailVerification().timeout(
+        const Duration(seconds: 6),
+        onTimeout: () {
+          print(' Firebase email fallback timeout (continuing)');
+        },
+      );
+    } catch (e) {
+      print(' Firebase email fallback error: $e');
+    }
+  }
+
+  Future<void> _writeRegistrationLog(String name, User user) async {
+    try {
+      await _firestore.collection('logs').add({
+        'user': name,
+        'action': 'Registered account (pending verification)',
+        'time': Timestamp.now(),
+        'userId': user.uid,
+      });
+    } catch (e) {
+      print(' Log error: $e');
+    }
+  }
+
+  Future<void> _writeUserProfile(String uid, Map<String, dynamic> userData) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .set(userData, SetOptions(merge: false))
+          .timeout(const Duration(seconds: 20));
+      print(' User profile written');
+    } catch (e) {
+      print(' User profile write error (continuing): $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -308,43 +366,10 @@ class _RegisterPageState extends State<RegisterPage>
         'lastMessageResetDate': FieldValue.serverTimestamp(),
       };
 
-      print(' Running parallel operations...');
-
-      await Future.wait([
-        _firestore
-            .collection('users')
-            .doc(user.uid)
-            .set(userData, SetOptions(merge: false))
-            .timeout(
-              const Duration(seconds: 8),
-              onTimeout: () => throw TimeoutException('Firestore timeout'),
-            ),
-        user
-            .sendEmailVerification()
-            .timeout(
-              const Duration(seconds: 6),
-              onTimeout: () {
-                print(' Email timeout (continuing)');
-                return;
-              },
-            )
-            .catchError((e) {
-              print(' Email error (continuing): $e');
-              return;
-            }),
-      ], eagerError: false);
-
-      print(' Parallel operations completed');
-
-      _firestore
-          .collection('logs')
-          .add({
-            'user': name,
-            'action': 'Registered account (pending verification)',
-            'time': Timestamp.now(),
-            'userId': user.uid,
-          })
-          .catchError((e) => print(' Log error: $e'));
+      print(' Writing user profile...');
+      unawaited(_writeUserProfile(user.uid, userData));
+      unawaited(_sendRegistrationVerificationEmail(user));
+      unawaited(_writeRegistrationLog(name, user));
 
       if (mounted) {
         setState(() => _isLoading = false);

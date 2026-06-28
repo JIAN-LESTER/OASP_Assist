@@ -1,6 +1,6 @@
 {
   "projects": {
-    "capstone": "capstone-project-1703b",
+    "capstone": "cmu-oasp-assist",
     "default": "cmu-oasp-assist"
   },
   "targets": {},

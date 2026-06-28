@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/services/auth_email_service.dart';
 
 import 'onboarding/green_snow_animation.dart';
 
@@ -120,9 +121,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
     });
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: emailController.text.trim(),
-      );
+      await AuthEmailService().sendPasswordReset(emailController.text.trim());
 
       // Clear the email field
       emailController.clear();
@@ -131,19 +130,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
       if (mounted) {
         _showSuccessDialog();
       }
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseFunctionsException catch (e) {
       switch (e.code) {
-        case 'user-not-found':
+        case 'not-found':
           _setEmailError('No account found with this email address');
           break;
-        case 'invalid-email':
+        case 'invalid-argument':
           _setEmailError('Invalid email address format');
           break;
-        case 'too-many-requests':
+        case 'resource-exhausted':
           _setGeneralError('Too many requests. Please try again later');
-          break;
-        case 'network-request-failed':
-          _setGeneralError('Network error. Please check your connection');
           break;
         default:
           _setGeneralError(

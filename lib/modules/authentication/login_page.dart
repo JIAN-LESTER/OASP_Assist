@@ -164,6 +164,7 @@ class _LoginPageState extends State<LoginPage>
             .collection('users')
             .doc(user.uid)
             .update({
+              'email': user.email ?? email,
               'isVerified': true,
               'emailVerified': true,
               'verifiedAt': FieldValue.serverTimestamp(),
