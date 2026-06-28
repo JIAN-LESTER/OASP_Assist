@@ -68,3 +68,62 @@ Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
     ),
   );
 }
+
+Widget buildManagementEmptyState({
+  required bool hasFilters,
+  required bool isMobileOrTablet,
+  required String item,
+}) {
+  final titleCaseItem = _toTitleCase(item);
+  final title =
+      hasFilters ? 'No $titleCaseItem Found' : 'No $titleCaseItem Yet';
+  final message =
+      hasFilters
+          ? 'Try adjusting your search or filters.'
+          : '$titleCaseItem will appear here once they are added.';
+
+  return Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          hasFilters ? Icons.search_off_rounded : Icons.inbox_rounded,
+          size: isMobileOrTablet ? 48 : 64,
+          color: Colors.grey[300],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: isMobileOrTablet ? 18 : 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isMobileOrTablet ? 14 : 16,
+              color: Colors.grey[500],
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+String _toTitleCase(String value) {
+  return value
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+      .join(' ');
+}

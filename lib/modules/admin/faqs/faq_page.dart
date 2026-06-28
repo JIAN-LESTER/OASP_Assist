@@ -3,6 +3,7 @@ import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_candidate_tab.dart';
 
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/faq_category_dropdown_button.dart';
 import 'package:capstone_project/widgets/pagination.dart';
 import 'package:capstone_project/widgets/search_field.dart';
@@ -622,7 +623,12 @@ class MobileFaqManagement extends StatelessWidget {
                         Expanded(
                           child:
                               allDocs.isEmpty
-                                  ? const Center(child: Text('No FAQs found.'))
+                                  ? buildManagementEmptyState(
+                                    hasFilters: false,
+                                    isMobileOrTablet:
+                                        MediaQuery.of(context).size.width < 900,
+                                    item: 'FAQs',
+                                  )
                                   : _buildFAQList(
                                     context: context,
                                     getAllFAQs: allDocs,
@@ -745,7 +751,12 @@ Widget mainContent(
                       Expanded(
                         child:
                             allDocs.isEmpty
-                                ? const Center(child: Text('No FAQs found.'))
+                                ? buildManagementEmptyState(
+                                  hasFilters: false,
+                                  isMobileOrTablet:
+                                      MediaQuery.of(context).size.width < 900,
+                                  item: 'FAQs',
+                                )
                                 : _buildFAQList(
                                   context: context,
                                   getAllFAQs: allDocs,
@@ -1110,8 +1121,12 @@ Widget _buildFAQList({
       Expanded(
         child:
             currentPageFAQs.isEmpty
-                ? const Center(
-                  child: Text('No FAQs match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters:
+                      searchQuery.isNotEmpty ||
+                      selectedCategory != 'All Categories',
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'FAQs',
                 )
                 : ListView.builder(
                   shrinkWrap: false,

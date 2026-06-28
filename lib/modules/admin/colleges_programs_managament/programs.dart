@@ -254,6 +254,7 @@ class MobileProgramManagement extends StatelessWidget {
                             itemsPerPage: itemsPerPage,
                             onPageChanged: onPageChanged,
                             onItemsPerPageChanged: onItemsPerPageChanged,
+                            context: context
                           );
                         },
                       ),
@@ -340,6 +341,7 @@ Widget mainContent(
                           itemsPerPage: itemsPerPage,
                           onPageChanged: onPageChanged,
                           onItemsPerPageChanged: onItemsPerPageChanged,
+                          context: context,
                         );
                       },
                     ),
@@ -401,6 +403,7 @@ Widget _buildProgramList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required BuildContext context,
 }) {
   final filtered =
       allPrograms.where((doc) {
@@ -424,8 +427,10 @@ Widget _buildProgramList({
       Expanded(
         child:
             currentPagePrograms.isEmpty
-                ? const Center(
-                  child: Text('No programs match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters: searchQuery.isNotEmpty,
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Programs',
                 )
                 : ListView.separated(
                   itemCount: currentPagePrograms.length,

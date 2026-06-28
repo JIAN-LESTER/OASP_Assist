@@ -28,7 +28,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'firebase_options.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 
 import 'modules/staff/human_escalation/human_escalation.dart';
 
@@ -559,6 +559,11 @@ void main() async {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      if (kIsWeb) {
+        FirebaseFirestore.instance.settings = const Settings(
+          webExperimentalAutoDetectLongPolling: true,
+        );
+      }
       print(' Firebase initialized');
 
       //  Wait a moment for Firebase to fully initialize

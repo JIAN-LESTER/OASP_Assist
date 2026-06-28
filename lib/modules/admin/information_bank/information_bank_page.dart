@@ -6,6 +6,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_ma
 import 'package:capstone_project/modules/admin/information_bank/ib_format.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:capstone_project/widgets/category_dropdown_button.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/pagination.dart';
 import 'package:capstone_project/widgets/search_field.dart';
 
@@ -417,8 +418,11 @@ class MobileInformationBank extends StatelessWidget {
                         Expanded(
                           child:
                               allDocs.isEmpty
-                                  ? const Center(
-                                    child: Text('No documents found.'),
+                                  ? buildManagementEmptyState(
+                                    hasFilters: false,
+                                    isMobileOrTablet:
+                                        MediaQuery.of(context).size.width < 900,
+                                    item: 'Documents',
                                   )
                                   : _buildIBList(
                                     context: context,
@@ -545,8 +549,11 @@ Widget mainContent(
                       Expanded(
                         child:
                             allDocs.isEmpty
-                                ? const Center(
-                                  child: Text('No documents found.'),
+                                ? buildManagementEmptyState(
+                                  hasFilters: false,
+                                  isMobileOrTablet:
+                                      MediaQuery.of(context).size.width < 900,
+                                  item: 'Documents',
                                 )
                                 : _buildIBList(
                                   context: context,
@@ -911,8 +918,12 @@ Widget _buildIBList({
       Expanded(
         child:
             currentPageIB.isEmpty
-                ? const Center(
-                  child: Text('No documents match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters:
+                      searchQuery.isNotEmpty ||
+                      selectedCategory != 'All Categories',
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Documents',
                 )
                 : ListView.builder(
                   shrinkWrap: false,

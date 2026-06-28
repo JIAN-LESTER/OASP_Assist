@@ -253,6 +253,7 @@ class MobileCollegeManagement extends StatelessWidget {
                             itemsPerPage: itemsPerPage,
                             onPageChanged: onPageChanged,
                             onItemsPerPageChanged: onItemsPerPageChanged,
+                            context: context,
                           );
                         },
                       ),
@@ -339,6 +340,7 @@ Widget mainContent(
                           itemsPerPage: itemsPerPage,
                           onPageChanged: onPageChanged,
                           onItemsPerPageChanged: onItemsPerPageChanged,
+                          context: context,
                         );
                       },
                     ),
@@ -400,6 +402,7 @@ Widget _buildCollegeList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required BuildContext context,
 }) {
   final filtered =
       allColleges.where((doc) {
@@ -423,8 +426,10 @@ Widget _buildCollegeList({
       Expanded(
         child:
             currentPageColleges.isEmpty
-                ? const Center(
-                  child: Text('No colleges match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters: searchQuery.isNotEmpty,
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Colleges',
                 )
                 : ListView.separated(
                   itemCount: currentPageColleges.length,
