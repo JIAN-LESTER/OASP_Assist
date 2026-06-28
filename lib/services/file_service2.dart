@@ -55,17 +55,8 @@ class FileService {
     InformationBank ib, {
     bool isFromUpload = true,
   }) async {
+    DocumentReference<Map<String, dynamic>>? docRef;
     try {
-      //  CHECK PLATFORM SUPPORT FIRST
-      if (!_pineconeService.isSupported) {
-        throw UnsupportedError(_pineconeService.unsupportedPlatformMessage);
-      }
-
-      final isHealthy = await _pineconeService.isHealthy();
-      if (!isHealthy) {
-        throw Exception('Pinecone service is not available');
-      }
-
       //   Use category-prefixed ID for category documents
       String finalDocId = ib.id;
 
@@ -101,6 +92,43 @@ class FileService {
         }
 
         // Continue with update...
+      }
+
+      docRef = firestore.collection('information_bank').doc(sanitizedId);
+
+      await docRef.set({
+        'ibID': sanitizedId,
+        'id': sanitizedId,
+        'ib_title': ib.title,
+        'title': ib.title,
+        'content': ib.content,
+        'source': ib.source,
+        'category': ib.category,
+        'categoryID': ib.category,
+        'pinecone_id': null,
+        'totalChunks': 0,
+        'chunkIds': [],
+        'chunked': false,
+        'chunkSize': maxChunkSize,
+        'chunkOverlap': chunkOverlap,
+        'uploadedViaFlutter': true,
+        'isFromDocumentUpload': isFromUpload,
+        'indexingStatus': 'processing',
+        'createdAt':
+            existingDoc.exists
+                ? (existingDoc.data()?['createdAt'] ?? FieldValue.serverTimestamp())
+                : FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      //  CHECK PLATFORM SUPPORT FIRST
+      if (!_pineconeService.isSupported) {
+        throw UnsupportedError(_pineconeService.unsupportedPlatformMessage);
+      }
+
+      final isHealthy = await _pineconeService.isHealthy();
+      if (!isHealthy) {
+        throw Exception('Pinecone service is not available');
       }
 
       // Split document into chunks
@@ -173,8 +201,7 @@ class FileService {
         );
       }
 
-      // Save to Firestore with prefixed ID
-      await firestore.collection('information_bank').doc(sanitizedId).set({
+      await docRef.update({
         'ibID': sanitizedId,
         'id': sanitizedId,
         'ib_title': ib.title,
@@ -191,7 +218,7 @@ class FileService {
         'chunkOverlap': chunkOverlap,
         'uploadedViaFlutter': true,
         'isFromDocumentUpload': isFromUpload,
-        'createdAt': FieldValue.serverTimestamp(),
+        'indexingStatus': 'completed',
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -201,9 +228,23 @@ class FileService {
     } on UnsupportedError catch (e) {
       //  PLATFORM-SPECIFIC ERROR
       print(' Platform not supported: ${e.message}');
+      if (docRef != null) {
+        await docRef.update({
+          'indexingStatus': 'failed',
+          'indexingError': e.message,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
       rethrow;
     } catch (e) {
       print(' Error saving document: $e');
+      if (docRef != null) {
+        await docRef.update({
+          'indexingStatus': 'failed',
+          'indexingError': e.toString(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
       rethrow;
     }
   }
