@@ -11,7 +11,7 @@ import 'package:http/http.dart' as http;
 
 class FbSyncConfig {
   static const String projectId = 'cmu-oasp-assist';
-  static const String region = 'us-central1';
+  static const String region = 'asia-southeast1';
 
   static String get exchangeTokenUrl =>
       'https://exchangetokenhttp-kt3rxdstza-uc.a.run.app';

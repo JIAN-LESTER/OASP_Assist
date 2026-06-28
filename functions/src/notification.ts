@@ -327,7 +327,7 @@ export const checkFacebookTokenExpiry = onSchedule(
   {
     schedule: "0 8 * * *", // runs daily at 8am Manila time
     timeZone: "Asia/Manila",
-    region: "us-central1",
+    region: "asia-southeast1",
   },
   async (event) => {
     console.log(" Checking Facebook token expiry...");
@@ -537,7 +537,7 @@ function formatDeadlineForNotification(deadline: admin.firestore.Timestamp | nul
 export const onAnnouncementCreated = onDocumentCreated(
   {
     document: "announcements/{announcementId}",
-    region: "us-central1",
+    region: "asia-southeast1",
     retry: false,
   },
   async (event) => {
@@ -662,7 +662,7 @@ export const checkUpcomingDeadlines = onSchedule(
     schedule: "0 6,18 * * *",
 
     timeZone: "Asia/Manila",
-    region: "us-central1",
+    region: "asia-southeast1",
   },
   async (event) => {
     const now = new Date(
@@ -1013,7 +1013,7 @@ export const cleanupDuplicateNotifications = onSchedule(
   {
     schedule: "0 3 * * *",
     timeZone: "Asia/Manila",
-    region: "us-central1",
+    region: "asia-southeast1",
   },
   async (event) => {
     try {
@@ -1096,7 +1096,7 @@ export const cleanupOldNotifications = onSchedule(
   {
     schedule: "0 2 * * *",
     timeZone: "Asia/Manila",
-    region: "us-central1",
+    region: "asia-southeast1",
   },
   async (event) => {
     try {
@@ -1175,7 +1175,7 @@ export const cleanupOldNotifications = onSchedule(
 export const onEscalationCreated = onDocumentCreated(
   {
     document: "escalations/{escalationId}",
-    region: "us-central1",
+    region: "asia-southeast1",
     retry: false, //  Already disabled retry
   },
   async (event) => {
@@ -1445,7 +1445,7 @@ export const onEscalationCreated = onDocumentCreated(
 export const onEscalationReplied = onDocumentUpdated(
   {
     document: "escalations/{escalationId}",
-    region: "us-central1",
+    region: "asia-southeast1",
     retry: false,
   },
   async (event) => {

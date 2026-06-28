@@ -88,6 +88,12 @@ export {
 } from "./appDistributionInvite";
 
 export {
+  sendCustomEmailVerification,
+  sendCustomPasswordReset,
+  sendCustomEmailChangeVerification,
+} from "./authEmail";
+
+export {
   logFirebaseRead,
   logTopLevelFirebaseUsage,
   logNestedFirebaseUsage,

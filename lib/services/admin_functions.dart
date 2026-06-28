@@ -5,7 +5,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 
 class FirebaseFunctionsService {
   static const String projectId = 'cmu-oasp-assist';
-  static const String region = 'us-central1';
+  static const String region = 'asia-southeast1';
 
   static bool _useHttpFallback = false;
   static FirebaseFunctions? _functionsInstance;

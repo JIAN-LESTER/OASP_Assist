@@ -32,7 +32,7 @@ async function isAdmin(uid: string): Promise<boolean> {
 
 export const createUser = onCall(
   {
-    region: "us-central1",
+    region: "asia-southeast1",
     cors: true,
     invoker: "private",
     timeoutSeconds: 60,
@@ -176,7 +176,7 @@ export const createUser = onCall(
 
 export const updateUser = onCall(
   {
-    region: "us-central1",
+    region: "asia-southeast1",
     cors: true,
     invoker: "private",
     timeoutSeconds: 60,
@@ -328,7 +328,7 @@ export const updateUser = onCall(
 
 export const deleteUser = onCall(
   {
-    region: "us-central1",
+    region: "asia-southeast1",
     cors: true,
     invoker: "private",
     timeoutSeconds: 120,
@@ -458,7 +458,7 @@ export const deleteUser = onCall(
 
 export const setAdminRole = onCall(
   {
-    region: "us-central1",
+    region: "asia-southeast1",
     cors: true,
     invoker: "private",
     timeoutSeconds: 60,
