@@ -1,8 +1,5 @@
-import {
-  onDocumentCreated,
-  onDocumentUpdated,
-} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
 const db = admin.firestore();
@@ -534,17 +531,16 @@ function formatDeadlineForNotification(deadline: admin.firestore.Timestamp | nul
 // EXPORTED FUNCTIONS
 // ============================================================================
 
-export const onAnnouncementCreated = onDocumentCreated(
-  {
-    document: "announcements/{announcementId}",
-    region: "asia-southeast1",
-    retry: false,
-  },
-  async (event) => {
-    const announcementId = event.params.announcementId;
+export const onAnnouncementCreated = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("announcements/{announcementId}")
+  .onCreate(async (_snapshot, context) => {
+    const announcementId = context.params.announcementId;
+    const eventId = context.eventId;
 
     console.log(` onAnnouncementCreated triggered for: ${announcementId}`);
-    console.log(` Event ID: ${event.id}`);
+    console.log(` Event ID: ${eventId}`);
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -573,7 +569,7 @@ export const onAnnouncementCreated = onDocumentCreated(
           transaction.update(announcementRef, {
             notification_sent: true,
             notification_sent_at: admin.firestore.FieldValue.serverTimestamp(),
-            notification_event_id: event.id,
+            notification_event_id: eventId,
           });
 
           announcementData = data;
@@ -629,7 +625,7 @@ export const onAnnouncementCreated = onDocumentCreated(
           category: category,
           deadline: deadline ? deadline.toMillis().toString() : null,
           message: message,
-          eventId: event.id,
+          eventId: eventId,
         }
       );
 
@@ -649,13 +645,12 @@ export const onAnnouncementCreated = onDocumentCreated(
         );
       }
 
-      return {success: true, notificationsCreated, eventId: event.id};
+      return {success: true, notificationsCreated, eventId: eventId};
     } catch (error) {
       console.error("Error creating announcement notification:", error);
       return {success: false, error: error};
     }
-  }
-);
+  });
 
 export const checkUpcomingDeadlines = onSchedule(
   {
@@ -1172,16 +1167,15 @@ export const cleanupOldNotifications = onSchedule(
   }
 );
 
-export const onEscalationCreated = onDocumentCreated(
-  {
-    document: "escalations/{escalationId}",
-    region: "asia-southeast1",
-    retry: false, //  Already disabled retry
-  },
-  async (event) => {
+export const onEscalationCreated = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("escalations/{escalationId}")
+  .onCreate(async (snapshot, context) => {
     try {
-      const escalationData = event.data?.data();
-      const escalationId = event.params.escalationId;
+      const escalationData = snapshot.data();
+      const escalationId = context.params.escalationId;
+      const eventId = context.eventId;
 
       if (!escalationData) {
         console.log("No escalation data found");
@@ -1189,16 +1183,16 @@ export const onEscalationCreated = onDocumentCreated(
       }
 
       console.log(` New escalation: ${escalationId}`);
-      console.log(` Event ID: ${event.id}`);
+      console.log(` Event ID: ${eventId}`);
 
       //  CRITICAL: Idempotency check to prevent duplicate processing
       const idempotencyRef = db.collection("notification_processing")
-        .doc(`escalation_created_${escalationId}_${event.id}`);
+        .doc(`escalation_created_${escalationId}_${eventId}`);
 
       try {
         await idempotencyRef.create({
           escalationId: escalationId,
-          eventId: event.id,
+          eventId: eventId,
           processedAt: admin.firestore.FieldValue.serverTimestamp(),
           status: "processing",
           type: "escalation_created",
@@ -1206,7 +1200,7 @@ export const onEscalationCreated = onDocumentCreated(
         console.log(` Idempotency lock acquired for escalation ${escalationId}`);
       } catch (error: any) {
         if (error.code === 6) { // ALREADY_EXISTS error
-          console.log(` Notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          console.log(` Notification already being processed for escalation ${escalationId} (event: ${eventId})`);
           return {success: false, reason: "already_processing"};
         }
         throw error;
@@ -1328,7 +1322,7 @@ export const onEscalationCreated = onDocumentCreated(
             question: question,
             userId: userId,
             conversationId: conversationId,
-            eventId: event.id,
+            eventId: eventId,
             category: category || "General",
             serviceUnit: normalizedCategory || "N/A",
           }
@@ -1370,7 +1364,7 @@ export const onEscalationCreated = onDocumentCreated(
             question: question,
             userId: userId,
             conversationId: conversationId,
-            eventId: event.id,
+            eventId: eventId,
             category: category || "General",
             serviceUnit: normalizedCategory || "N/A",
           }
@@ -1426,7 +1420,7 @@ export const onEscalationCreated = onDocumentCreated(
 
       try {
         const idempotencyRef = db.collection("notification_processing")
-          .doc(`escalation_created_${event.params.escalationId}_${event.id}`);
+          .doc(`escalation_created_${context.params.escalationId}_${context.eventId}`);
         await idempotencyRef.update({
           status: "failed",
           error: String(error),
@@ -1438,21 +1432,19 @@ export const onEscalationCreated = onDocumentCreated(
 
       return {success: false, error: error};
     }
-  }
-);
+  });
 
 
-export const onEscalationReplied = onDocumentUpdated(
-  {
-    document: "escalations/{escalationId}",
-    region: "asia-southeast1",
-    retry: false,
-  },
-  async (event) => {
+export const onEscalationReplied = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("escalations/{escalationId}")
+  .onUpdate(async (change, context) => {
     try {
-      const beforeData = event.data?.before.data();
-      const afterData = event.data?.after.data();
-      const escalationId = event.params.escalationId;
+      const beforeData = change.before.data();
+      const afterData = change.after.data();
+      const escalationId = context.params.escalationId;
+      const eventId = context.eventId;
 
       if (!beforeData || !afterData) {
         console.log("No escalation data found");
@@ -1471,15 +1463,15 @@ export const onEscalationReplied = onDocumentUpdated(
       }
 
       console.log(` Staff or Admin replied to escalation: ${escalationId}`);
-      console.log(` Event ID: ${event.id}`);
+      console.log(` Event ID: ${eventId}`);
 
       const idempotencyRef = db.collection("notification_processing")
-        .doc(`escalation_reply_${escalationId}_${event.id}`);
+        .doc(`escalation_reply_${escalationId}_${eventId}`);
 
       try {
         await idempotencyRef.create({
           escalationId: escalationId,
-          eventId: event.id,
+          eventId: eventId,
           processedAt: admin.firestore.FieldValue.serverTimestamp(),
           status: "processing",
           type: "escalation_reply",
@@ -1487,7 +1479,7 @@ export const onEscalationReplied = onDocumentUpdated(
         console.log(` Idempotency lock acquired for escalation reply ${escalationId}`);
       } catch (error: any) {
         if (error.code === 6) {
-          console.log(` Reply notification already being processed for escalation ${escalationId} (event: ${event.id})`);
+          console.log(` Reply notification already being processed for escalation ${escalationId} (event: ${eventId})`);
           return {success: false, reason: "already_processing"};
         }
         throw error;
@@ -1560,7 +1552,7 @@ export const onEscalationReplied = onDocumentUpdated(
           staffResponse,
           adminResponse,
           conversationId,
-          eventId: event.id,
+          eventId: eventId,
           targetUserId: userId, //  Add for Firestore
         }
       );
@@ -1600,7 +1592,7 @@ export const onEscalationReplied = onDocumentUpdated(
 
       try {
         const idempotencyRef = db.collection("notification_processing")
-          .doc(`escalation_reply_${event.params.escalationId}_${event.id}`);
+          .doc(`escalation_reply_${context.params.escalationId}_${context.eventId}`);
         await idempotencyRef.update({
           status: "failed",
           error: String(error),
@@ -1612,8 +1604,7 @@ export const onEscalationReplied = onDocumentUpdated(
 
       return {success: false, error};
     }
-  }
-);
+  });
 
 function normalizeCategory(category: string): string {
   const normalized = category.toLowerCase().trim();

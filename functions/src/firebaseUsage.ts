@@ -1,5 +1,5 @@
 import {onCall} from "firebase-functions/v2/https";
-import {onDocumentWritten} from "firebase-functions/v2/firestore";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
 type FirebaseOperation = "read" | "write" | "delete";
@@ -53,11 +53,11 @@ async function logFirebaseUsage({
   });
 }
 
-async function handleFirestoreWrite(event: any, collection: string) {
+async function handleFirestoreWrite(change: any, collection: string) {
   if (ignoredCollections.has(collection)) return;
 
-  const beforeExists = event.data?.before?.exists ?? false;
-  const afterExists = event.data?.after?.exists ?? false;
+  const beforeExists = change.before?.exists ?? false;
+  const afterExists = change.after?.exists ?? false;
 
   if (!beforeExists && !afterExists) return;
 
@@ -70,7 +70,7 @@ async function handleFirestoreWrite(event: any, collection: string) {
     collection,
     count: 1,
     source: operation === "delete" ? "delete" : "add_update",
-    path: event.document ?? null,
+    path: change.after?.ref?.path ?? change.before?.ref?.path ?? null,
   });
 }
 
@@ -93,16 +93,18 @@ export const logFirebaseRead = onCall(
   }
 );
 
-export const logTopLevelFirebaseUsage = onDocumentWritten(
-  "{collectionId}/{docId}",
-  async (event) => {
-    await handleFirestoreWrite(event, event.params.collectionId);
-  }
-);
+export const logTopLevelFirebaseUsage = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("{collectionId}/{docId}")
+  .onWrite(async (change, context) => {
+    await handleFirestoreWrite(change, context.params.collectionId);
+  });
 
-export const logNestedFirebaseUsage = onDocumentWritten(
-  "{collectionId}/{docId}/{subCollectionId}/{subDocId}",
-  async (event) => {
-    await handleFirestoreWrite(event, event.params.subCollectionId);
-  }
-);
+export const logNestedFirebaseUsage = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("{collectionId}/{docId}/{subCollectionId}/{subDocId}")
+  .onWrite(async (change, context) => {
+    await handleFirestoreWrite(change, context.params.subCollectionId);
+  });

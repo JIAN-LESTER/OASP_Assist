@@ -2,8 +2,8 @@
 /* eslint-disable no-useless-catch */
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
-import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {defineSecret} from "firebase-functions/params";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import {logGeminiUsage} from "./geminiUsage";
@@ -2215,15 +2215,14 @@ export const batchSyncCategoriesToInfoBank = onCall(
   }
 );
 
-export const cleanupDeletedAnnouncement = onDocumentUpdated(
-  {
-    document: "announcements/{postId}",
-    secrets: [],
-  },
-  async (event) => {
-    const before = event.data?.before.data();
-    const after = event.data?.after.data();
-    const postId = event.params.postId;
+export const cleanupDeletedAnnouncement = functions
+  .region("asia-southeast1")
+  .firestore
+  .document("announcements/{postId}")
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const postId = context.params.postId;
 
     if (!before || !after) return;
 
@@ -2249,8 +2248,7 @@ export const cleanupDeletedAnnouncement = onDocumentUpdated(
         }
       }
     }
-  }
-);
+  });
 // ============================================================================
 
 // ============================================================================
