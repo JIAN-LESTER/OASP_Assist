@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class FbSyncConfig {
-  static const String projectId = 'capstone-project-1703b';
+  static const String projectId = 'cmu-oasp-assist';
   static const String region = 'us-central1';
 
   static String get exchangeTokenUrl =>

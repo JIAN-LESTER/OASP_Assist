@@ -518,29 +518,19 @@ Future<void> initializeServices() async {
 //  CRITICAL  Properly configure Firebase Functions for production
 void configureFirebaseFunctions() {
   try {
-    // Get the default Functions instance
+
     final functions = FirebaseFunctions.instance;
-
-    //  NEVER use emulator in production builds
-    // The emulator should ONLY be used during local development
-    // For production, Firebase Functions automatically connects to your deployed functions
-
     if (kDebugMode) {
       print(
         ' Firebase Functions configured for: ${functions.app.options.projectId}',
       );
       print('   Region: us-central1 (default)');
-
-      //  ONLY uncomment these lines if you're actively developing locally with the emulator running
-      // Comment them out or remove them for production builds
-      // functions.useFunctionsEmulator('localhost', 5001);
-      // print(' Using Functions emulator at localhost:5001');
     } else {
       print(' Firebase Functions configured for production');
       print('   Project: ${functions.app.options.projectId}');
     }
   } catch (e) {
-    print(' Error configuring Firebase Functions: $e');
+
   }
 }
 
@@ -551,11 +541,8 @@ void main() async {
 
       //  Load environment variables FIRST
       try {
-        await dotenv.load(fileName: '.env');
-        print(' Environment variables loaded');
+        await dotenv.load(fileName: '.env');  
       } catch (e) {
-        print(' Could not load .env file: $e');
-        print('   Make sure .env exists in project root');
       }
 
       await SystemChrome.setPreferredOrientations([

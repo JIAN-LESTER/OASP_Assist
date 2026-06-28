@@ -12,7 +12,12 @@
           "package_name": "com.example.capstone_project"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "13855273820-72hpqqhplltklr09mb40lqk84pn7ktke.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBkSXKcHhlhLUdf97nKJ1zEA0nyPS5VNeM"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "13855273820-72hpqqhplltklr09mb40lqk84pn7ktke.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "13855273820-s5t7uf5825cs11vt78dmb3lu8rgb0a2t.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.capstoneProject"
+              }
+            }
+          ]
         }
       }
     }
