@@ -104,39 +104,41 @@ Widget buildManagementTableSkeleton({
   int statCardCount = 4,
   bool showTabs = false,
 }) {
-  return Scaffold(
-    backgroundColor: const Color(0xFFF0F4F8),
-    body: LayoutBuilder(
-      builder: (context, constraints) {
-        final isMobile = MediaQuery.of(context).size.width < 600;
-        final cardCount = statCardCount.clamp(1, 4).toInt();
+  return _ManagementSkeletonShimmer(
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF0F4F8),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = MediaQuery.of(context).size.width < 600;
+          final cardCount = statCardCount.clamp(1, 4).toInt();
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (showTabs) ...[
-                Row(
-                  children: [
-                    _managementSkeletonBox(width: 120, height: 38),
-                    const SizedBox(width: 12),
-                    _managementSkeletonBox(width: 150, height: 38),
-                  ],
-                ),
-                const SizedBox(height: 20),
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showTabs) ...[
+                  Row(
+                    children: [
+                      _managementSkeletonBox(width: 120, height: 38),
+                      const SizedBox(width: 12),
+                      _managementSkeletonBox(width: 150, height: 38),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                _managementSkeletonPageHeader(isMobile),
+                const SizedBox(height: 16),
+                _managementSkeletonStats(cardCount, isMobile),
+                const SizedBox(height: 8),
+                _managementSkeletonActions(isMobile),
+                const SizedBox(height: 16),
+                _managementSkeletonTable(isMobile),
               ],
-              _managementSkeletonPageHeader(isMobile),
-              const SizedBox(height: 16),
-              _managementSkeletonStats(cardCount, isMobile),
-              const SizedBox(height: 8),
-              _managementSkeletonActions(isMobile),
-              const SizedBox(height: 16),
-              _managementSkeletonTable(isMobile),
-            ],
-          ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     ),
   );
 }
@@ -430,14 +432,110 @@ Widget _managementSkeletonBox({
   double radius = 8,
   Color color = const Color(0xFFE2E8F0),
 }) {
-  return Container(
+  return _ManagementSkeletonShimmerBox(
     width: width,
     height: height,
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(radius),
-    ),
+    radius: radius,
+    baseColor: color,
   );
+}
+
+class _ManagementSkeletonShimmer extends StatefulWidget {
+  final Widget child;
+
+  const _ManagementSkeletonShimmer({required this.child});
+
+  @override
+  State<_ManagementSkeletonShimmer> createState() =>
+      _ManagementSkeletonShimmerState();
+}
+
+class _ManagementSkeletonShimmerState extends State<_ManagementSkeletonShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSkeletonShimmerScope(
+      animation: _controller,
+      child: widget.child,
+    );
+  }
+}
+
+class _ManagementSkeletonShimmerScope extends InheritedNotifier<Animation<double>> {
+  final Animation<double> animation;
+
+  const _ManagementSkeletonShimmerScope({
+    required this.animation,
+    required super.child,
+  }) : super(notifier: animation);
+
+  static Animation<double>? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<_ManagementSkeletonShimmerScope>()
+        ?.animation;
+  }
+}
+
+class _ManagementSkeletonShimmerBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+  final Color baseColor;
+
+  const _ManagementSkeletonShimmerBox({
+    this.width,
+    required this.height,
+    required this.radius,
+    required this.baseColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = _ManagementSkeletonShimmerScope.maybeOf(context);
+    if (animation == null) return _buildBox(baseColor);
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final pulse = Curves.easeInOut.transform(
+          animation.value < 0.5
+              ? animation.value * 2
+              : (1 - animation.value) * 2,
+        );
+        final color = Color.lerp(baseColor, Colors.white, 0.22 * pulse)!;
+
+        return RepaintBoundary(child: _buildBox(color));
+      },
+    );
+  }
+
+  Widget _buildBox(Color color) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
 }
 
 class StatData {
