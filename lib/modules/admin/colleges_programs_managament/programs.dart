@@ -13,6 +13,9 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:flutter/material.dart';
 
+final Stream<QuerySnapshot> _programsManagementStream =
+    FirebaseFirestore.instance.collection('programs').orderBy('name').snapshots();
+
 class ProgramManagementPage extends StatefulWidget {
   const ProgramManagementPage({super.key});
 
@@ -222,11 +225,7 @@ class MobileProgramManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('programs')
-                                .orderBy('name')
-                                .snapshots(),
+                        stream: _programsManagementStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -310,11 +309,7 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('programs')
-                              .orderBy('name')
-                              .snapshots(),
+                      stream: _programsManagementStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {

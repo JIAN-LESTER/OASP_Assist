@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
+  final titleCaseItem = _toTitleCase(item);
+
   if (isLoading) {
     return  Center(
       child: Column(
@@ -11,7 +13,7 @@ Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
           ),
           SizedBox(height: 16),
           Text(
-            'Loading $item...',
+            'Loading $titleCaseItem...',
             style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
         ],
@@ -30,7 +32,7 @@ Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
         ),
         const SizedBox(height: 16),
         Text(
-          'No $item Yet',
+          'No $titleCaseItem Yet',
           style: TextStyle(
             fontSize: isMobileOrTablet ? 18 : 20,
             fontWeight: FontWeight.w600,
@@ -39,7 +41,7 @@ Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
         ),
         const SizedBox(height: 8),
         Text(
-          '$item will appear here once users interacts with the system.',
+          '$titleCaseItem will appear here once users interacts with the system.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: isMobileOrTablet ? 14 : 16,
@@ -56,7 +58,7 @@ Widget buildEmptyState(bool isLoading, bool isMobileOrTablet, String item, ) {
             border: Border.all(color: Colors.green.withOpacity(0.2)),
           ),
           child: Text(
-            '$item will automatically appear here',
+            '$titleCaseItem will automatically appear here',
             style: TextStyle(
               fontSize: isMobileOrTablet ? 12 : 14,
               color: Colors.green[700],
@@ -124,6 +126,11 @@ String _toTitleCase(String value) {
       .trim()
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
-      .map((word) => word[0].toUpperCase() + word.substring(1).toLowerCase())
+      .map((word) {
+        if (word.toLowerCase() == 'faq' || word.toLowerCase() == 'faqs') {
+          return word.toLowerCase() == 'faq' ? 'FAQ' : 'FAQs';
+        }
+        return word[0].toUpperCase() + word.substring(1).toLowerCase();
+      })
       .join(' ');
 }

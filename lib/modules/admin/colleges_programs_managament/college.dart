@@ -12,6 +12,9 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:flutter/material.dart';
 
+final Stream<QuerySnapshot> _collegesManagementStream =
+    FirebaseFirestore.instance.collection('colleges').orderBy('name').snapshots();
+
 class CollegeManagementPage extends StatefulWidget {
   const CollegeManagementPage({super.key});
 
@@ -221,11 +224,7 @@ class MobileCollegeManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('colleges')
-                                .orderBy('name')
-                                .snapshots(),
+                        stream: _collegesManagementStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -309,11 +308,7 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('colleges')
-                              .orderBy('name')
-                              .snapshots(),
+                      stream: _collegesManagementStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
