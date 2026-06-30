@@ -34,6 +34,26 @@ import 'modules/staff/human_escalation/human_escalation.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+TextTheme _sturdyAppTextTheme(TextTheme base) {
+  final themed = base.apply(
+    fontFamily: 'Segoe UI',
+    bodyColor: const Color(0xFF111827),
+    displayColor: const Color(0xFF111827),
+  );
+
+  return themed.copyWith(
+    bodyLarge: themed.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+    bodyMedium: themed.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+    bodySmall: themed.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+    labelLarge: themed.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    labelMedium: themed.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+    labelSmall: themed.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+    titleLarge: themed.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    titleMedium: themed.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+    titleSmall: themed.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+  );
+}
+
 // Loading Overlay Widget
 class LoadingOverlay {
   static void show(BuildContext context, {String? message}) {
@@ -624,7 +644,12 @@ class MyApp extends StatelessWidget {
       title: 'OASP Assist',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        fontFamily: 'Roboto',
+        fontFamily: 'Segoe UI',
+        fontFamilyFallback: const ['Arial', 'Roboto', 'sans-serif'],
+        textTheme: _sturdyAppTextTheme(ThemeData.light().textTheme),
+        primaryTextTheme: _sturdyAppTextTheme(
+          ThemeData.light().primaryTextTheme,
+        ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
