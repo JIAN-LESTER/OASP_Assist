@@ -69,7 +69,7 @@ class FacebookSyncService {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        return user.getIdToken();
+        return user.getIdToken(true);
       }
     } catch (e) {
       print('Error getting auth token: $e');
@@ -84,17 +84,9 @@ class FacebookSyncService {
   }) async {
     print('Exchanging Facebook token...');
     print('Platform: ${_getPlatformName()}');
-    print('Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
+    print('Using: Cloud Functions SDK');
 
     try {
-      if (_shouldUseHttp) {
-        return await _exchangeTokenViaHttp(
-          shortToken,
-          pageId: pageId,
-          appId: appId,
-        );
-      }
-
       return await _exchangeTokenViaCloudFunctions(
         shortToken,
         pageId: pageId,
@@ -159,9 +151,12 @@ class FacebookSyncService {
 
       return _parseCallableData(result.data, fallbackMessage: 'Token exchange failed');
     } catch (e) {
-      print('Cloud Functions call failed: $e');
-      print('Falling back to HTTP...');
-      return _exchangeTokenViaHttp(shortToken, pageId: pageId, appId: appId);
+      if (_shouldFallbackToHttp(e)) {
+        print('Cloud Functions call failed: $e');
+        print('Falling back to HTTP...');
+        return _exchangeTokenViaHttp(shortToken, pageId: pageId, appId: appId);
+      }
+      rethrow;
     }
   }
 
@@ -213,13 +208,9 @@ class FacebookSyncService {
   static Future<Map<String, dynamic>> syncPosts() async {
     print('Starting Facebook sync...');
     print('Platform: ${_getPlatformName()}');
-    print('Using: ${_shouldUseHttp ? "HTTP" : "Cloud Functions SDK"}');
+    print('Using: Cloud Functions SDK');
 
     try {
-      if (_shouldUseHttp) {
-        return await _syncViaHttp();
-      }
-
       return await _syncViaCloudFunctions();
     } catch (e) {
       print('Sync failed: $e');
@@ -263,9 +254,12 @@ class FacebookSyncService {
 
       return _parseCallableData(result.data, fallbackMessage: 'Sync failed');
     } catch (e) {
-      print('Cloud Functions call failed: $e');
-      print('Falling back to HTTP...');
-      return _syncViaHttp();
+      if (_shouldFallbackToHttp(e)) {
+        print('Cloud Functions call failed: $e');
+        print('Falling back to HTTP...');
+        return _syncViaHttp();
+      }
+      rethrow;
     }
   }
 
@@ -369,7 +363,17 @@ class FacebookSyncService {
   }) {
     print('$action response: ${response.statusCode}');
 
-    final body = response.body.isNotEmpty ? json.decode(response.body) : {};
+    var body = <String, dynamic>{};
+    if (response.body.isNotEmpty) {
+      try {
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          body = decoded;
+        }
+      } catch (e) {
+        print('$action response body was not JSON: ${response.body}');
+      }
+    }
     final result = body is Map<String, dynamic>
         ? (body['result'] is Map<String, dynamic> ? body['result'] : body)
         : <String, dynamic>{};
@@ -379,10 +383,16 @@ class FacebookSyncService {
     }
 
     if (response.statusCode == 401) {
-      throw Exception('Authentication failed. Please log in again.');
+      throw Exception(
+        (result['message'] ?? 'Authentication failed. Please log in again.')
+            .toString(),
+      );
     }
     if (response.statusCode == 403) {
-      throw Exception('Permission denied. Admin access required.');
+      throw Exception(
+        (result['message'] ?? 'Permission denied. Admin access required.')
+            .toString(),
+      );
     }
 
     throw Exception(
@@ -401,6 +411,21 @@ class FacebookSyncService {
     }
 
     throw Exception(data['message'] ?? data['error'] ?? fallbackMessage);
+  }
+
+  static bool _shouldFallbackToHttp(dynamic error) {
+    if (error is FirebaseFunctionsException) {
+      return error.code == 'unavailable' ||
+          error.code == 'not-found' ||
+          error.code == 'deadline-exceeded';
+    }
+
+    final message = error.toString();
+    return message.contains('UNAVAILABLE') ||
+        message.contains('Unable to establish connection') ||
+        message.contains('Failed to fetch') ||
+        message.contains('XMLHttpRequest error') ||
+        message.contains('SocketException');
   }
 
   static String _getPlatformName() {

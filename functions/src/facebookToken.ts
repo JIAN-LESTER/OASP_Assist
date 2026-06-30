@@ -195,7 +195,13 @@ async function attemptExchange(
 
 async function getUserPages(longUserToken: string): Promise<any> {
   const url = `https://graph.facebook.com/${FB_API_VERSION}/me/accounts`;
-  const resp = await axios.get(url, {params: {access_token: longUserToken}});
+  const resp = await axios.get(url, {
+    params: {
+      access_token: longUserToken,
+      fields: "id,name,access_token,tasks,perms",
+      limit: 100,
+    },
+  });
   return resp.data as any;
 }
 
@@ -260,15 +266,40 @@ async function exchangeTokenLogic(
       const pagesResp = await getUserPages(longToken);
       const pages = pagesResp.data || [];
       console.log(` Found ${pages.length} page(s)`);
+      console.log(` Page IDs found: ${pages.map((p: any) => p.id).join(", ")}`);
+
+      if (pageId) {
+        const requestedPage = pages.find((p: any) => p.id === pageId);
+
+        if (!requestedPage) {
+          throw new Error(
+            `Page ID ${pageId} was not returned by Facebook. ` +
+            `Found page IDs: ${pages.map((p: any) => p.id).join(", ") || "none"}. ` +
+            "Generate the token using a Facebook user that manages this exact page."
+          );
+        }
+
+        if (!requestedPage.access_token) {
+          throw new Error(
+            `Facebook did not return a page access token for Page ID ${pageId}. ` +
+            "Regenerate the token with pages_show_list and pages_read_engagement."
+          );
+        }
+      }
 
       for (const p of pages) {
-        pagesObj[p.id] = {
-          access_token: p.access_token,
-          name: p.name,
-          expires_at: null,
-        };
+        if (p.access_token) {
+          pagesObj[p.id] = {
+            access_token: p.access_token,
+            name: p.name,
+            expires_at: null,
+          };
+        }
       }
     } catch (err: any) {
+      if (pageId) {
+        throw err;
+      }
       console.warn(" Could not fetch pages:", err?.message);
     }
 

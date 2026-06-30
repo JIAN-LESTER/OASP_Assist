@@ -425,24 +425,14 @@ async function getAccessToken(): Promise<string> {
       throw new Error("No Page ID configured. Please add your Page ID in settings.");
     }
 
-    const pageIds = Object.keys(pages);
-
-
     if (pages[pageId] && pages[pageId].access_token) {
       return pages[pageId].access_token;
     }
 
-    if (pageIds.length > 0) {
-      const firstPageId = pageIds[0];
-      const firstPageToken = pages[firstPageId].access_token;
-      return firstPageToken;
-    }
-
-    if (data.long_token) {
-      return data.long_token;
-    }
-
-    throw new Error("No valid access token found. Please refresh your token.");
+    throw new Error(
+      `No page access token found for Page ID ${pageId}. ` +
+      `Refresh the Facebook token using an account that manages this page.`
+    );
   } catch (error: any) {
     throw error;
   }
@@ -456,6 +446,21 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
 
     const accessToken = await getAccessToken();
 
+    const tokenOwner = await axios.get<{ id: string; name?: string }>(
+      `https://graph.facebook.com/${FB_API_VERSION}/me`,
+      {
+        params: {access_token: accessToken, fields: "id,name"},
+        timeout: 30000,
+      }
+    );
+
+    if (tokenOwner.data.id !== PAGE_ID) {
+      throw new Error(
+        `Saved page token belongs to Page ID ${tokenOwner.data.id}, ` +
+        `but configured Page ID is ${PAGE_ID}. Refresh the Facebook token.`
+      );
+    }
+
     // Calculate start of the current month (midnight on the 1st)
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -465,7 +470,7 @@ async function fetchFacebookPosts(): Promise<FacebookPost[]> {
     const sinceTimestamp = Math.floor(startOfMonth.getTime() / 1000);
 
 
-    const url = `https://graph.facebook.com/${FB_API_VERSION}/${PAGE_ID}/posts`;
+    const url = `https://graph.facebook.com/${FB_API_VERSION}/me/posts`;
     const params = {
       fields: "message,created_time,full_picture,permalink_url,attachments",
       since: sinceTimestamp.toString(),
