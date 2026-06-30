@@ -22,6 +22,12 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+final Stream<QuerySnapshot> _informationBankStream =
+    FirebaseFirestore.instance
+        .collection('information_bank')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+
 class InformationBankPage extends StatefulWidget {
   const InformationBankPage({super.key});
 
@@ -340,11 +346,7 @@ class MobileInformationBank extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('information_bank')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
+        stream: _informationBankStream,
         builder: (context, snapshot) {
           // Show loading only on first load
           if (!snapshot.hasData &&
@@ -473,11 +475,7 @@ Widget mainContent(
   return Scaffold(
     backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('information_bank')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: _informationBankStream,
       builder: (context, snapshot) {
         // Show loading only on first load
         if (!snapshot.hasData &&

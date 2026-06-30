@@ -29,6 +29,23 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
   final List<Map<String, dynamic>> messages = [];
+  late final Stream<QuerySnapshot> _logsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _logsStream =
+        FirebaseFirestore.instance
+            .collection('logs')
+            .orderBy('time', descending: true)
+            .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _onDateRangeChanged(DateTimeRange? dateRange) {
     setState(() {
@@ -91,6 +108,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        logsStream: _logsStream,
       ),
       tabletBody: TabletUserActivityLogs(
         selectedDateRange: selectedDateRange,
@@ -104,6 +122,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        logsStream: _logsStream,
       ),
       desktopBody: DesktopUserActivityLogs(
         selectedDateRange: selectedDateRange,
@@ -117,6 +136,7 @@ class _UserActivityLogsPageState extends State<UserActivityLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        logsStream: _logsStream,
       ),
     );
   }
@@ -134,6 +154,7 @@ class DesktopUserActivityLogs extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> logsStream;
 
   const DesktopUserActivityLogs({
     super.key,
@@ -148,6 +169,7 @@ class DesktopUserActivityLogs extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.logsStream,
   });
 
   @override
@@ -173,6 +195,7 @@ class _DesktopUserActivityLogsState extends State<DesktopUserActivityLogs> {
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.logsStream,
       context,
       24.0,
 
@@ -193,6 +216,7 @@ class TabletUserActivityLogs extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> logsStream;
 
   const TabletUserActivityLogs({
     super.key,
@@ -207,6 +231,7 @@ class TabletUserActivityLogs extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.logsStream,
   });
 
   @override
@@ -231,6 +256,7 @@ class _TabletUserActivityLogsState extends State<TabletUserActivityLogs> {
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.logsStream,
       context,
       20.0,
 
@@ -252,6 +278,7 @@ class MobileUserActivityLogs extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> logsStream;
 
   const MobileUserActivityLogs({
     super.key,
@@ -266,6 +293,7 @@ class MobileUserActivityLogs extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.logsStream,
   });
 
   @override
@@ -290,6 +318,7 @@ class _MobileUserActivityLogsState extends State<MobileUserActivityLogs> {
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.logsStream,
       context,
       16.0,
 
@@ -309,6 +338,7 @@ Widget mainContent(
   ValueChanged<int> onPageChanged,
   ValueChanged<int> onItemsPerPageChanged,
   List<Map<String, dynamic>> messages,
+  Stream<QuerySnapshot> logsStream,
   BuildContext context,
   double padding,
   VoidCallback onSearchChanged, // 🔹 new param instead of setState
@@ -352,11 +382,7 @@ Widget mainContent(
 
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('logs')
-                              .orderBy('time', descending: true)
-                              .snapshots(),
+                      stream: logsStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {

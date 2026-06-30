@@ -95,6 +95,7 @@ class ChatProvider extends ChangeNotifier {
   Timer? _messageResetTimer;
 
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
+  String? _userMessageCountSubscriptionUserId;
 
   int _userDailyMessageCount = 0;
   DateTime? _userLastResetDate;
@@ -120,8 +121,13 @@ class ChatProvider extends ChangeNotifier {
   void listenToUserMessageCount() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
+    if (_userMessageCountSubscriptionUserId == userId &&
+        _userMessageCountSubscription != null) {
+      return;
+    }
 
     _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscriptionUserId = userId;
     _scheduleMessageResetTimer();
 
     _userMessageCountSubscription = _firestore
@@ -251,6 +257,7 @@ class ChatProvider extends ChangeNotifier {
   static const int MAX_DAILY_ESCALATIONS = 2;
 
   StreamSubscription<DocumentSnapshot>? _userEscalationCountSubscription;
+  String? _userEscalationCountSubscriptionUserId;
 
   int _userDailyEscalationCount = 0;
   DateTime? _userLastEscalationResetDate;
@@ -383,8 +390,13 @@ class ChatProvider extends ChangeNotifier {
   void listenToUserEscalationCount() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
+    if (_userEscalationCountSubscriptionUserId == userId &&
+        _userEscalationCountSubscription != null) {
+      return;
+    }
 
     _userEscalationCountSubscription?.cancel();
+    _userEscalationCountSubscriptionUserId = userId;
 
     _userEscalationCountSubscription = _firestore
         .collection('users')
@@ -462,9 +474,13 @@ class ChatProvider extends ChangeNotifier {
     _isDisposed = true;
 
     _messagesSubscription?.cancel();
+    _messagesSubscriptionConversationId = null;
     _escalationSubscription?.cancel();
+    _escalationSubscriptionConversationId = null;
     _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscriptionUserId = null;
     _userEscalationCountSubscription?.cancel();
+    _userEscalationCountSubscriptionUserId = null;
     _messageResetTimer?.cancel();
 
     _messages.clear();
@@ -640,6 +656,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
+  String? _messagesSubscriptionConversationId;
   bool _isSettingConversation = false;
 
   Future<void> setConversationId(String id) async {
@@ -660,8 +677,10 @@ class ChatProvider extends ChangeNotifier {
     try {
       _messagesSubscription?.cancel();
       _messagesSubscription = null;
+      _messagesSubscriptionConversationId = null;
       _escalationSubscription?.cancel();
       _escalationSubscription = null;
+      _escalationSubscriptionConversationId = null;
 
       _messages.clear();
       _processedMessages.clear();
@@ -820,13 +839,19 @@ class ChatProvider extends ChangeNotifier {
   }
 
   StreamSubscription<QuerySnapshot>? _escalationSubscription;
+  String? _escalationSubscriptionConversationId;
 
   void listenToEscalationResponses() {
     if (conversationId == null) return;
+    if (_escalationSubscriptionConversationId == conversationId &&
+        _escalationSubscription != null) {
+      return;
+    }
 
     print('👂 Starting escalation response listener for: $conversationId');
 
     _escalationSubscription?.cancel();
+    _escalationSubscriptionConversationId = conversationId;
 
     _escalationSubscription = _firestore
         .collection('escalations')
@@ -899,9 +924,15 @@ class ChatProvider extends ChangeNotifier {
 
   void listenToMessages() {
     if (conversationId == null) return;
+    if (_messagesSubscriptionConversationId == conversationId &&
+        _messagesSubscription != null) {
+      return;
+    }
 
     print('👂 Starting message listener for conversation: $conversationId');
 
+    _messagesSubscription?.cancel();
+    _messagesSubscriptionConversationId = conversationId;
     _messagesSubscription = _firestore
         .collection('conversations')
         .doc(conversationId!)
@@ -1048,18 +1079,30 @@ class ChatProvider extends ChangeNotifier {
         print('⚠️ Background count update error: $e');
       });
 
-      final embeddingFuture = _generateEmbeddingCached(question);
-      final faqFuture = _ensureFAQCacheLoaded();
+      List<double>? currentEmbedding;
+      Map<String, dynamic>? existingFAQ;
 
-      await Future.wait([embeddingFuture, faqFuture]);
-      final currentEmbedding = await embeddingFuture;
-      final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+      try {
+        final embeddingFuture = _generateEmbeddingCached(question);
+        final faqFuture = _ensureFAQCacheLoaded();
+
+        await Future.wait([embeddingFuture, faqFuture]);
+        currentEmbedding = await embeddingFuture;
+        existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+      } catch (e) {
+        print('⚠️ FAQ matching skipped: $e');
+      }
 
       String questionCategory;
       if (existingFAQ != null && existingFAQ['category'] != null) {
         questionCategory = existingFAQ['category'] as String;
       } else {
-        questionCategory = await _classifyQuestionCategoryFast(question);
+        try {
+          questionCategory = await _classifyQuestionCategoryFast(question);
+        } catch (e) {
+          print('⚠️ Category classification skipped: $e');
+          questionCategory = 'General';
+        }
       }
 
       userMessageRef.update({'category': questionCategory}).catchError((e) {
@@ -1579,22 +1622,29 @@ $question
     BuildContext context,
     String question,
     String answerText,
-    List<double> currentEmbedding,
+    List<double>? currentEmbedding,
     String category,
     String? userId,
   ) async {
     try {
-      await Future.wait([
+      final tasks = <Future<void>>[
         _logMessageAction(question, answerText),
         checkEscalation(context, answerText, userId, question),
-        _checkAndPromoteToFAQOptimized(
-          question,
-          currentEmbedding,
-          answerText,
-          category,
-        ),
         _updateConversationTitleIfNeeded(question),
-      ]);
+      ];
+
+      if (currentEmbedding != null) {
+        tasks.add(
+          _checkAndPromoteToFAQOptimized(
+            question,
+            currentEmbedding,
+            answerText,
+            category,
+          ),
+        );
+      }
+
+      await Future.wait(tasks);
     } catch (e) {
       print('Error in post-response tasks: $e');
     }
@@ -3010,8 +3060,10 @@ $question
 
     _messagesSubscription?.cancel();
     _messagesSubscription = null;
+    _messagesSubscriptionConversationId = null;
     _escalationSubscription?.cancel();
     _escalationSubscription = null;
+    _escalationSubscriptionConversationId = null;
 
     _messages.clear();
     _processedMessages.clear();

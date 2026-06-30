@@ -61,10 +61,18 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
+  late final Stream<QuerySnapshot> _recentAnnouncementsStream;
 
   @override
   void initState() {
     super.initState();
+    _recentAnnouncementsStream =
+        FirebaseFirestore.instance
+            .collection('announcements')
+            .where('deleted', isEqualTo: false)
+            .orderBy('created_time', descending: true)
+            .limit(5)
+            .snapshots();
     _loadAnnouncements();
   }
 
@@ -662,13 +670,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('announcements')
-                        .where('deleted', isEqualTo: false)
-                        .orderBy('created_time', descending: true)
-                        .limit(5)
-                        .snapshots(),
+                stream: _recentAnnouncementsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const _AnnouncementSidebarSkeleton();

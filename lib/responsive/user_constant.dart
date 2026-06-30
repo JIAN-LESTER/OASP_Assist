@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
@@ -22,7 +21,6 @@ class UserConstant {
 
   static List<Map<String, dynamic>> _recentConversations = [];
   static String? _selectedConversationId;
-  static StreamSubscription<QuerySnapshot>? _conversationsSubscription;
 
   // ADD: Flag to prevent multiple initializations
   static bool _isInitializing = false;
@@ -139,10 +137,10 @@ class UserConstant {
       return;
     }
 
-    // If already initialized, just subscribe to updates
+    // If already initialized, just refresh the cached list
     if (_isInitialized) {
-      print('DEBUG: Already initialized, just subscribing to conversations...');
-      subscribeToRecentConversations(context, setState);
+      print('DEBUG: Already initialized, refreshing conversations...');
+      await refreshRecentConversations(context, setState);
       return;
     }
 
@@ -197,8 +195,8 @@ class UserConstant {
         });
       }
 
-      // Subscribe to conversation updates
-      subscribeToRecentConversations(context, setState);
+      // Refresh cached conversation list
+      await refreshRecentConversations(context, setState);
 
       _isInitialized = true;
       print('DEBUG: Chat session initialization completed');
@@ -266,86 +264,52 @@ class UserConstant {
   //   }
   // }
 
-  // FIXED: Show all conversations instead of limiting to 5 active ones
-  static void subscribeToRecentConversations(
+  // Refresh all conversations instead of keeping a duplicate live listener.
+  static Future<void> refreshRecentConversations(
     BuildContext context,
     Function setState,
-  ) {
+  ) async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    print('DEBUG: Starting subscription for user: $userId');
+    print('DEBUG: Refreshing conversations for user: $userId');
 
     if (userId == null) {
-      print('DEBUG: No user logged in, cannot subscribe to conversations');
+      print('DEBUG: No user logged in, cannot refresh conversations');
       return;
     }
 
-    // Cancel existing subscription to prevent duplicates
-    _conversationsSubscription?.cancel();
-    print('DEBUG: Setting up Firestore listener...');
+    try {
+      final querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('conversations')
+              .where('userId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true)
+              .get();
 
-    _conversationsSubscription = FirebaseFirestore.instance
-        .collection('conversations')
-        .where('userId', isEqualTo: userId)
-        // Removed status filter to show all conversations
-        .orderBy('createdAt', descending: true)
-        // Removed limit to show all conversations
-        .snapshots()
-        .listen(
-          (querySnapshot) {
-            print(
-              'DEBUG: Listener triggered with ${querySnapshot.docs.length} docs',
-            );
+      final conversations =
+          querySnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'title': data['title'] ?? 'Untitled',
+              'status': data['status'] ?? 'unknown',
+              'createdAt': data['createdAt'],
+            };
+          }).toList();
 
-            if (querySnapshot.docs.isEmpty) {
-              print('DEBUG: No conversations found for user $userId');
-            }
+      setState(() {
+        _recentConversations = conversations;
 
-            final conversations =
-                querySnapshot.docs.map((doc) {
-                  final data = doc.data();
-                  print(
-                    'DEBUG: Found conversation - ID: ${doc.id}, Title: ${data['title']}, Status: ${data['status']}',
-                  );
-
-                  return {
-                    'id': doc.id,
-                    'title': data['title'] ?? 'Untitled',
-                    'status': data['status'] ?? 'unknown',
-                    'createdAt': data['createdAt'],
-                  };
-                }).toList();
-
-            print('DEBUG: Processed ${conversations.length} conversations');
-
-            try {
-              setState(() {
-                _recentConversations = conversations;
-
-                // Auto-select the first active conversation if none selected
-                if (_selectedConversationId == null &&
-                    conversations.isNotEmpty) {
-                  final activeConversations =
-                      conversations
-                          .where((c) => c['status'] == 'active')
-                          .toList();
-                  if (activeConversations.isNotEmpty) {
-                    _selectedConversationId = activeConversations[0]['id'];
-                  }
-                }
-
-                print(
-                  'DEBUG: Updated UI with ${conversations.length} conversations',
-                );
-                print('DEBUG: Selected conversation: $_selectedConversationId');
-              });
-            } catch (e) {
-              print('DEBUG: Error updating UI: $e');
-            }
-          },
-          onError: (error) {
-            print('DEBUG: Firestore listener error: $error');
-          },
-        );
+        if (_selectedConversationId == null && conversations.isNotEmpty) {
+          final activeConversations =
+              conversations.where((c) => c['status'] == 'active').toList();
+          if (activeConversations.isNotEmpty) {
+            _selectedConversationId = activeConversations[0]['id'];
+          }
+        }
+      });
+    } catch (e) {
+      print('DEBUG: Error refreshing conversations: $e');
+    }
   }
 
   static Future<void> onConversationSelected(
@@ -670,8 +634,10 @@ class UserConstant {
     try {
       print('Creating new conversation for user: $userId');
 
-      final firestore = FirebaseFirestore.instance;
-      final conversationRef = await firestore.collection('conversations').add({
+      final conversationRef =
+          FirebaseFirestore.instance.collection('conversations').doc();
+
+      await conversationRef.set({
         'userId': userId,
         'title': 'New Conversation',
         'status': 'active',
@@ -679,12 +645,6 @@ class UserConstant {
         'lastActivity': FieldValue.serverTimestamp(),
         'messageCount': 0,
       });
-
-      //  Wait for Firestore to confirm write
-      final doc = await conversationRef.get();
-      if (!doc.exists) {
-        throw Exception('Failed to create conversation');
-      }
 
       print(' Created new conversation: ${conversationRef.id}');
       return conversationRef.id;
@@ -858,8 +818,6 @@ class UserConstant {
   // FIXED: Enhanced dispose method
   static void dispose() {
     print('DEBUG: Disposing conversation manager...');
-    _conversationsSubscription?.cancel();
-    _conversationsSubscription = null;
     _controller.dispose();
 
     // Reset initialization flags
@@ -870,8 +828,6 @@ class UserConstant {
   // FIXED: Reset method for when user logs out/changes
   static void reset() {
     print('DEBUG: Resetting conversation manager...');
-    _conversationsSubscription?.cancel();
-    _conversationsSubscription = null;
     _recentConversations.clear();
     _selectedConversationId = null;
     _isInitializing = false;
@@ -950,8 +906,6 @@ class UserConstant {
   //  Cancel subscription method
   static void cancelConversationSubscription() {
     print('DEBUG: Cancelling conversation subscription');
-    _conversationsSubscription?.cancel();
-    _conversationsSubscription = null;
   }
 
   static void scrollToBottom() {

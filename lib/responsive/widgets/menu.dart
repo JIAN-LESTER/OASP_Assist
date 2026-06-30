@@ -56,6 +56,7 @@ class UniversalUIComponents {
   static Color get backgroundGrey => Colors.grey[50]!;
   static final Map<String, Stream<QuerySnapshot>> _conversationStreams = {};
   static final Map<String, QuerySnapshot> _conversationSnapshots = {};
+  static final Map<String, Stream<QuerySnapshot>> _notificationStreams = {};
 
   static Stream<QuerySnapshot> _getConversationStream(String userId) {
     return _conversationStreams.putIfAbsent(
@@ -65,6 +66,24 @@ class UniversalUIComponents {
               .collection('conversations')
               .where('userId', isEqualTo: userId)
               .orderBy('createdAt', descending: true)
+              .snapshots(),
+    );
+  }
+
+  static Stream<QuerySnapshot> _getNotificationStream(
+    String userId,
+    UserRole userRole,
+  ) {
+    final key = '$userId:${roleToString(userRole)}';
+    return _notificationStreams.putIfAbsent(
+      key,
+      () =>
+          FirebaseFirestore.instance
+              .collection('notifications')
+              .where('userId', isEqualTo: userId)
+              .where('targetRole', isEqualTo: roleToString(userRole))
+              .orderBy('createdAt', descending: true)
+              .limit(50)
               .snapshots(),
     );
   }
@@ -2198,14 +2217,7 @@ class UniversalUIComponents {
     }
 
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('notifications')
-              .where('userId', isEqualTo: currentUserId) //  Filter by userId
-              .where('targetRole', isEqualTo: roleToString(userRole))
-              .orderBy('createdAt', descending: true)
-              .limit(50)
-              .snapshots(),
+      stream: _getNotificationStream(currentUserId, userRole),
       builder: (context, snapshot) {
         int unreadCount = 0;
 

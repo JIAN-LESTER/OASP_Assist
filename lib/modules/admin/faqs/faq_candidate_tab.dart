@@ -15,6 +15,7 @@ class FaqCandidatesTab extends StatefulWidget {
 class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
   String _statusFilter = 'pending'; // 'pending' | 'promoted' | 'dismissed'
   String? _lastLoggedQueryKey;
+  final Map<String, Stream<QuerySnapshot>> _candidateStreams = {};
 
   @override
   Widget build(BuildContext context) {
@@ -121,11 +122,15 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
       );
     }
 
-    return FirebaseFirestore.instance
-        .collection('faq_candidates')
-        .where('status', isEqualTo: _statusFilter)
-        .orderBy('occurrenceCount', descending: true)
-        .snapshots();
+    return _candidateStreams.putIfAbsent(
+      _statusFilter,
+      () =>
+          FirebaseFirestore.instance
+              .collection('faq_candidates')
+              .where('status', isEqualTo: _statusFilter)
+              .orderBy('occurrenceCount', descending: true)
+              .snapshots(),
+    );
   }
 
   void _logCandidateQueryError(Object? error) {

@@ -29,6 +29,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   final ScrollController _announcementScrollController = ScrollController();
   final Map<String, GlobalKey> _announcementKeys = {};
   late final Stream<QuerySnapshot> announcementStream;
+  late final Stream<QuerySnapshot> recentAnnouncementStream;
 
   // Facebook Integration Helper
   final fbHelper = FacebookIntegrationHelper();
@@ -40,6 +41,13 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _initializeFacebookIntegration();
 
     announcementStream =
+        FirebaseFirestore.instance
+            .collection('announcements')
+            .where('deleted', isEqualTo: false)
+            .orderBy('created_time', descending: true)
+            .snapshots();
+
+    recentAnnouncementStream =
         FirebaseFirestore.instance
             .collection('announcements')
             .where('deleted', isEqualTo: false)
@@ -603,12 +611,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   Widget _buildMainContent({required bool isDesktop}) {
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('announcements')
-              .where('deleted', isEqualTo: false)
-              .orderBy('created_time', descending: true)
-              .snapshots(),
+      stream: announcementStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -627,7 +630,27 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         _announcementKeys.removeWhere((id, _) => !visibleIds.contains(id));
 
         if (displayedAnnouncements.isEmpty) {
-          return Center(child: Text('No announcements found'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.announcement_outlined,
+                  size: isDesktop ? 64 : 48,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No announcements found',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 20 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return RefreshIndicator(
@@ -723,7 +746,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: StreamBuilder<QuerySnapshot>(
-                stream: announcementStream,
+                stream: recentAnnouncementStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const _AnnouncementSidebarSkeleton();

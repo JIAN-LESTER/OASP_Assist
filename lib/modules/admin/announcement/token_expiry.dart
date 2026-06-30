@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+final Stream<DocumentSnapshot> _facebookAdminTokenStream =
+    FirebaseFirestore.instance
+        .collection('fb_tokens')
+        .doc('facebook_admin')
+        .snapshots();
+
 /// Widget that displays a warning banner when Facebook token is expiring or expired
 /// Should be placed at the top of the admin announcements page
 class FacebookTokenExpirationBanner extends StatelessWidget {
@@ -14,11 +20,7 @@ class FacebookTokenExpirationBanner extends StatelessWidget {
     if (user == null) return const SizedBox.shrink();
 
     return StreamBuilder<DocumentSnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('fb_tokens')
-              .doc('facebook_admin')
-              .snapshots(),
+      stream: _facebookAdminTokenStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();
@@ -496,11 +498,7 @@ class FacebookTokenExpirationIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('fb_tokens')
-              .doc('facebook_admin')
-              .snapshots(),
+      stream: _facebookAdminTokenStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return const SizedBox.shrink();

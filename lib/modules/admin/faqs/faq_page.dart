@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone_project/buttons/add_faq_button.dart';
 import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_candidate_tab.dart';
@@ -20,6 +22,12 @@ import 'package:capstone_project/modules/admin/faqs/faq_info.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
 import 'package:flutter/material.dart';
+
+final Stream<QuerySnapshot> _faqManagementStream =
+    FirebaseFirestore.instance
+        .collection('faqs')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
 
 class FaqManagementPage extends StatefulWidget {
   const FaqManagementPage({super.key});
@@ -46,6 +54,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   // ── Pending-candidate badge count ───────────────────────────────────────
   int _pendingCandidateCount = 0;
+  StreamSubscription<QuerySnapshot>? _pendingCandidateSubscription;
 
   @override
   void initState() {
@@ -58,6 +67,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   @override
   void dispose() {
+    _pendingCandidateSubscription?.cancel();
     _tabController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
@@ -66,7 +76,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   // ── Badge listener ──────────────────────────────────────────────────────
   void _listenToPendingCandidateCount() {
-    FirebaseFirestore.instance
+    _pendingCandidateSubscription = FirebaseFirestore.instance
         .collection('faq_candidates')
         .where('status', isEqualTo: 'pending')
         .snapshots()
@@ -548,11 +558,7 @@ class MobileFaqManagement extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('faqs')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
+        stream: _faqManagementStream,
         builder: (context, snapshot) {
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
@@ -678,11 +684,7 @@ Widget mainContent(
   return Scaffold(
     backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('faqs')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: _faqManagementStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
