@@ -381,7 +381,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         });
       }
 
-      // Refresh in background if stale
+    
       if (cached.isStale) {
         _refreshInBackground();
       }
