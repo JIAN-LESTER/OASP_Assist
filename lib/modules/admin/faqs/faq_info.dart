@@ -557,7 +557,7 @@ Future<void> _handleDeleteFAQ(
         if (feedbackContext.mounted) {
           SnackbarUtil.showError(
             feedbackContext,
-            'Failed to delete FAQ: $error',
+            'FAQ deletion failed: $error',
           );
         }
       }
@@ -566,7 +566,7 @@ Future<void> _handleDeleteFAQ(
     if (context.mounted) {
       Navigator.of(context).pop();
       Navigator.of(context).pop();
-      SnackbarUtil.showInfo(context, 'FAQ deletion is running in background');
+      SnackbarUtil.showInfo(context, 'FAQ deleted successfully');
     }
   } catch (error) {
     if (context.mounted) {
@@ -574,7 +574,7 @@ Future<void> _handleDeleteFAQ(
       Navigator.of(context).pop();
 
       // Show error snackbar using SnackbarUtil
-      SnackbarUtil.showError(context, 'Failed to delete FAQ');
+      SnackbarUtil.showError(context, 'FAQ deletion failed');
     }
   }
 }

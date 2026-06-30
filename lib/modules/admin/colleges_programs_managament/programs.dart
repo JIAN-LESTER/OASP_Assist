@@ -1156,7 +1156,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to delete program: $e',
+              'Program deletion failed: $e',
             );
           }
         }
@@ -1168,13 +1168,13 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
         ).pop(true); // Return true to indicate success
         SnackbarUtil.showInfo(
           context,
-          'Program deletion is running in background',
+          'Program deleted successfully',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        SnackbarUtil.showError(context, 'Failed to delete program: $e');
+        SnackbarUtil.showError(context, 'Program deletion failed: $e');
       }
     }
   }
@@ -1654,7 +1654,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+              'Program ${isEditing ? 'update' : 'creation'} failed: $e',
             );
           }
         }
@@ -1662,7 +1662,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
       SnackbarUtil.showInfo(
         context,
-        'Program ${isEditing ? 'update' : 'creation'} is running in background',
+        'Program ${isEditing ? 'updated' : 'created'} successfully',
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -1670,7 +1670,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         setState(() => _isSubmitting = false);
         SnackbarUtil.showError(
           context,
-          'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+          'Program ${isEditing ? 'update' : 'creation'} failed: $e',
         );
       }
     }

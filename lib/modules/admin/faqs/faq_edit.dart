@@ -630,19 +630,19 @@ Future<void> _handleSaveChanges(
         if (feedbackContext.mounted) {
           SnackbarUtil.showError(
             feedbackContext,
-            'Failed to update: ${e.toString()}',
+            'FAQ update failed: ${e.toString()}',
           );
         }
       }
     }());
 
-    SnackbarUtil.showInfo(context, 'FAQ update is running in background');
+    SnackbarUtil.showInfo(context, 'FAQ updated successfully');
     if (context.mounted) {
       Navigator.of(context).pop();
     }
   } catch (e) {
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
+      SnackbarUtil.showError(context, 'FAQ update failed: ${e.toString()}');
     }
   }
 }

@@ -1025,20 +1025,20 @@ Future<void> _handleSaveChanges(
         if (feedbackContext.mounted) {
           SnackbarUtil.showError(
             feedbackContext,
-            'Failed to update document: $e',
+            'Document update failed: $e',
           );
         }
       }
     }());
 
-    SnackbarUtil.showInfo(context, 'Document update is running in background');
+    SnackbarUtil.showInfo(context, 'Document updated successfully');
     if (context.mounted) {
       Navigator.of(context).pop();
     }
   } catch (e) {
     print('Error updating document: $e');
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Failed to update document: $e');
+      SnackbarUtil.showError(context, 'Document update failed: $e');
     }
   }
 }

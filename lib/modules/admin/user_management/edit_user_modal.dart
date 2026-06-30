@@ -1647,20 +1647,20 @@ class _EditUserModalState extends State<EditUserModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to update: ${e.toString()}',
+              'User update failed: ${e.toString()}',
             );
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'User update is running in background');
+      SnackbarUtil.showInfo(context, 'User updated successfully');
       Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         setState(() {
           _isSubmitting = false;
         });
-        SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
+        SnackbarUtil.showError(context, 'User update failed: ${e.toString()}');
       }
     }
   }

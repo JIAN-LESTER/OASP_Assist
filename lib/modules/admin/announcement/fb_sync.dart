@@ -247,9 +247,7 @@ class FacebookSyncService {
 
       return _parseHttpResponse(response, action: 'Sync');
     } on TimeoutException {
-      throw Exception(
-        'Request timed out. The sync may still be running in the background.',
-      );
+      throw Exception('Facebook sync failed. Please try again.');
     }
   }
 

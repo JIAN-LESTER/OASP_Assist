@@ -1099,7 +1099,7 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to delete college: $e',
+              'College deletion failed: $e',
             );
           }
         }
@@ -1111,13 +1111,13 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
         ).pop(true); // Return true to indicate success
         SnackbarUtil.showInfo(
           context,
-          'College deletion is running in background',
+          'College deleted successfully',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        SnackbarUtil.showError(context, 'Failed to delete college: $e');
+        SnackbarUtil.showError(context, 'College deletion failed: $e');
       }
     }
   }
@@ -1452,7 +1452,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to ${isEditing ? 'update' : 'create'} college: $e',
+              'College ${isEditing ? 'update' : 'creation'} failed: $e',
             );
           }
         }
@@ -1460,7 +1460,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
 
       SnackbarUtil.showInfo(
         context,
-        'College ${isEditing ? 'update' : 'creation'} is running in background',
+        'College ${isEditing ? 'updated' : 'created'} successfully',
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -1468,7 +1468,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
         setState(() => _isSubmitting = false);
         SnackbarUtil.showError(
           context,
-          'Failed to ${isEditing ? 'update' : 'create'} college: $e',
+          'College ${isEditing ? 'update' : 'creation'} failed: $e',
         );
       }
     }

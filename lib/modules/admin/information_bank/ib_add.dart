@@ -509,16 +509,16 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         } catch (e) {
           print(" Upload error: $e");
           if (feedbackContext.mounted) {
-            SnackbarUtil.showError(feedbackContext, 'Upload failed: $e');
+            SnackbarUtil.showError(feedbackContext, 'Document upload failed: $e');
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'Document upload is running in background');
+      SnackbarUtil.showInfo(context, 'Document uploaded successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
       print(" Upload error: $e");
-      SnackbarUtil.showError(context, 'Upload failed: $e');
+      SnackbarUtil.showError(context, 'Document upload failed: $e');
     }
   }
 

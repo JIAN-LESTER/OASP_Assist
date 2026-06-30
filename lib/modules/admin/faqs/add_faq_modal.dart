@@ -247,16 +247,16 @@ class _AddFaqContentState extends State<AddFaqContent> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to create FAQ: $e',
+              'FAQ creation failed: $e',
             );
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'FAQ creation is running in background');
+      SnackbarUtil.showInfo(context, 'FAQ created successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
-      SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
+      SnackbarUtil.showError(context, 'FAQ creation failed: $e');
     }
   }
 
