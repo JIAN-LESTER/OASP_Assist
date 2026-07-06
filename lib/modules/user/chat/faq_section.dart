@@ -1217,10 +1217,11 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                 horizontal: horizontalPadding,
                 vertical: verticalPadding,
               ),
-              child: Container(
-                constraints: BoxConstraints(maxWidth: 900),
-                child: Row(
-                  children: [
+              child: Center(
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: 900),
+                  child: Row(
+                    children: [
                     // FAQ Toggle Button
                     Tooltip(
                       message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
@@ -1463,7 +1464,8 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                         ),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

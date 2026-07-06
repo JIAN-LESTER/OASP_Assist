@@ -696,8 +696,6 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       });
 
-      await Future.delayed(Duration(milliseconds: 100));
-
       await loadConversationInfo();
 
       if (currentConversation != null &&
@@ -721,9 +719,7 @@ class ChatProvider extends ChangeNotifier {
       listenToMessages();
       listenToEscalationResponses();
 
-      await loadUserEscalationCount();
-
-      await Future.delayed(Duration(milliseconds: 100));
+      unawaited(loadUserEscalationCount());
 
       print('✅ ChatProvider setup complete');
       print('   - Conversation ID: $conversationId');
@@ -1080,29 +1076,13 @@ class ChatProvider extends ChangeNotifier {
       });
 
       List<double>? currentEmbedding;
-      Map<String, dynamic>? existingFAQ;
-
-      try {
-        final embeddingFuture = _generateEmbeddingCached(question);
-        final faqFuture = _ensureFAQCacheLoaded();
-
-        await Future.wait([embeddingFuture, faqFuture]);
-        currentEmbedding = await embeddingFuture;
-        existingFAQ = _findBestFAQMatch(question, currentEmbedding);
-      } catch (e) {
-        print('⚠️ FAQ matching skipped: $e');
-      }
 
       String questionCategory;
-      if (existingFAQ != null && existingFAQ['category'] != null) {
-        questionCategory = existingFAQ['category'] as String;
-      } else {
-        try {
-          questionCategory = await _classifyQuestionCategoryFast(question);
-        } catch (e) {
-          print('⚠️ Category classification skipped: $e');
-          questionCategory = 'General';
-        }
+      try {
+        questionCategory = await _classifyQuestionCategoryFast(question);
+      } catch (e) {
+        print('⚠️ Category classification skipped: $e');
+        questionCategory = 'General';
       }
 
       userMessageRef.update({'category': questionCategory}).catchError((e) {
@@ -1155,32 +1135,13 @@ class ChatProvider extends ChangeNotifier {
 
       String finalAnswer = "";
 
-      if (existingFAQ != null) {
-        final String answer = existingFAQ["answer"];
-        const int chunkSize = 50;
-
-        for (int i = 0; i < answer.length; i += chunkSize) {
-          final chunk = answer.substring(
-            i,
-            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-          );
-
-          _streamingContent[botMessageId] =
-              _streamingContent[botMessageId]! + chunk;
-
-          notifyListeners();
-          _onMessageAdded?.call();
-
-          await Future.delayed(Duration(milliseconds: 20));
-        }
-
+      if (_isFastGeneralMessage(question)) {
+        final answer = _fastGeneralReply(question);
+        _streamingContent[botMessageId] = answer;
         finalAnswer = answer;
 
-        _incrementFAQSimilarityCountAsync(existingFAQ["question"]).catchError((
-          e,
-        ) {
-          print('⚠️ Background FAQ count error: $e');
-        });
+        notifyListeners();
+        _onMessageAdded?.call();
       } else {
         await for (final streamedText in _retriever.generateAnswerStream(
           question,
@@ -1472,6 +1433,10 @@ $question
   Future<String> _classifyQuestionCategoryFast(String question) async {
     final q = question.toLowerCase();
 
+    if (_isFastGeneralMessage(question)) {
+      return 'General';
+    }
+
     if (RegExp(
       r'\b(admission|admit|admitted|enroll|enrollment|application|apply|applying|entrance|entry|requirement|requirements|eligibility|qualify|acceptance|accepted|applicant)\b',
     ).hasMatch(q)) {
@@ -1490,35 +1455,50 @@ $question
       return 'Placement';
     }
 
-    try {
-      final prompt =
-          '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
+    return 'General';
+  }
 
-  Categories:
-  - Admission: enrollment, application process, requirements, eligibility, cmucat, 
-  - Scholarship: financial aid, grants, scholarships, tuition assistance
-  - Placement: jobs, internships, career services, OJT, employment
-  - General: anything else
+  bool _isFastGeneralMessage(String question) {
+    final q = question.trim().toLowerCase();
+    if (q.isEmpty) return true;
 
-  Question: "$question"
+    final normalized = q.replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
+    final compact = normalized.split(RegExp(r'\s+')).join(' ').trim();
+    final words = compact.split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
 
-  Return ONLY the category name (Admission, Scholarship, Placement, or General):''';
-
-      final category = await _cohere?.generateResponse(prompt);
-
-      if (category != null && category.trim().isNotEmpty) {
-        final normalized = category.trim().replaceAll(RegExp(r'[^a-zA-Z]'), '');
-
-        if (normalized.toLowerCase().contains('admission')) return 'Admission';
-        if (normalized.toLowerCase().contains('scholarship'))
-          return 'Scholarship';
-        if (normalized.toLowerCase().contains('placement')) return 'Placement';
-      }
-    } catch (e) {
-      print('❌ Classification error: $e');
+    if (words.length <= 3 &&
+        RegExp(
+          r'^(hi|hello|hey|yo|good morning|good afternoon|good evening|thanks|thank you|ok|okay|yes|no)$',
+        ).hasMatch(compact)) {
+      return true;
     }
 
-    return 'General';
+    return false;
+  }
+
+  String _fastGeneralReply(String question) {
+    final compact =
+        question
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+            .split(RegExp(r'\s+'))
+            .join(' ')
+            .trim();
+
+    if (compact == 'thanks' || compact == 'thank you') {
+      return "You're welcome! How else can I help?";
+    }
+
+    if (compact == 'ok' || compact == 'okay' || compact == 'yes') {
+      return 'Got it. How can I help you next?';
+    }
+
+    if (compact == 'no') {
+      return 'No problem. What would you like to ask?';
+    }
+
+    return 'Hi! How can I help you today?';
   }
 
   // =========================================================================
@@ -1642,11 +1622,35 @@ $question
             category,
           ),
         );
+      } else if (_isQuestionWorthyOfFAQ(question) &&
+          _isAnswerWorthyOfFAQ(answerText)) {
+        tasks.add(
+          _promoteToFAQAfterEmbedding(question, answerText, category),
+        );
       }
 
       await Future.wait(tasks);
     } catch (e) {
       print('Error in post-response tasks: $e');
+    }
+  }
+
+  Future<void> _promoteToFAQAfterEmbedding(
+    String question,
+    String answerText,
+    String category,
+  ) async {
+    try {
+      final embedding = await _generateEmbeddingCached(question);
+      await _ensureFAQCacheLoaded();
+      await _checkAndPromoteToFAQOptimized(
+        question,
+        embedding,
+        answerText,
+        category,
+      );
+    } catch (e) {
+      print('⚠️ Background FAQ promotion skipped: $e');
     }
   }
 

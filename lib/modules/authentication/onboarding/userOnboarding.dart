@@ -2321,10 +2321,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
                 color: textSecondaryColor.withOpacity(0.5),
                 fontWeight: FontWeight.w500,
               ),
-              suffixIcon:
-                  controller.text.isNotEmpty
-                      ? Icon(Icons.check, color: Colors.green, size: 24)
-                      : null,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -2410,14 +2406,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 32,
-          child:
-              controller.text.isNotEmpty
-                  ? Icon(Icons.check, color: Colors.green, size: 24)
-                  : null,
-        ),
       ],
     );
   }
@@ -2470,10 +2458,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
               ),
             ),
             decoration: InputDecoration(
-              suffixIcon:
-                  safeValue != null
-                      ? Icon(Icons.check, color: Colors.green, size: 24)
-                      : null,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
@@ -2587,14 +2571,6 @@ class _UserOnboardingScreenState extends State<UserOnboardingScreen>
             isExpanded: true,
             menuMaxHeight: 300,
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 32,
-          child:
-              safeValue != null
-                  ? Icon(Icons.check, color: Colors.green, size: 24)
-                  : null,
         ),
       ],
     );
