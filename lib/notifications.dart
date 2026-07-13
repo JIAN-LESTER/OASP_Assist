@@ -1383,9 +1383,7 @@ class _NotificationModalState extends State<NotificationModal>
                       print(' Continue in Chat pressed');
                       print('   - conversationId: $conversationId');
 
-                      if (conversationId == null ||
-                          conversationId.isEmpty ||
-                          conversationId == 'null') {
+                      if (conversationId.isEmpty || conversationId == 'null') {
                         _showErrorSnackbar('No conversation available');
                         return;
                       }

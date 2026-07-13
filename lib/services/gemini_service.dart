@@ -4,20 +4,19 @@ import 'dart:io';
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class GeminiService {
   final FirebaseFunctions functions = FirebaseFunctions.instance;
-  final bool _isDesktop;
+  final bool _isDesktop = false;
 
   // Desktop-only fields
   late final String _apiKey;
   late final String _embedUrl;
 
-  GeminiService() : _isDesktop = _checkIfDesktop() {
+  GeminiService() {
     if (_isDesktop) {
-      _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      _apiKey = '';
 
       if (_apiKey.isEmpty) {
         throw Exception('Gemini API key not found in .env file');

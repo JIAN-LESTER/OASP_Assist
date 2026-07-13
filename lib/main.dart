@@ -23,7 +23,6 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:capstone_project/services/notification_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -551,15 +550,6 @@ void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
-
-      //  Load environment variables FIRST
-      try {
-        await dotenv.load(fileName: '.env');
-        print(' Environment variables loaded');
-      } catch (e) {
-        print(' Could not load .env file: $e');
-        print('   Make sure .env exists in project root');
-      }
 
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,

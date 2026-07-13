@@ -12,7 +12,6 @@ import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -2726,7 +2725,7 @@ $question
     }
   }
 
-  late final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+  late final String _geminiApiKey = '';
 
   Future<List<double>> generateEmbedding(String question) async {
     if (!kIsWeb && Platform.isWindows) {

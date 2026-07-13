@@ -7,7 +7,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/services/admin_functions.dart'
     show FirebaseFunctionsService;
@@ -1197,8 +1196,8 @@ Future<void> _deleteFromPineconeDirect(
   late final String indexHost;
   try {
     // Fetching from Environment Variables
-    apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
-    indexHost = dotenv.env['PINECONE_HOST'] ?? '';
+    apiKey = '';
+    indexHost = '';
 
     if (apiKey.isEmpty || indexHost.isEmpty) {
       throw Exception("Missing Pinecone Environment Variables");
@@ -1241,7 +1240,6 @@ Future<void> _deleteFromPineconeFirebase(
   });
   print(' Deleted ${result.data['deleted']} Pinecone vectors via Firebase');
 }
-
 
 // Future<void> _deleteFromPinecone(
 //   List<String> chunkIds,
