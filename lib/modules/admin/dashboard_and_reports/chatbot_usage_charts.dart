@@ -431,6 +431,32 @@ Widget _buildEmptyState({
   );
 }
 
+Widget _buildEmptyChartCard({
+  required IconData icon,
+  required String message,
+  required String subtitle,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: _buildEmptyState(
+      icon: icon,
+      message: message,
+      subtitle: subtitle,
+    ),
+  );
+}
+
 Widget buildConversationsOverTimeCard(
   List<ChartData> conversationTrend,
   String timeFrame, {
@@ -1809,7 +1835,7 @@ Widget buildEscalationLimitReachCard(double escalationLimitReachRate) {
 // Chart for Chat Limit Reach Trend
 Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
   if (trendData.isEmpty) {
-    return _buildEmptyState(
+    return _buildEmptyChartCard(
       message: 'Chat Limit Reach Trend',
       subtitle: 'Users hitting message limit over time',
       icon: Icons.chat_bubble_outline,
@@ -2027,7 +2053,7 @@ Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
 // Chart for Escalation Limit Reach Trend
 Widget buildEscalationLimitReachTrendCard(List<ChartData> trendData) {
   if (trendData.isEmpty) {
-    return _buildEmptyState(
+    return _buildEmptyChartCard(
       message: 'Escalation Limit Reach Trend',
       subtitle: 'Users hitting escalation limit over time',
       icon: Icons.priority_high,
