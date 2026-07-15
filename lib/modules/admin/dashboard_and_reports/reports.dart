@@ -32,6 +32,15 @@ class ChartData {
   }
 }
 
+DateTime _readDateTime(dynamic value, {DateTime? fallback}) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) {
+    return DateTime.tryParse(value) ?? fallback ?? DateTime.now();
+  }
+  return fallback ?? DateTime.now();
+}
+
 class SystemLog {
   final String user;
   final DateTime time;
@@ -43,7 +52,7 @@ class SystemLog {
     return SystemLog(
       user: map['user'] ?? '',
       action: map['action'] ?? '',
-      time: (map['time'] as Timestamp).toDate(),
+      time: _readDateTime(map['time']),
     );
   }
 }
@@ -66,7 +75,7 @@ class MessageLogs {
       user: map['user'] ?? '',
       message: map['message'] ?? '',
       reply: map['reply'] ?? '',
-      time: (map['time'] as Timestamp).toDate(),
+      time: _readDateTime(map['time']),
     );
   }
 }
@@ -219,6 +228,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading inquiry reports data: $e');
       return getEmptyInquiryReportsData();
     }
   }
@@ -270,6 +280,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading chatbot usage reports data: $e');
       return getEmptyChatbotUsageReportsData();
     }
   }
@@ -325,6 +336,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading user demographics reports data: $e');
       return getEmptyUserDemographicsReportsData();
     }
   }
@@ -390,6 +402,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading admin dashboard data: $e');
       return getEmptyAdminDashboardData();
     }
   }
@@ -453,6 +466,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading staff dashboard data: $e');
       return getEmptyStaffDashboardData();
     }
   }
@@ -1587,6 +1601,7 @@ class FirebaseService {
         'totalUsers': usersSnapshot.count ?? 0,
       };
     } catch (e) {
+      debugPrint('Error loading quick stats: $e');
       return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
     }
   }
