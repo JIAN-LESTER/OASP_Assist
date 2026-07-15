@@ -8,6 +8,10 @@ enum OnboardingStep {
   sidebar,
   sidebarContent,
   faqButton,
+  faqCards,
+  textInput,
+  chatBubbles,
+  escalationButton,
   audioButton,
   notifications,
   profile,
@@ -20,6 +24,8 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
   final VoidCallback? onFinished;
 
@@ -31,19 +37,21 @@ class OnboardingGuide extends StatefulWidget {
     this.profileKey,
     this.bottomNavKey,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
     this.onFinished,
   });
 
   @override
-  State<OnboardingGuide> createState() => _OnboardingGuideState();
+  OnboardingGuideState createState() => OnboardingGuideState();
 
-  static _OnboardingGuideState? of(BuildContext context) {
-    return context.findAncestorStateOfType<_OnboardingGuideState>();
+  static OnboardingGuideState? of(BuildContext context) {
+    return context.findAncestorStateOfType<OnboardingGuideState>();
   }
 }
 
-class _OnboardingGuideState extends State<OnboardingGuide>
+class OnboardingGuideState extends State<OnboardingGuide>
     with SingleTickerProviderStateMixin {
   bool _showOnboarding = false;
   OnboardingStep _currentStep = OnboardingStep.sidebar;
@@ -94,7 +102,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
 
       if (!hasSeenLocal && !dbHasSeenOnboarding) {
         await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) {
+        if (mounted && !_showOnboarding) {
           setState(() {
             _showOnboarding = true;
           });
@@ -107,6 +115,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
   }
 
   void _showOverlay() {
+    if (_overlayEntry != null) return;
     _overlayEntry = _createOverlayEntry();
     Overlay.of(context).insert(_overlayEntry!);
   }
@@ -126,6 +135,8 @@ class _OnboardingGuideState extends State<OnboardingGuide>
             profileKey: widget.profileKey,
             bottomNavKey: widget.bottomNavKey,
             faqButtonKey: widget.faqButtonKey,
+            faqCardsKey: widget.faqCardsKey,
+            textInputKey: widget.textInputKey,
             audioButtonKey: widget.audioButtonKey,
             pulseAnimation: _pulseAnimation,
             onNext: _nextStep,
@@ -139,104 +150,51 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     return MediaQuery.of(context).size.width < 600;
   }
 
+  List<OnboardingStep> _availableSteps() {
+    final steps = <OnboardingStep>[
+      OnboardingStep.sidebar,
+      OnboardingStep.sidebarContent,
+      OnboardingStep.faqButton,
+    ];
+
+    if (widget.faqCardsKey?.currentContext != null) {
+      steps.add(OnboardingStep.faqCards);
+    }
+
+    steps.addAll(const [
+      OnboardingStep.textInput,
+      OnboardingStep.chatBubbles,
+      OnboardingStep.escalationButton,
+      OnboardingStep.audioButton,
+      OnboardingStep.notifications,
+      OnboardingStep.profile,
+    ]);
+    return steps;
+  }
+
   void _nextStep() {
     HapticFeedback.lightImpact();
-    setState(() {
-      if (_isMobile(context)) {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.notifications;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.profile;
-            break;
-          case OnboardingStep.profile:
-            _finishOnboarding();
-            return;
-        }
-      } else {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.notifications;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.profile;
-            break;
-          case OnboardingStep.profile:
-            _finishOnboarding();
-            return;
-        }
-      }
-    });
+    final steps = _availableSteps();
+    final currentIndex = steps.indexOf(_currentStep);
 
+    if (currentIndex == -1 || currentIndex == steps.length - 1) {
+      _finishOnboarding();
+      return;
+    }
+
+    setState(() => _currentStep = steps[currentIndex + 1]);
     _removeOverlay();
     _showOverlay();
   }
 
   void _previousStep() {
     HapticFeedback.lightImpact();
-    setState(() {
-      if (_isMobile(context)) {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            return;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.sidebar;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.profile:
-            _currentStep = OnboardingStep.notifications;
-            break;
-        }
-      } else {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            return;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.sidebar;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.profile:
-            _currentStep = OnboardingStep.notifications;
-            break;
-        }
-      }
-    });
+    final steps = _availableSteps();
+    final currentIndex = steps.indexOf(_currentStep);
 
+    if (currentIndex <= 0) return;
+
+    setState(() => _currentStep = steps[currentIndex - 1]);
     _removeOverlay();
     _showOverlay();
   }
@@ -474,6 +432,8 @@ class _OnboardingOverlay extends StatelessWidget {
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
   final Animation<double> pulseAnimation;
   final VoidCallback onNext;
@@ -487,6 +447,8 @@ class _OnboardingOverlay extends StatelessWidget {
     this.profileKey,
     this.bottomNavKey,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
     required this.pulseAnimation,
     required this.onNext,
@@ -511,6 +473,11 @@ class _OnboardingOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     if (currentStep == OnboardingStep.sidebarContent) {
       return _buildSidebarContentOverlay(context);
+    }
+
+    if (currentStep == OnboardingStep.chatBubbles ||
+        currentStep == OnboardingStep.escalationButton) {
+      return _buildChatPreviewOverlay(context);
     }
 
     final targetKey = _getTargetKey();
@@ -568,6 +535,137 @@ class _OnboardingOverlay extends StatelessWidget {
             child: _buildTooltip(context),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatPreviewOverlay(BuildContext context) {
+    final isEscalationStep = currentStep == OnboardingStep.escalationButton;
+
+    return Material(
+      color: Colors.black.withOpacity(0.72),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black38,
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chat preview',
+                    style: TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: const Text(
+                        'How do I apply?',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(4),
+                        bottomRight: Radius.circular(16),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'You can submit your application through the admissions portal.',
+                      style: TextStyle(color: Color(0xFF374151), height: 1.4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isEscalationStep
+                            ? const Color(0xFFFFF7ED)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isEscalationStep
+                              ? const Color(0xFF4CAF50)
+                              : Colors.grey.shade300,
+                          width: isEscalationStep ? 3 : 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.support_agent, size: 18, color: Color(0xFF4B5563)),
+                          SizedBox(width: 6),
+                          Text(
+                            'Escalate to Staff',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF4B5563),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTooltip(context),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -690,6 +788,13 @@ class _OnboardingOverlay extends StatelessWidget {
         return null;
       case OnboardingStep.faqButton:
         return faqButtonKey;
+      case OnboardingStep.faqCards:
+        return faqCardsKey;
+      case OnboardingStep.textInput:
+        return textInputKey;
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return null;
       case OnboardingStep.audioButton:
         return audioButtonKey;
       case OnboardingStep.notifications:
@@ -707,6 +812,12 @@ class _OnboardingOverlay extends StatelessWidget {
         return 0;
       case OnboardingStep.faqButton:
         return 8;
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        return 12;
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
       case OnboardingStep.audioButton:
         return 8;
       case OnboardingStep.notifications:
@@ -746,6 +857,21 @@ class _OnboardingOverlay extends StatelessWidget {
           return screenWidth - tooltipWidth - 20;
         }
         return centeredLeft;
+
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        final tooltipWidth =
+            isMobile ? (screenWidth - 40).clamp(280.0, 340.0) : 340.0;
+        final centeredLeft = offset.dx + (size.width / 2) - (tooltipWidth / 2);
+        if (centeredLeft < 20) return 20;
+        if (centeredLeft + tooltipWidth > screenWidth - 20) {
+          return screenWidth - tooltipWidth - 20;
+        }
+        return centeredLeft;
+
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
 
       case OnboardingStep.audioButton:
         // Center tooltip above the button (positioned to the right)
@@ -799,6 +925,16 @@ class _OnboardingOverlay extends StatelessWidget {
         }
         return proposedTop;
 
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        final proposedTop = offset.dy - 210;
+        if (proposedTop < 80) return offset.dy + size.height + 24;
+        return proposedTop;
+
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
+
       case OnboardingStep.audioButton:
         // Position tooltip above the button with better spacing
         final tooltipHeight = 160.0;
@@ -828,8 +964,6 @@ class _OnboardingOverlay extends StatelessWidget {
   Widget _buildTooltip(BuildContext context) {
     final info = _getStepInfo(context);
     final isMobile = _isMobile(context);
-    final isTablet = _isTablet(context);
-    final isDesktop = _isDesktop(context);
     final isFirstStep = currentStep == OnboardingStep.sidebar;
     final isLastStep = _isLastStep(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1008,11 +1142,29 @@ class _OnboardingOverlay extends StatelessWidget {
   }
 
   Widget _buildStepIndicator(BuildContext context) {
-    final isMobile = _isMobile(context);
-    final totalSteps = 6; // 6 steps total
+    final totalSteps = _availableSteps().length;
     final currentStepIndex = _getCurrentStepIndex();
 
+    if (totalSteps > 6) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F5E9),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '${currentStepIndex + 1}/$totalSteps',
+          style: const TextStyle(
+            color: Color(0xFF2E7D32),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: List.generate(totalSteps, (index) {
         final isActive = index == currentStepIndex;
         return Container(
@@ -1029,24 +1181,31 @@ class _OnboardingOverlay extends StatelessWidget {
   }
 
   int _getCurrentStepIndex() {
-    switch (currentStep) {
-      case OnboardingStep.sidebar:
-        return 0;
-      case OnboardingStep.sidebarContent:
-        return 1;
-      case OnboardingStep.faqButton:
-        return 2;
-      case OnboardingStep.audioButton:
-        return 3;
-      case OnboardingStep.notifications:
-        return 4;
-      case OnboardingStep.profile:
-        return 5;
-    }
+    return _availableSteps().indexOf(currentStep);
   }
 
   bool _isLastStep(BuildContext context) {
-    return currentStep == OnboardingStep.profile;
+    return _getCurrentStepIndex() == _availableSteps().length - 1;
+  }
+
+  List<OnboardingStep> _availableSteps() {
+    final steps = <OnboardingStep>[
+      OnboardingStep.sidebar,
+      OnboardingStep.sidebarContent,
+      OnboardingStep.faqButton,
+    ];
+    if (faqCardsKey?.currentContext != null) {
+      steps.add(OnboardingStep.faqCards);
+    }
+    steps.addAll(const [
+      OnboardingStep.textInput,
+      OnboardingStep.chatBubbles,
+      OnboardingStep.escalationButton,
+      OnboardingStep.audioButton,
+      OnboardingStep.notifications,
+      OnboardingStep.profile,
+    ]);
+    return steps;
   }
 
   _StepInfo _getStepInfo(BuildContext context) {
@@ -1088,6 +1247,34 @@ class _OnboardingOverlay extends StatelessWidget {
           title: 'Browse FAQs',
           description:
               'Toggle this button to view frequently asked questions. It\'s a quick way to find answers without typing.',
+        );
+
+      case OnboardingStep.faqCards:
+        return _StepInfo(
+          title: 'FAQ Categories',
+          description:
+              'Choose a category card to browse common questions. This step appears only when FAQs are available.',
+        );
+
+      case OnboardingStep.textInput:
+        return _StepInfo(
+          title: 'Ask a Question',
+          description:
+              'Type your question here, then use the arrow button or your keyboard to send it.',
+        );
+
+      case OnboardingStep.chatBubbles:
+        return _StepInfo(
+          title: 'Your Chat',
+          description:
+              'Your messages appear in green and OASP Assist replies in white, so it is easy to follow the conversation.',
+        );
+
+      case OnboardingStep.escalationButton:
+        return _StepInfo(
+          title: 'Escalate to Staff',
+          description:
+              'If an answer does not resolve your concern, use this button below an OASP Assist reply to ask staff for help.',
         );
 
       case OnboardingStep.audioButton:

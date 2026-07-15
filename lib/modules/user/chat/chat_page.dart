@@ -34,6 +34,8 @@ class ChatPage extends StatefulWidget {
   final bool showFAQs;
   final VoidCallback? onFAQToggle;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
 
   const ChatPage({
@@ -43,6 +45,8 @@ class ChatPage extends StatefulWidget {
     this.showFAQs = false,
     this.onFAQToggle,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
   }) : super(key: key);
 
@@ -3015,6 +3019,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                           key: _faqSectionKey,
                           onFAQSelected: _onFAQSelected,
                           messageController: _controller,
+                          faqCardsKey: widget.faqCardsKey,
                         )
                         : (messages.isEmpty
                             ? _buildEmptyChatState()
@@ -3032,6 +3037,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                         ? (_faqSectionKey.currentState?.isListening ?? false)
                         : _isListening,
                 faqButtonKey: widget.faqButtonKey,
+                textInputKey: widget.textInputKey,
                 audioButtonKey: widget.audioButtonKey,
               ),
             ],

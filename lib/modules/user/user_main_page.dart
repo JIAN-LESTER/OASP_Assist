@@ -75,7 +75,11 @@ class _UserMainPageState extends State<UserMainPage>
   final GlobalKey _profileKey = GlobalKey();
   final GlobalKey _bottomNavKey = GlobalKey();
   final GlobalKey _faqButtonKey = GlobalKey();
+  final GlobalKey _faqCardsKey = GlobalKey();
+  final GlobalKey _textInputKey = GlobalKey();
   final GlobalKey _audioButtonKey = GlobalKey();
+  final GlobalKey<OnboardingGuideState> _onboardingGuideKey =
+      GlobalKey<OnboardingGuideState>();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -97,6 +101,47 @@ class _UserMainPageState extends State<UserMainPage>
   void _toggleSidebar() {
     setState(() {
       _isSidebarExpanded = !_isSidebarExpanded;
+    });
+  }
+
+  void _showGuideAgain() {
+    _showGuideAgainAfterChatIsMounted();
+  }
+
+  Future<void> _showGuideAgainAfterChatIsMounted() async {
+    if (!mounted) return;
+
+    if (_selectedIndex != 1) {
+      setState(() {
+        _selectedIndex = 1;
+        _currentIndex = 1;
+      });
+      _tabController.animateTo(1);
+      await Future.delayed(const Duration(milliseconds: 350));
+    } else {
+      await Future.delayed(Duration.zero);
+    }
+
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showGuideWhenReady();
+    });
+  }
+
+  void _showGuideWhenReady({int attempt = 0}) {
+    final guideState = _onboardingGuideKey.currentState;
+    if (guideState != null) {
+      guideState.showGuide();
+      return;
+    }
+
+    if (attempt >= 10 || !mounted) return;
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      _showGuideWhenReady(attempt: attempt + 1);
     });
   }
 
@@ -170,11 +215,8 @@ class _UserMainPageState extends State<UserMainPage>
 
         //  REMOVED DELAY - Show immediately
         if (mounted) {
-          final onboardingGuide = OnboardingGuide.of(context);
-          if (onboardingGuide != null) {
-            print(' Triggering OnboardingGuide after user onboarding');
-            onboardingGuide.showGuide();
-          }
+          print(' Triggering OnboardingGuide after user onboarding');
+          _showGuideAgain();
         }
       }
     } catch (e) {
@@ -811,6 +853,8 @@ class _UserMainPageState extends State<UserMainPage>
         showFAQs: _showFAQs,
         onFAQToggle: _toggleFAQs,
         faqButtonKey: _faqButtonKey,
+        faqCardsKey: _faqCardsKey,
+        textInputKey: _textInputKey,
         audioButtonKey: _audioButtonKey,
       ),
       const UserAnnouncementPage(),
@@ -836,11 +880,14 @@ class _UserMainPageState extends State<UserMainPage>
         }
 
         return OnboardingGuide(
+          key: _onboardingGuideKey,
           sidebarKey: _sidebarKey,
           notificationKey: _notificationKey,
           profileKey: _profileKey,
           bottomNavKey: _bottomNavKey,
           faqButtonKey: _faqButtonKey,
+          faqCardsKey: _faqCardsKey,
+          textInputKey: _textInputKey,
           audioButtonKey: _audioButtonKey,
           onFinished: () {
             //  Callback when guide finishes
@@ -936,6 +983,7 @@ class _UserMainPageState extends State<UserMainPage>
             isExpanded: _isSidebarExpanded,
             onConversationSelected: _onConversationSelected,
             onNewChat: _onNewChatPressed,
+            onShowGuide: _showGuideAgain,
           ),
           //   Wrap only the page content in Stack
           Expanded(
@@ -1034,6 +1082,28 @@ class _UserMainPageState extends State<UserMainPage>
                     ),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showGuideAgain();
+                  },
+                  icon: const Icon(Icons.school_outlined, size: 18),
+                  label: const Text('Show Guide Again'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: UniversalUIComponents.primaryGreen,
+                    side: BorderSide(
+                      color: UniversalUIComponents.primaryGreen.withOpacity(
+                        0.35,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
             Expanded(child: _buildDrawerConversationsList()),

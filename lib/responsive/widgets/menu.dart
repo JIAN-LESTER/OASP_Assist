@@ -250,6 +250,7 @@ class UniversalUIComponents {
     required bool isExpanded,
     Function(BuildContext, String?)? onConversationSelected,
     VoidCallback? onNewChat, //  ADD THIS PARAMETER
+    VoidCallback? onShowGuide,
   }) {
     final menuConfig = _getMenuConfig(userRole);
 
@@ -287,6 +288,12 @@ class UniversalUIComponents {
               ),
             ),
           ),
+          if (userRole == UserRole.user && onShowGuide != null)
+            _buildPersistentShowGuideButton(
+              context,
+              isExpanded,
+              onShowGuide,
+            ),
         ],
       ),
     );
@@ -1738,8 +1745,6 @@ class UniversalUIComponents {
                       borderRadius: BorderRadius.circular(8),
                       onTap: () async {
                         HapticFeedback.mediumImpact();
-
-                        //   Use callback for collapsed state
                         if (onNewChat != null && context.mounted) {
                           onNewChat();
                         }
@@ -1762,6 +1767,69 @@ class UniversalUIComponents {
           ],
         );
       },
+    );
+  }
+
+  static Widget _buildPersistentShowGuideButton(
+    BuildContext context,
+    bool isExpanded,
+    VoidCallback onShowGuide,
+  ) {
+    if (!isExpanded) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+        child: Tooltip(
+          message: 'Show Guide Again',
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onShowGuide();
+              },
+              child: Container(
+                width: double.infinity,
+                height: 44,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.school_outlined,
+                  color: primaryGreen,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        height: 40,
+        child: OutlinedButton.icon(
+          onPressed: onShowGuide,
+          icon: const Icon(Icons.school_outlined, size: 18),
+          label: const Text(
+            'Show Guide Again',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: primaryGreen,
+            side: BorderSide(color: primaryGreen.withOpacity(0.35)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

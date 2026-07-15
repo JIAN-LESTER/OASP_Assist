@@ -14,12 +14,14 @@ class FAQSection extends StatefulWidget {
   final bool isLoading;
   final TextEditingController?
   messageController; // Add controller to update text field
+  final GlobalKey? faqCardsKey;
 
   const FAQSection({
     Key? key,
     required this.onFAQSelected,
     this.isLoading = false,
     this.messageController,
+    this.faqCardsKey,
   }) : super(key: key);
 
   @override
@@ -430,11 +432,12 @@ class FAQSectionState extends State<FAQSection>
   }
 
   /// Builds desktop category card (always expanded with scrollable list)
-  Widget _buildDesktopCategoryCard(String category) {
+  Widget _buildDesktopCategoryCard(String category, {Key? key}) {
     final faqItems = faqCategories[category] ?? [];
     final icon = _getIconForCategory(category);
 
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -542,12 +545,13 @@ class FAQSectionState extends State<FAQSection>
   }
 
   /// Builds mobile/tablet category card (collapsible with dropdown)
-  Widget _buildMobileTabletCategoryCard(String category) {
+  Widget _buildMobileTabletCategoryCard(String category, {Key? key}) {
     final isExpanded = _expandedCategory == category;
     final faqItems = faqCategories[category] ?? [];
     final icon = _getIconForCategory(category);
 
     return Container(
+      key: key,
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -804,7 +808,10 @@ class FAQSectionState extends State<FAQSection>
                     for (var i = 0; i < displayCategories.length; i++) ...[
                       if (i > 0) SizedBox(width: spacing),
                       Expanded(
-                        child: _buildDesktopCategoryCard(displayCategories[i]),
+                        child: _buildDesktopCategoryCard(
+                          displayCategories[i],
+                          key: i == 0 ? widget.faqCardsKey : null,
+                        ),
                       ),
                     ],
                   ],
@@ -848,12 +855,15 @@ class FAQSectionState extends State<FAQSection>
             _buildHeader(),
             SizedBox(height: 32),
             //  Center the FAQ cards
-            ...displayCategories.map(
-              (category) => Container(
+            ...displayCategories.asMap().entries.map(
+              (entry) => Container(
                 constraints: BoxConstraints(
                   maxWidth: 600,
                 ), //  Max width for centering
-                child: _buildMobileTabletCategoryCard(category),
+                child: _buildMobileTabletCategoryCard(
+                  entry.value,
+                  key: entry.key == 0 ? widget.faqCardsKey : null,
+                ),
               ),
             ),
             SizedBox(height: 40),
@@ -1089,6 +1099,7 @@ class FAQInputSection extends StatefulWidget {
   final VoidCallback? onMicrophoneTap;
   final bool isListening;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
 
   const FAQInputSection({
@@ -1101,6 +1112,7 @@ class FAQInputSection extends StatefulWidget {
     this.onMicrophoneTap,
     this.isListening = false,
     this.faqButtonKey,
+    this.textInputKey,
     this.audioButtonKey,
   }) : super(key: key);
 
@@ -1287,6 +1299,7 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                     // Text Input Field
                     Expanded(
                       child: Container(
+                        key: widget.textInputKey,
                         constraints: BoxConstraints(
                           minHeight: buttonSize,
                           maxHeight: 100,
