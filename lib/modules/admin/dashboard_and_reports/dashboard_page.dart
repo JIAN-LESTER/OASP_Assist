@@ -255,7 +255,7 @@ class DashboardCache {
   final AdminDashboardData? ad; //  ADD THIS
   final ExternalToolsUsageSummary? externalToolsUsage;
   final DateTime timestamp;
-  final Map<String, dynamic>? quickStats;
+  final Map<String, int>? quickStats;
 
   DashboardCache({
     this.inq,
@@ -311,6 +311,14 @@ class _DashboardModulestate extends State<DashboardPage> {
   bool isLazyLoading = false;
   bool showSkeleton = true;
 
+  bool get _hasRequiredDashboardData {
+    return userName != null &&
+        quickStats != null &&
+        inq != null &&
+        ud != null &&
+        ad != null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -333,15 +341,15 @@ class _DashboardModulestate extends State<DashboardPage> {
       // Phase 1: Load critical data first (username + quick stats)
       await _loadCriticalData();
 
-      // Phase 2: Show the dashboard, then fill full data in the background
+      // Phase 2: Keep the skeleton visible until the full dashboard payload is ready.
+      await _loadFullData();
+
       if (mounted) {
         setState(() {
-          showSkeleton = false;
+          showSkeleton = !_hasRequiredDashboardData;
           isInitialLoad = false;
         });
       }
-
-      await _loadFullData();
     } catch (e) {
       print('Error loading dashboard: $e');
       if (mounted) {
@@ -377,7 +385,7 @@ class _DashboardModulestate extends State<DashboardPage> {
           ud = cached.ud;
           ad = cached.ad; //  LOAD FROM CACHE
           externalToolsUsage = cached.externalToolsUsage;
-          quickStats = cached.quickStats as Map<String, int>?;
+          quickStats = cached.quickStats ?? quickStats;
         });
       }
 
@@ -446,6 +454,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         ad: adminData,
         externalToolsUsage: externalUsageData,
         timestamp: DateTime.now(),
+        quickStats: quickStats,
       );
 
       setState(() {
@@ -610,7 +619,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
-          showSkeleton = false;
+          showSkeleton = !_hasRequiredDashboardData;
         });
       }
     }
@@ -660,7 +669,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
-          showSkeleton = false;
+          showSkeleton = !_hasRequiredDashboardData;
         });
       }
     }
@@ -713,7 +722,7 @@ class _DashboardModulestate extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = showSkeleton || userName == null;
+    final isLoading = showSkeleton || !_hasRequiredDashboardData;
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
@@ -1136,8 +1145,7 @@ Widget dashboardContents(
         Widget statCards() {
           final totalMessages = inq?.totalMessages ?? 0;
           final totalUsers = ud?.totalUsers ?? 0;
-          final escalated = inq?.escalatedMessages ?? 0;
-          final resolved = inq?.resolvedMessages ?? 0;
+          final allEscalations = inq?.allEscalations ?? 0;
 
           // Calculate ratios
           final escalationRate = inq?.escalationRate ?? 0.0;
@@ -1240,7 +1248,7 @@ Widget dashboardContents(
                 Expanded(
                   child: buildStatCard(
                     'Escalated Messages',
-                    '${inq?.allEscalations}',
+                    '$allEscalations',
                     Colors.orange,
                     Icons.warning_amber_rounded,
                     onTap:

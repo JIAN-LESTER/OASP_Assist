@@ -390,6 +390,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               }
                             },
                             maxLines: 2,
+                            textAlignVertical: TextAlignVertical.top,
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,
@@ -400,13 +401,30 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               labelText: 'FAQ Question',
                               hintText:
                                   'Enter the frequently asked question...',
-                              prefixIcon: Icon(
-                                Icons.help_outline,
-                                color:
-                                    _questionError != null
-                                        ? Colors.red
-                                        : const Color(0xFF6B7280),
-                                size: 20,
+                              alignLabelWithHint: true,
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 48,
+                              ),
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 10,
+                                  top: 16,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  widthFactor: 1,
+                                  heightFactor: 1,
+                                  child: Icon(
+                                    Icons.help_outline,
+                                    color:
+                                        _questionError != null
+                                            ? Colors.red
+                                            : const Color(0xFF6B7280),
+                                    size: 20,
+                                  ),
+                                ),
                               ),
                               errorText: _questionError,
                               labelStyle: TextStyle(
@@ -460,9 +478,11 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               ),
                               filled: true,
                               fillColor: const Color(0xFFFAFBFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                0,
+                                16,
+                                16,
+                                16,
                               ),
                             ),
                           ),
@@ -500,6 +520,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               }
                             },
                             maxLines: 5,
+                            textAlignVertical: TextAlignVertical.top,
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,
@@ -510,13 +531,30 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               labelText: 'FAQ Answer',
                               hintText:
                                   'Enter the detailed answer to this question...',
-                              prefixIcon: Icon(
-                                Icons.article_outlined,
-                                color:
-                                    _answerError != null
-                                        ? Colors.red
-                                        : const Color(0xFF6B7280),
-                                size: 20,
+                              alignLabelWithHint: true,
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 48,
+                              ),
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 10,
+                                  top: 16,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  widthFactor: 1,
+                                  heightFactor: 1,
+                                  child: Icon(
+                                    Icons.article_outlined,
+                                    color:
+                                        _answerError != null
+                                            ? Colors.red
+                                            : const Color(0xFF6B7280),
+                                    size: 20,
+                                  ),
+                                ),
                               ),
                               errorText: _answerError,
                               errorMaxLines: 2,
@@ -571,9 +609,11 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               ),
                               filled: true,
                               fillColor: const Color(0xFFFAFBFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                0,
+                                16,
+                                16,
+                                16,
                               ),
                             ),
                           ),
