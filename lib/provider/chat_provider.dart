@@ -63,7 +63,7 @@ class ChatProvider extends ChangeNotifier {
 
   bool _isDisposed = false;
 
-  static const int MAX_DAILY_MESSAGES = 5;
+  static const int MAX_DAILY_MESSAGES = 3;
 
   DateTime _currentChatWindowStart() {
     final now = DateTime.now();

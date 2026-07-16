@@ -3362,9 +3362,9 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
                     // Feature items
                     _buildFeatureItem(
                       icon: Icons.chat_bubble_outline,
-                      title: '5 Messages Per Day',
+                      title: '3 Messages Per Day',
                       description:
-                          'Ask up to 5 questions daily to get instant answers',
+                          'Ask up to 3 questions daily to get instant answers',
                       isMobile: isMobile,
                     ),
                     SizedBox(height: isMobile ? 14 : 16),
