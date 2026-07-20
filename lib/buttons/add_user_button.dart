@@ -6,10 +6,10 @@ class AddUserButton extends StatelessWidget {
   final Function(int)? onNavigateToPage; // Add this parameter
 
   const AddUserButton({
-    Key? key,
+    super.key,
     this.onPressed,
     this.onNavigateToPage, // Add this to constructor
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +35,7 @@ class AddUserButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha: 0.1),
                 spreadRadius: 1,
                 blurRadius: isMobile ? 2 : 3,
                 offset: const Offset(0, 1),

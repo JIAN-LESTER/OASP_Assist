@@ -93,9 +93,3 @@ export {
   sendCustomPasswordReset,
   sendCustomEmailChangeVerification,
 } from "./authEmail";
-
-export {
-  logFirebaseRead,
-  logTopLevelFirebaseUsage,
-  logNestedFirebaseUsage,
-} from "./firebaseUsage";

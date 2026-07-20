@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/faq_text_normalizer.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showEditFAQModal(
@@ -583,6 +584,7 @@ Future<void> _handleSaveChanges(
       try {
         await FirebaseFirestore.instance.collection('faqs').doc(userDoc.id).update({
           'question': question,
+          'questionNormalized': normalizeFaqQuestion(question),
           'answer': answer,
           'category': category,
           'updatedAt': Timestamp.now(),

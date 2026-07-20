@@ -9,6 +9,7 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/utils/faq_text_normalizer.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -211,6 +212,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
 
           final Map<String, dynamic> faqData = {
             'question': question,
+            'questionNormalized': normalizeFaqQuestion(question),
             'answer': answer,
             'category': category,
             'isPredefined': true,

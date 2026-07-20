@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
+import 'package:capstone_project/utils/faq_text_normalizer.dart';
 import 'faq_candidate_tab.dart';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,7 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
       final faqRef = db.collection('faqs').doc();
       batch.set(faqRef, {
         'question': question,
+        'questionNormalized': normalizeFaqQuestion(question),
         'answer': answer,
         'category': _selectedCategory,
         'isPredefined': false,

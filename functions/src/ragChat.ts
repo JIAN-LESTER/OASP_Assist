@@ -9,6 +9,12 @@ import {onSchedule} from "firebase-functions/scheduler";
 import {Firestore, FieldValue} from "@google-cloud/firestore";
 
 type JsonResponse = Record<string, any>;
+type FAQMatch = {
+  question: string;
+  answer: string;
+  similarity: number;
+  category: string;
+};
 
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
@@ -76,6 +82,15 @@ function limitText(text: string, maxChars: number): string {
 
 function buildFAQContext(question: string, answer: string): string {
   return limitText(`Q: ${question}\nA: ${answer}`, 700);
+}
+
+function normalizeFAQText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export const generateCohereEmbedding = onCall(
@@ -215,7 +230,7 @@ async function findMatchingFAQ(
   queryEmbedding: number[],
   geminiApiKey: string,
   similarityThreshold = FAQ_SIMILARITY_THRESHOLD
-): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
+): Promise<FAQMatch | null> {
   try {
     const faqSnapshot = await db
       .collection("faqs")
@@ -236,7 +251,11 @@ async function findMatchingFAQ(
       if (!faqQuestion || !faqAnswer) continue;
 
       let faqEmbedding: number[];
-      const storedEmbedding = data.contextEmbedding ?? data.faqContextEmbedding;
+      const storedEmbedding =
+        data.contextEmbedding ??
+        data.faqContextEmbedding ??
+        data.embedding ??
+        data.geminiEmbedding;
 
       if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
         faqEmbedding = storedEmbedding as number[];
@@ -290,6 +309,87 @@ async function findMatchingFAQ(
   } catch {
     return null;
   }
+}
+
+async function findDirectFAQMatch(query: string): Promise<FAQMatch | null> {
+  const trimmedQuery = query.trim();
+  const normalizedQuery = normalizeFAQText(trimmedQuery);
+
+  if (!normalizedQuery) return null;
+
+  try {
+    const exactSnapshot = await db
+      .collection("faqs")
+      .where("question", "==", trimmedQuery)
+      .limit(1)
+      .get();
+
+    for (const doc of exactSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+
+      if (question && answer && answer.trim()) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+
+    const normalizedSnapshot = await db
+      .collection("faqs")
+      .where("questionNormalized", "==", normalizedQuery)
+      .limit(1)
+      .get();
+
+    for (const doc of normalizedSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+
+      if (question && answer && answer.trim()) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+
+    const faqSnapshot = await db.collection("faqs").limit(200).get();
+
+    for (const doc of faqSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+      const storedNormalizedQuestion =
+        data.questionNormalized as string | undefined;
+      const normalizedQuestion =
+        storedNormalizedQuestion || normalizeFAQText(question || "");
+
+      if (
+        question &&
+        answer &&
+        answer.trim() &&
+        normalizedQuestion === normalizedQuery
+      ) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+  } catch (error) {
+    console.warn("Direct FAQ lookup failed:", error);
+  }
+
+  return null;
 }
 
 async function retrieveRelevantDocuments(
@@ -381,7 +481,11 @@ export const generateAnswer = onRequest(
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Accept, Authorization, X-Requested-With"
+    );
+    res.set("Access-Control-Max-Age", "3600");
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -402,6 +506,41 @@ export const generateAnswer = onRequest(
           answer: "Please provide a valid question.",
           source: "error",
         });
+        return;
+      }
+
+      const directFAQMatch = await findDirectFAQMatch(query);
+      if (directFAQMatch) {
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+
+          const answer = directFAQMatch.answer;
+          const chunkSize = 40;
+
+          for (let i = 0; i < answer.length; i += chunkSize) {
+            const chunk = answer.substring(i, Math.min(i + chunkSize, answer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "faq", category: directFAQMatch.category},
+          })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } else {
+          res.json({
+            answer: directFAQMatch.answer,
+            source: "faq",
+            category: directFAQMatch.category,
+          });
+        }
         return;
       }
 
@@ -596,9 +735,35 @@ A:`;
         });
       }
     } catch (error: any) {
+      const answer =
+        "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.";
+
+      if (req.body?.stream && !res.writableEnded) {
+        if (!res.headersSent) {
+          res.status(200);
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+        }
+
+        res.write(`data: ${JSON.stringify({
+          type: "content-delta",
+          delta: {message: {content: {text: answer}}},
+        })}\n\n`);
+        res.write(`data: ${JSON.stringify({
+          type: "error",
+          error: error.message,
+          answer,
+        })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+
       res.status(500).json({
         error: error.message,
-        answer: "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.",
+        answer,
         source: "error",
       });
     }

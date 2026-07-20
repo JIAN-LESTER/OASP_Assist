@@ -631,21 +631,27 @@ class _OnboardingOverlay extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: isEscalationStep
-                            ? const Color(0xFFFFF7ED)
-                            : Colors.white,
+                        color:
+                            isEscalationStep
+                                ? const Color(0xFFFFF7ED)
+                                : Colors.white,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isEscalationStep
-                              ? const Color(0xFF4CAF50)
-                              : Colors.grey.shade300,
+                          color:
+                              isEscalationStep
+                                  ? const Color(0xFF4CAF50)
+                                  : Colors.grey.shade300,
                           width: isEscalationStep ? 3 : 1.5,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.support_agent, size: 18, color: Color(0xFF4B5563)),
+                          Icon(
+                            Icons.support_agent,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
                           SizedBox(width: 6),
                           Text(
                             'Escalate to Staff',
@@ -1252,8 +1258,7 @@ class _OnboardingOverlay extends StatelessWidget {
       case OnboardingStep.faqCards:
         return _StepInfo(
           title: 'FAQ Categories',
-          description:
-              'Choose a category card to browse common questions. This step appears only when FAQs are available.',
+          description: 'Choose a category card to browse common questions. ',
         );
 
       case OnboardingStep.textInput:
