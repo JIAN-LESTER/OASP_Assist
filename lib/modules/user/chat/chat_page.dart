@@ -133,6 +133,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             _showFAQs = false;
             _isLoadingConversation = false;
           });
+          _scrollToBottomInstant();
         }
         return;
       }
@@ -369,6 +370,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         setState(() {
           _showFAQs = widget.showFAQs;
         });
+
+        if (!_showFAQs && chatProvider.messages.isNotEmpty) {
+          _scrollToBottomInstant();
+        }
       }
       print(' ChatPage FAQ visibility changed: $_showFAQs');
     }
@@ -382,9 +387,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
     //  INSTANT: Scroll when switching from FAQs to chat
     if (!_showFAQs && chatProvider.messages.isNotEmpty) {
-      if (mounted && _scrollController.hasClients) {
-        _scrollToBottomInstant();
-      }
+      _scrollToBottomInstant();
     }
 
     if (widget.onFAQToggle != null) {
@@ -409,9 +412,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
 
     //  INSTANT: Scroll to bottom when closing FAQs
-    if (mounted &&
-        _scrollController.hasClients &&
-        chatProvider.messages.isNotEmpty) {
+    if (mounted && chatProvider.messages.isNotEmpty) {
       _scrollToBottomInstant();
     }
 
@@ -1243,23 +1244,32 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   //           .toInt();
 
   void _scrollToBottomInstant() {
-    if (!_scrollController.hasClients) return;
-
-    // Use multiple frame callbacks to ensure scroll happens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && mounted) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-
-        // Double-check after another frame
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients && mounted) {
-            _scrollController.jumpTo(
-              _scrollController.position.maxScrollExtent,
-            );
-          }
-        });
+    void jumpWhenReady() {
+      if (_isDisposing ||
+          !mounted ||
+          _showFAQs ||
+          !_scrollController.hasClients) {
+        return;
       }
+
+      final position = _scrollController.position;
+      if (!position.hasContentDimensions) return;
+
+      _scrollController.jumpTo(position.maxScrollExtent);
+    }
+
+    // The message list is often mounted by the same setState that requests the
+    // scroll, so retry across layout frames instead of requiring clients now.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      jumpWhenReady();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        jumpWhenReady();
+      });
     });
+
+    Future.delayed(Duration(milliseconds: 100), jumpWhenReady);
+    Future.delayed(Duration(milliseconds: 300), jumpWhenReady);
   }
 
   Future<Map<String, dynamic>?> _getEscalationStatus(String messageId) async {
@@ -2989,6 +2999,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     print(' ChatPage disposing...');
+    _isDisposing = true;
     _controller.dispose();
     _scrollController.dispose();
     _conversationsSubscription?.cancel();
