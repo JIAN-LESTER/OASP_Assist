@@ -141,6 +141,7 @@ class OnboardingGuideState extends State<OnboardingGuide>
             pulseAnimation: _pulseAnimation,
             onNext: _nextStep,
             onPrevious: _previousStep,
+            onClose: _closeOnboarding,
             onSkip: _skipOnboarding,
           ),
     );
@@ -202,6 +203,15 @@ class OnboardingGuideState extends State<OnboardingGuide>
   Future<void> _skipOnboarding() async {
     HapticFeedback.mediumImpact();
     await _finishOnboarding();
+  }
+
+  void _closeOnboarding() {
+    HapticFeedback.lightImpact();
+    _removeOverlay();
+    if (!mounted) return;
+    setState(() {
+      _showOnboarding = false;
+    });
   }
 
   Widget _buildWelcomeFeature(IconData icon, String title, String subtitle) {
@@ -438,6 +448,7 @@ class _OnboardingOverlay extends StatelessWidget {
   final Animation<double> pulseAnimation;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
+  final VoidCallback onClose;
   final VoidCallback onSkip;
 
   const _OnboardingOverlay({
@@ -453,6 +464,7 @@ class _OnboardingOverlay extends StatelessWidget {
     required this.pulseAnimation,
     required this.onNext,
     required this.onPrevious,
+    required this.onClose,
     required this.onSkip,
   });
 
@@ -995,15 +1007,37 @@ class _OnboardingOverlay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            info.title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  info.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Close guide',
+                child: IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded),
+                  color: Colors.grey[600],
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             info.description,
             style: TextStyle(
@@ -1020,21 +1054,12 @@ class _OnboardingOverlay extends StatelessWidget {
           ],
           const SizedBox(height: 20),
 
-          // Updated action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Previous/Skip button
-              if (!isFirstStep)
-                TextButton.icon(
-                  onPressed: onPrevious,
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text(
-                    'Previous',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
-                  ),
+          if (isMobile) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: onSkip,
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(
@@ -1042,79 +1067,111 @@ class _OnboardingOverlay extends StatelessWidget {
                       vertical: 8,
                     ),
                   ),
-                )
-              else
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                _buildPrimaryActions(context, isLastStep, isMobile),
+              ],
+            ),
+            if (!isFirstStep) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _buildPreviousButton(),
+              ),
+            ],
+          ] else
+            Row(
+              children: [
+                if (!isFirstStep) _buildPreviousButton(),
                 TextButton(
                   onPressed: onSkip,
                   style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 8,
                     ),
                   ),
-                  child: Text(
-                    'Skip Tour',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 ),
+                const Spacer(),
+                _buildPrimaryActions(context, isLastStep, isMobile),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 
-              const Spacer(),
+  Widget _buildPreviousButton() {
+    return TextButton.icon(
+      onPressed: onPrevious,
+      icon: const Icon(Icons.arrow_back_rounded, size: 16),
+      label: const Text(
+        'Previous',
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        maxLines: 1,
+        overflow: TextOverflow.visible,
+      ),
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.grey[600],
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      ),
+    );
+  }
 
-              // Step indicator and Next/Finish button
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildStepIndicator(context),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: onNext,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 16 : 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isLastStep ? 'Finish' : 'Next',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.visible,
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          isLastStep
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+  Widget _buildPrimaryActions(
+    BuildContext context,
+    bool isLastStep,
+    bool isMobile,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildStepIndicator(context),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: onNext,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: 12,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isLastStep ? 'Finish' : 'Next',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                isLastStep ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                size: 18,
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

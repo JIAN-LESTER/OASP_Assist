@@ -56,7 +56,9 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController(
+    keepScrollOffset: false,
+  );
   final Map<String, String?> _localRatings = {};
   final Map<String, bool> _ratingLoading =
       {}; // Track loading state per message
@@ -1255,7 +1257,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       final position = _scrollController.position;
       if (!position.hasContentDimensions) return;
 
-      _scrollController.jumpTo(position.maxScrollExtent);
+      _scrollController.jumpTo(position.minScrollExtent);
     }
 
     // The message list is often mounted by the same setState that requests the
@@ -3196,7 +3198,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (!_scrollController.hasClients) return;
 
       final double currentPosition = _scrollController.position.pixels;
-      final double targetPosition = _scrollController.position.maxScrollExtent;
+      final double targetPosition = _scrollController.position.minScrollExtent;
 
       // If already at bottom (within 50px), don't scroll
       if ((targetPosition - currentPosition).abs() < 50) {
@@ -3221,15 +3223,16 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       physics: BouncingScrollPhysics(),
       itemCount:
           messages
               .length, //  REMOVED: + (chatProvider.showTypingIndicator ? 1 : 0)
       padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
       itemBuilder: (context, index) {
-        final Message message = messages[index];
+        final Message message = messages[messages.length - 1 - index];
         final bool isUser = message.sender == 'user';
-        final bool isLastMessage = index == messages.length - 1;
+        final bool isLastMessage = index == 0;
 
         //   Better streaming detection
         final streamingContent = chatProvider.getStreamingContent(message.id);
