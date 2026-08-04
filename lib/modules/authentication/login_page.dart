@@ -27,6 +27,7 @@ class _LoginPageState extends State<LoginPage>
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _showSigningInOverlay = false;
   bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
@@ -129,7 +130,10 @@ class _LoginPageState extends State<LoginPage>
 
     if (!isEmailValid || !isPasswordValid) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _showSigningInOverlay = false;
+    });
 
     try {
       UserCredential userCredential = await FirebaseAuth.instance
@@ -144,13 +148,19 @@ class _LoginPageState extends State<LoginPage>
       final user = userCredential.user;
       if (user == null) {
         _setGeneralError('Sign in failed. Please try again.');
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _showSigningInOverlay = false;
+        });
         return;
       }
 
       if (!user.emailVerified) {
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isLoading = false;
+            _showSigningInOverlay = false;
+          });
           _setVerificationError(
             'Email not verified. Please check your inbox and verify your email address before signing in.',
           );
@@ -158,6 +168,8 @@ class _LoginPageState extends State<LoginPage>
         await FirebaseAuth.instance.signOut();
         return;
       }
+
+      if (mounted) setState(() => _showSigningInOverlay = true);
 
       try {
         await FirebaseFirestore.instance
@@ -229,7 +241,12 @@ class _LoginPageState extends State<LoginPage>
         'An unexpected error occurred. Please try again or contact support.',
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _showSigningInOverlay = false;
+        });
+      }
     }
   }
 
@@ -879,7 +896,7 @@ class _LoginPageState extends State<LoginPage>
               ),
             ),
             const AppDistributionQrButton(),
-            if (_isLoading)
+            if (_showSigningInOverlay)
               Positioned.fill(
                 child: buildContentLoadingOverlay('Signing in...'),
               ),
