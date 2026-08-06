@@ -76,7 +76,11 @@ class GeminiService {
               {'text': text},
             ],
           },
-          'outputDimensionality': 768,
+          'embedContentConfig': {
+            'taskType': taskType,
+            'outputDimensionality': 768,
+            'autoTruncate': true,
+          },
         }),
       );
 
@@ -155,7 +159,6 @@ class GeminiService {
               ],
             },
           ],
-          'outputDimensionality': 768,
           'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 1024},
         }),
       );

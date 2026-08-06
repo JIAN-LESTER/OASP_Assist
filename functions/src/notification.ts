@@ -1,4 +1,5 @@
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
@@ -1435,16 +1436,17 @@ export const onEscalationCreated = functions
   });
 
 
-export const onEscalationReplied = functions
-  .region("asia-southeast1")
-  .firestore
-  .document("escalations/{escalationId}")
-  .onUpdate(async (change, context) => {
+export const onEscalationRepliedV2 = onDocumentUpdated(
+  {
+    document: "escalations/{escalationId}",
+    region: "asia-southeast1",
+  },
+  async (event) => {
     try {
-      const beforeData = change.before.data();
-      const afterData = change.after.data();
-      const escalationId = context.params.escalationId;
-      const eventId = context.eventId;
+      const beforeData = event.data?.before.data();
+      const afterData = event.data?.after.data();
+      const escalationId = event.params.escalationId;
+      const eventId = event.id;
 
       if (!beforeData || !afterData) {
         console.log("No escalation data found");
@@ -1453,9 +1455,10 @@ export const onEscalationReplied = functions
 
       const hasNewReply =
         (afterData.staffResponse && !beforeData.staffResponse) ||
+        (afterData.adminResponse && !beforeData.adminResponse) ||
         (afterData.status === "resolved" &&
           beforeData.status !== "resolved" &&
-          afterData.staffResponse);
+          (afterData.staffResponse || afterData.adminResponse));
 
       if (!hasNewReply) {
         console.log("No new staff reply detected");
@@ -1592,7 +1595,7 @@ export const onEscalationReplied = functions
 
       try {
         const idempotencyRef = db.collection("notification_processing")
-          .doc(`escalation_reply_${context.params.escalationId}_${context.eventId}`);
+          .doc(`escalation_reply_${event.params.escalationId}_${event.id}`);
         await idempotencyRef.update({
           status: "failed",
           error: String(error),
@@ -1604,7 +1607,8 @@ export const onEscalationReplied = functions
 
       return {success: false, error};
     }
-  });
+  }
+);
 
 function normalizeCategory(category: string): string {
   const normalized = category.toLowerCase().trim();

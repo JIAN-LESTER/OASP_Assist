@@ -99,7 +99,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
         final callable = FirebaseFunctions.instance.httpsCallable(
           'generateEmbedding',
         );
-        final result = await callable.call({'text': 'Q: $question\nA: $answer'});
+        final result = await callable.call({
+          'text': 'Q: $question\nA: $answer',
+          'taskType': 'RETRIEVAL_DOCUMENT',
+        });
         contextEmbedding =
             (result.data['embedding'] as List)
                 .map((e) => (e as num).toDouble())

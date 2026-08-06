@@ -1,6 +1,6 @@
 /* eslint-disable no-empty */
 /* eslint-disable no-useless-catch */
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import {Pinecone} from "@pinecone-database/pinecone";
@@ -74,6 +74,62 @@ const MAX_HISTORY_CHARS = 140;
 const FAQ_SIMILARITY_THRESHOLD = 0.88;
 const FAQ_STRONG_SIMILARITY = 0.92;
 const FAQ_SIMILARITY_MARGIN = 0.03;
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
+
+type GeminiEmbeddingTaskType =
+  | "RETRIEVAL_QUERY"
+  | "RETRIEVAL_DOCUMENT"
+  | "SEMANTIC_SIMILARITY"
+  | "CLASSIFICATION"
+  | "CLUSTERING"
+  | "QUESTION_ANSWERING"
+  | "FACT_VERIFICATION"
+  | "CODE_RETRIEVAL_QUERY";
+
+function normalizeEmbeddingTaskType(taskType?: string): GeminiEmbeddingTaskType {
+  switch (taskType) {
+  case "search_query":
+  case "RETRIEVAL_QUERY":
+    return "RETRIEVAL_QUERY";
+  case "search_document":
+  case "RETRIEVAL_DOCUMENT":
+    return "RETRIEVAL_DOCUMENT";
+  case "SEMANTIC_SIMILARITY":
+  case "CLASSIFICATION":
+  case "CLUSTERING":
+  case "QUESTION_ANSWERING":
+  case "FACT_VERIFICATION":
+  case "CODE_RETRIEVAL_QUERY":
+    return taskType;
+  default:
+    return "RETRIEVAL_DOCUMENT";
+  }
+}
+
+function buildGeminiEmbeddingRequest(
+  text: string,
+  taskType?: string
+): JsonResponse {
+  return {
+    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
+    content: {
+      parts: [{text}],
+    },
+    embedContentConfig: {
+      taskType: normalizeEmbeddingTaskType(taskType),
+      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+      autoTruncate: true,
+    },
+  };
+}
+
+function getAxiosErrorMessage(error: any): string {
+  return error.response?.data?.error?.message ??
+    error.message ??
+    "Unknown error";
+}
 
 function limitText(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
@@ -129,16 +185,11 @@ export const generateCohereEmbedding = onCall(
 async function generateGeminiEmbedding(
   text: string,
   apiKey: string,
-  _inputType: "search_document" | "search_query" = "search_document"
+  inputType: "search_document" | "search_query" = "search_document"
 ): Promise<number[]> {
   const response = await axios.post<JsonResponse>(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-    {
-      content: {
-        parts: [{text}],
-      },
-      outputDimensionality: 768,
-    },
+    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${apiKey}`,
+    buildGeminiEmbeddingRequest(text, inputType),
     {
       headers: {"Content-Type": "application/json"},
       timeout: 30000,
@@ -150,14 +201,17 @@ async function generateGeminiEmbedding(
     throw new Error("Invalid embedding response");
   }
 
-  if (embedding.length !== 768) {
-    throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
+  if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+    throw new Error(
+      `Unexpected embedding size: ${embedding.length} ` +
+      `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+    );
   }
 
   await logGeminiUsage({
     userId: null,
     conversationId: null,
-    model: "gemini-embedding-001",
+    model: GEMINI_EMBEDDING_MODEL,
     inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
     outputTokens: 0,
   }).catch(() => undefined);
@@ -168,40 +222,49 @@ async function generateGeminiEmbedding(
 export const generateEmbedding = onCall(
   {secrets: [GEMINI_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-    const {text} = request.data;
-    if (!text) throw new Error("Text required");
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
+    const {text, taskType} = request.data;
+    if (typeof text !== "string" || text.trim().length === 0) {
+      throw new HttpsError("invalid-argument", "Text required");
+    }
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
+        buildGeminiEmbeddingRequest(text.trim(), taskType),
         {
-          content: {
-            parts: [{text}],
-          },
-          outputDimensionality: 768,
-        },
-        {timeout: 30000}
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
       );
 
       const embedding = response.data?.embedding?.values;
       if (!Array.isArray(embedding) || embedding.length === 0) {
         throw new Error("Invalid Gemini embedding response");
       }
-      if (embedding.length !== 768) {
-        throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
+      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+        throw new Error(
+          `Unexpected embedding dimension: ${embedding.length} ` +
+          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+        );
       }
       await logGeminiUsage({
         userId: request.auth.uid ?? null,
         conversationId: null,
-        model: "gemini-embedding-001",
+        model: GEMINI_EMBEDDING_MODEL,
         inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
         outputTokens: 0,
       }).catch(() => undefined);
 
       return {embedding};
     } catch (error: any) {
-      throw new Error(`Embedding failed: ${error.message}`);
+      const msg = getAxiosErrorMessage(error);
+      console.error("Gemini embedding error:", msg);
+      console.error(
+        "Gemini embedding response:",
+        JSON.stringify(error.response?.data ?? {})
+      );
+      throw new HttpsError("internal", `Embedding failed: ${msg}`);
     }
   }
 );
@@ -497,6 +560,8 @@ export const generateAnswer = onRequest(
       return;
     }
 
+    let stage = "initializing";
+
     try {
       const {query, conversationHistory = [], topK = 5, minSimilarityScore = 0.30, stream = true} = req.body;
 
@@ -509,6 +574,7 @@ export const generateAnswer = onRequest(
         return;
       }
 
+      stage = "direct_faq_lookup";
       const directFAQMatch = await findDirectFAQMatch(query);
       if (directFAQMatch) {
         if (stream) {
@@ -548,13 +614,13 @@ export const generateAnswer = onRequest(
       const geminiKey = GEMINI_API_KEY.value();
       const pineconeKey = PINECONE_API_KEY.value();
 
-
+      stage = "query_embedding";
       const [queryEmbedding, pineconeClient] = await Promise.all([
         generateGeminiEmbedding(query, geminiKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
       ]);
 
-
+      stage = "semantic_faq_lookup";
       const [faqMatch, pineconeIndex] = await Promise.all([
         findMatchingFAQ(query, queryEmbedding, geminiKey),
         Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
@@ -595,6 +661,7 @@ export const generateAnswer = onRequest(
       }
 
       // RETRIEVE DOCUMENTS FROM PINECONE
+      stage = "pinecone_retrieval";
       const results = await retrieveRelevantDocuments(
         query,
         queryEmbedding,
@@ -619,6 +686,7 @@ A:`;
           res.setHeader("Connection", "keep-alive");
 
           try {
+            stage = "ai_fallback_stream";
             for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
               if (chunk && chunk.length > 0) {
                 res.write(`data: ${JSON.stringify({
@@ -646,6 +714,7 @@ A:`;
           }
         } else {
           try {
+            stage = "ai_fallback_generate";
             const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
             res.json({answer: answer.trim(), source: "ai_fallback"});
           } catch {
@@ -676,6 +745,7 @@ A:`;
         let streamSucceeded = false;
 
         try {
+          stage = "rag_stream";
           for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
             if (chunk && chunk.length > 0) {
               streamSucceeded = true;
@@ -700,6 +770,7 @@ A:`;
 
         // FALLBACK IF STREAMING FAILS
         try {
+          stage = "rag_generate_fallback";
           const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
 
           const chunkSize = 30;
@@ -726,6 +797,7 @@ A:`;
           res.end();
         }
       } else {
+        stage = "rag_generate";
         const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({
           answer: answer.trim(),
@@ -735,6 +807,15 @@ A:`;
         });
       }
     } catch (error: any) {
+      const errorMessage = getAxiosErrorMessage(error);
+      console.error(`generateAnswer failed during ${stage}:`, errorMessage);
+      if (error.response?.data) {
+        console.error(
+          "generateAnswer upstream response:",
+          JSON.stringify(error.response.data)
+        );
+      }
+
       const answer =
         "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.";
 
@@ -753,8 +834,7 @@ A:`;
         })}\n\n`);
         res.write(`data: ${JSON.stringify({
           type: "error",
-          error: error.message,
-          answer,
+          error: errorMessage,
         })}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
@@ -762,7 +842,7 @@ A:`;
       }
 
       res.status(500).json({
-        error: error.message,
+        error: errorMessage,
         answer,
         source: "error",
       });

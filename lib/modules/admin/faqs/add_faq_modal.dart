@@ -149,7 +149,10 @@ class _AddFaqContentState extends State<AddFaqContent> {
       'generateEmbedding',
     );
 
-    final result = await callable.call({'text': text});
+    final result = await callable.call({
+      'text': text,
+      'taskType': 'RETRIEVAL_DOCUMENT',
+    });
 
     return (result.data['embedding'] as List)
         .map((e) => (e as num).toDouble())

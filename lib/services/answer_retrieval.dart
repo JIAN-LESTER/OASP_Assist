@@ -75,6 +75,21 @@ class AnswerRetrievalService {
 
         try {
           final data = json.decode(jsonStr) as Map<String, dynamic>;
+
+          if (data['type'] == 'error') {
+            print(' Streaming error from server: ${data['error']}');
+            final errorAnswer = _extractAnswerFromDynamic(data);
+            if (fullAnswer.isEmpty &&
+                errorAnswer != null &&
+                errorAnswer.isNotEmpty) {
+              yield errorAnswer;
+            } else if (fullAnswer.isEmpty) {
+              yield 'I encountered an error processing your request. '
+                  'Please try again.';
+            }
+            break;
+          }
+
           final text = _extractStreamText(data);
 
           if (text != null && text.isNotEmpty) {
@@ -88,16 +103,6 @@ class AnswerRetrievalService {
 
             if (fullAnswer.isNotEmpty) {
               yield fullAnswer;
-            }
-            break;
-          } else if (data['type'] == 'error') {
-            print(' Streaming error from server: ${data['error']}');
-            final errorAnswer = _extractAnswerFromDynamic(data);
-            if (errorAnswer != null && errorAnswer.isNotEmpty) {
-              yield errorAnswer;
-            } else if (fullAnswer.isEmpty) {
-              yield 'I encountered an error processing your request. '
-                  'Please try again.';
             }
             break;
           }

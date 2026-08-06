@@ -68,7 +68,7 @@ export {
   checkUpcomingDeadlines,
   cleanupOldNotifications,
   onEscalationCreated,
-  onEscalationReplied,
+  onEscalationRepliedV2,
 } from "./notification";
 
 // Health Check & Test Functions

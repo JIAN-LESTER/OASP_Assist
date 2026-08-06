@@ -2899,15 +2899,21 @@ $question
 
   late final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
-  Future<List<double>> generateEmbedding(String question) async {
+  Future<List<double>> generateEmbedding(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     if (!kIsWeb && Platform.isWindows) {
-      return await _generateEmbeddingDirect(question);
+      return await _generateEmbeddingDirect(question, taskType: taskType);
     } else {
-      return await _generateEmbeddingFirebase(question);
+      return await _generateEmbeddingFirebase(question, taskType: taskType);
     }
   }
 
-  Future<List<double>> _generateEmbeddingDirect(String question) async {
+  Future<List<double>> _generateEmbeddingDirect(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     try {
       print('🪟 Windows: Generating Gemini embedding via Direct HTTP');
 
@@ -2921,12 +2927,17 @@ $question
         ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
+          "model": "models/gemini-embedding-001",
           "content": {
             "parts": [
               {"text": question},
             ],
           },
-          "outputDimensionality": 768,
+          "embedContentConfig": {
+            "taskType": taskType,
+            "outputDimensionality": 768,
+            "autoTruncate": true,
+          },
         }),
       );
 
@@ -2956,14 +2967,20 @@ $question
     }
   }
 
-  Future<List<double>> _generateEmbeddingFirebase(String question) async {
+  Future<List<double>> _generateEmbeddingFirebase(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     try {
       print('📱 Mobile/Web: Generating Gemini embedding via Firebase');
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'generateEmbedding',
       );
-      final result = await callable.call({'text': question});
+      final result = await callable.call({
+        'text': question,
+        'taskType': taskType,
+      });
 
       final embedding =
           (result.data['embedding'] as List)

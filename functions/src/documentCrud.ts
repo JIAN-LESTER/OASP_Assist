@@ -11,6 +11,44 @@ const PINECONE_HOST = defineSecret("PINECONE_HOST");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
+
+function normalizeEmbeddingTaskType(taskType?: string): string {
+  switch (taskType) {
+  case "search_query":
+  case "RETRIEVAL_QUERY":
+    return "RETRIEVAL_QUERY";
+  case "search_document":
+  case "RETRIEVAL_DOCUMENT":
+    return "RETRIEVAL_DOCUMENT";
+  case "SEMANTIC_SIMILARITY":
+  case "CLASSIFICATION":
+  case "CLUSTERING":
+  case "QUESTION_ANSWERING":
+  case "FACT_VERIFICATION":
+  case "CODE_RETRIEVAL_QUERY":
+    return taskType;
+  default:
+    return "RETRIEVAL_DOCUMENT";
+  }
+}
+
+function buildGeminiEmbeddingRequest(
+  text: string,
+  taskType?: string
+): JsonResponse {
+  return {
+    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
+    content: {parts: [{text}]},
+    embedContentConfig: {
+      taskType: normalizeEmbeddingTaskType(taskType),
+      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+      autoTruncate: true,
+    },
+  };
+}
 
 export const checkPineconeHealth = onCall(
   {
@@ -46,18 +84,19 @@ export const generateGeminiEmbedding = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
 
-    const { text } = request.data;
-    if (!text) throw new HttpsError("invalid-argument", "Text required");
+    const { text, taskType } = request.data;
+    if (typeof text !== "string" || text.trim().length === 0) {
+      throw new HttpsError("invalid-argument", "Text required");
+    }
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
+        buildGeminiEmbeddingRequest(text.trim(), taskType),
         {
-          model: "models/gemini-embedding-001",
-          content: { parts: [{ text }] },
-          outputDimensionality: 768,
-        },
-        { timeout: 30000 }
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
       );
 
       const embedding = response.data?.embedding?.values;
@@ -65,14 +104,25 @@ export const generateGeminiEmbedding = onCall(
       await logGeminiUsage({
         userId: request.auth.uid ?? null,
         conversationId: null,
-        model: "gemini-embedding-001",
-        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+        model: GEMINI_EMBEDDING_MODEL,
+        inputTokens: response.data?.usageMetadata?.promptTokenCount ??
+          Math.ceil(text.length / 4),
         outputTokens: 0,
       }).catch(() => undefined);
 
       if (!Array.isArray(embedding) || embedding.length === 0) {
-        console.error(" Unexpected Gemini response:", JSON.stringify(response.data));
+        console.error(
+          " Unexpected Gemini response:",
+          JSON.stringify(response.data)
+        );
         throw new HttpsError("internal", "No embedding returned from Gemini");
+      }
+      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+        throw new HttpsError(
+          "internal",
+          `Unexpected embedding dimension: ${embedding.length} ` +
+          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+        );
       }
 
       console.log(` Embedding generated: ${embedding.length} dimensions`);
@@ -80,9 +130,14 @@ export const generateGeminiEmbedding = onCall(
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
 
-      const msg = error.response?.data?.error?.message ?? error.message;
+      const msg = error.response?.data?.error?.message ??
+        error.message ??
+        "Unknown error";
       console.error(" Gemini embedding error:", msg);
-      console.error(" Full Gemini error:", JSON.stringify(error.response?.data ?? {}));
+      console.error(
+        " Full Gemini error:",
+        JSON.stringify(error.response?.data ?? {})
+      );
       throw new HttpsError("internal", `Gemini embedding failed: ${msg}`);
     }
   }
