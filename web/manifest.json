@@ -1,11 +1,11 @@
 {
-    "name": "capstone_project",
-    "short_name": "capstone_project",
+    "name": "OASP Assist",
+    "short_name": "OASP Assist",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "OASP Assist",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
