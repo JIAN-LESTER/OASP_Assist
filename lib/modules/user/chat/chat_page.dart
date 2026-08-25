@@ -420,7 +420,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
     //  INSTANT: Send message immediately
     if (mounted && !chatProvider.isLoading) {
-      _sendMessage(chatProvider);
+      _sendMessage(chatProvider, isFAQSelection: true);
     }
   }
 
@@ -2920,7 +2920,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
+  void _sendMessage(
+    ChatProvider chatProvider, {
+    bool isFAQSelection = false,
+  }) async {
     final text = _controller.text.trim();
     if (text.isEmpty || chatProvider.isLoading) return;
 
@@ -2969,7 +2972,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
     try {
       // Send message - the scroll callback will be triggered automatically
-      await chatProvider.askQuestionWithStreaming(context, text);
+      await chatProvider.askQuestionWithStreaming(
+        context,
+        text,
+        isFAQSelection: isFAQSelection,
+      );
     } catch (e) {
       debugPrint('Error sending message: $e');
       if (mounted) {

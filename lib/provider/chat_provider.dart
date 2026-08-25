@@ -1000,8 +1000,9 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> askQuestionWithStreaming(
     BuildContext context,
-    String question,
-  ) async {
+    String question, {
+    bool isFAQSelection = false,
+  }) async {
     if (_isLoading) return;
 
     if (isMessageLimitReached) {
@@ -1147,6 +1148,7 @@ class ChatProvider extends ChangeNotifier {
           question,
           conversationHistory: recentHistory,
           conversationId: conversationId!,
+          isFAQSelection: isFAQSelection,
         )) {
           _streamingContent[botMessageId] = streamedText;
 
@@ -1339,8 +1341,7 @@ $question
         }
 
         final rawEmbedding =
-            data['contextEmbedding'] ??
-            data['faqContextEmbedding'];
+            data['contextEmbedding'] ?? data['faqContextEmbedding'];
 
         if (rawEmbedding == null) {
           print('⚠️ FAQ missing embedding: $faqQuestion');
@@ -1537,8 +1538,7 @@ $question
           }
 
           final rawEmbedding =
-              data['contextEmbedding'] ??
-              data['faqContextEmbedding'];
+              data['contextEmbedding'] ?? data['faqContextEmbedding'];
 
           if (rawEmbedding == null ||
               rawEmbedding is! List ||
@@ -1624,9 +1624,7 @@ $question
         );
       } else if (_isQuestionWorthyOfFAQ(question) &&
           _isAnswerWorthyOfFAQ(answerText)) {
-        tasks.add(
-          _promoteToFAQAfterEmbedding(question, answerText, category),
-        );
+        tasks.add(_promoteToFAQAfterEmbedding(question, answerText, category));
       }
 
       await Future.wait(tasks);

@@ -565,7 +565,14 @@ export const generateAnswer = onRequest(
     let stage = "initializing";
 
     try {
-      const {query, conversationHistory = [], topK = 5, minSimilarityScore = 0.30, stream = true} = req.body;
+      const {
+        query,
+        conversationHistory = [],
+        topK = 5,
+        minSimilarityScore = 0.30,
+        stream = true,
+        isFAQSelection = false,
+      } = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
         res.status(400).json({
@@ -576,8 +583,10 @@ export const generateAnswer = onRequest(
         return;
       }
 
+      // Free-typed messages must not be classified as FAQs. FAQ matching is
+      // enabled only when the user selected an item from the FAQ section.
       stage = "direct_faq_lookup";
-      const directFAQMatch = await findDirectFAQMatch(query);
+      const directFAQMatch = isFAQSelection ? await findDirectFAQMatch(query) : null;
       if (directFAQMatch) {
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -624,7 +633,7 @@ export const generateAnswer = onRequest(
 
       stage = "semantic_faq_lookup";
       const [faqMatch, pineconeIndex] = await Promise.all([
-        findMatchingFAQ(query, queryEmbedding, geminiKey),
+        isFAQSelection ? findMatchingFAQ(query, queryEmbedding, geminiKey) : Promise.resolve(null),
         Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
       ]);
 

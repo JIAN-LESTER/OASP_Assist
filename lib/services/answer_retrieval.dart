@@ -14,6 +14,7 @@ class AnswerRetrievalService {
     String question, {
     List<Message>? conversationHistory,
     String? conversationId,
+    bool isFAQSelection = false,
   }) async* {
     try {
       print(
@@ -26,6 +27,7 @@ class AnswerRetrievalService {
         'stream': true,
         'topK': 5,
         'minSimilarityScore': 0.30,
+        'isFAQSelection': isFAQSelection,
         'conversationHistory':
             conversationHistory
                 ?.map((m) => {'sender': m.sender, 'content': m.content})
@@ -272,6 +274,7 @@ class AnswerRetrievalService {
     String? conversationId,
     int topK = 5,
     double minSimilarityScore = 0.3,
+    bool isFAQSelection = false,
   }) async {
     try {
       print(' Generating answer for: "$query"');
@@ -288,6 +291,7 @@ class AnswerRetrievalService {
         'conversationId': conversationId,
         'topK': topK,
         'minSimilarityScore': minSimilarityScore,
+        'isFAQSelection': isFAQSelection,
       };
 
       final response = await http
