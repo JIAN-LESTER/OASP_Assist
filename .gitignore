@@ -17,11 +17,15 @@ migrate_working_dir/
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.*
 
 # Firebase
 .firebase/
 firebase-debug.log
 firestore-debug.log
+*firebase-adminsdk*.json
+**/*firebase-adminsdk*.json
 
 # Flutter
 *.g.dart
@@ -35,6 +39,7 @@ build/
 .idea/
 
 .env
+C:\Users\jianl\capstone_project\functions\.env
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line

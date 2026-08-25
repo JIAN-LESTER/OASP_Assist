@@ -12,6 +12,9 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 import 'package:flutter/material.dart';
 
+final Stream<QuerySnapshot> _collegesManagementStream =
+    FirebaseFirestore.instance.collection('colleges').orderBy('name').snapshots();
+
 class CollegeManagementPage extends StatefulWidget {
   const CollegeManagementPage({super.key});
 
@@ -70,33 +73,34 @@ class _CollegeManagementPageState extends State<CollegeManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return ResponsiveLayout(
-      mobileBody: MobileCollegeManagement(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 2),
+      child: ResponsiveLayout(
+        mobileBody: MobileCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      tabletBody: TabletCollegeManagement(
+        ),
+        tabletBody: TabletCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      desktopBody: DesktopCollegeManagement(
+        ),
+        desktopBody: DesktopCollegeManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
+        ),
       ),
     );
   }
@@ -220,17 +224,11 @@ class MobileCollegeManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('colleges')
-                                .orderBy('name')
-                                .snapshots(),
+                        stream: _collegesManagementStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
+                            return const SizedBox.shrink();
                           }
                           if (snapshot.hasError) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -254,6 +252,7 @@ class MobileCollegeManagement extends StatelessWidget {
                             itemsPerPage: itemsPerPage,
                             onPageChanged: onPageChanged,
                             onItemsPerPageChanged: onItemsPerPageChanged,
+                            context: context,
                           );
                         },
                       ),
@@ -309,17 +308,11 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('colleges')
-                              .orderBy('name')
-                              .snapshots(),
+                      stream: _collegesManagementStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const SizedBox.shrink();
                         }
                         if (snapshot.hasError) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -342,6 +335,7 @@ Widget mainContent(
                           itemsPerPage: itemsPerPage,
                           onPageChanged: onPageChanged,
                           onItemsPerPageChanged: onItemsPerPageChanged,
+                          context: context,
                         );
                       },
                     ),
@@ -403,6 +397,7 @@ Widget _buildCollegeList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required BuildContext context,
 }) {
   final filtered =
       allColleges.where((doc) {
@@ -426,8 +421,10 @@ Widget _buildCollegeList({
       Expanded(
         child:
             currentPageColleges.isEmpty
-                ? const Center(
-                  child: Text('No colleges match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters: searchQuery.isNotEmpty,
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Colleges',
                 )
                 : ListView.separated(
                   itemCount: currentPageColleges.length,
@@ -1102,7 +1099,7 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to delete college: $e',
+              'College deletion failed: $e',
             );
           }
         }
@@ -1114,13 +1111,13 @@ class _DeleteCollegeModalState extends State<DeleteCollegeModal> {
         ).pop(true); // Return true to indicate success
         SnackbarUtil.showInfo(
           context,
-          'College deletion is running in background',
+          'College deleted successfully',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        SnackbarUtil.showError(context, 'Failed to delete college: $e');
+        SnackbarUtil.showError(context, 'College deletion failed: $e');
       }
     }
   }
@@ -1455,7 +1452,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to ${isEditing ? 'update' : 'create'} college: $e',
+              'College ${isEditing ? 'update' : 'creation'} failed: $e',
             );
           }
         }
@@ -1463,7 +1460,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
 
       SnackbarUtil.showInfo(
         context,
-        'College ${isEditing ? 'update' : 'creation'} is running in background',
+        'College ${isEditing ? 'updated' : 'created'} successfully',
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -1471,7 +1468,7 @@ class _AddEditCollegeModalState extends State<AddEditCollegeModal> {
         setState(() => _isSubmitting = false);
         SnackbarUtil.showError(
           context,
-          'Failed to ${isEditing ? 'update' : 'create'} college: $e',
+          'College ${isEditing ? 'update' : 'creation'} failed: $e',
         );
       }
     }

@@ -3,6 +3,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/admin_dashb
 import 'package:capstone_project/modules/admin/dashboard_and_reports/chatbot_usage_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/export_button.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_section.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_service.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/paginated_list.dart';
@@ -18,21 +19,10 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:flutter/material.dart' hide DateRangePickerDialog;
 import '../../../widgets/custom_dropdown_button.dart';
 
-const _kNavy = Color(0xFF0F172A);
-const _kSlate = Color(0xFF1E293B);
 const _kCardBg = Color(0xFFFFFFFF);
 const _kPageBg = Color(0xFFEDF0F7);
 const _kAccent = Color(0xFF6366F1);
 const _kAccentLight = Color(0xFFEEF2FF);
-const _kGreen = Color(0xFF10B981);
-const _kGreenLight = Color(0xFFD1FAE5);
-const _kHeaderGreenDark = Color(0xFF166534);
-const _kHeaderGreen = Color(0xFF16A34A);
-const _kHeaderGreenLight = Color(0xFF22C55E);
-const _kOrange = Color(0xFFF59E0B);
-const _kOrangeLight = Color(0xFFFEF3C7);
-const _kRed = Color(0xFFEF4444);
-const _kRedLight = Color(0xFFFEE2E2);
 const _kTextPrimary = Color(0xFF0F172A);
 const _kTextSecondary = Color(0xFF64748B);
 const _kBorder = Color(0xFFE2E8F0);
@@ -85,7 +75,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
-              colors: [Colors.grey[300]!, Colors.grey[200]!, Colors.grey[300]!],
+              colors: [Colors.grey[300]!, Colors.grey[100]!, Colors.grey[300]!],
               stops:
                   [
                     _animation.value - 0.3,
@@ -106,6 +96,7 @@ class SkeletonStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -138,6 +129,7 @@ class SkeletonChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -168,6 +160,7 @@ class SkeletonLogsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Colors.white,
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -260,13 +253,15 @@ class DashboardCache {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad; //  ADD THIS
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final DateTime timestamp;
-  final Map<String, dynamic>? quickStats;
+  final Map<String, int>? quickStats;
 
   DashboardCache({
     this.inq,
     this.ud,
     this.ad, //  ADD THIS
+    this.externalToolsUsage,
     required this.timestamp,
     this.quickStats,
   });
@@ -307,6 +302,7 @@ class _DashboardModulestate extends State<DashboardPage> {
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
   AdminDashboardData? ad; //  ADD THIS
+  ExternalToolsUsageSummary? externalToolsUsage;
   String? userName;
   Map<String, int>? quickStats;
 
@@ -314,6 +310,14 @@ class _DashboardModulestate extends State<DashboardPage> {
   bool isRefreshing = false;
   bool isLazyLoading = false;
   bool showSkeleton = true;
+
+  bool get _hasRequiredDashboardData {
+    return userName != null &&
+        quickStats != null &&
+        inq != null &&
+        ud != null &&
+        ad != null;
+  }
 
   @override
   void initState() {
@@ -337,16 +341,15 @@ class _DashboardModulestate extends State<DashboardPage> {
       // Phase 1: Load critical data first (username + quick stats)
       await _loadCriticalData();
 
-      // Phase 2: Hide skeleton and show cached/fresh data
+      // Phase 2: Keep the skeleton visible until the full dashboard payload is ready.
+      await _loadFullData();
+
       if (mounted) {
         setState(() {
-          showSkeleton = false;
+          showSkeleton = !_hasRequiredDashboardData;
           isInitialLoad = false;
         });
       }
-
-      // Phase 3: Load full data in background
-      await _loadFullData();
     } catch (e) {
       print('Error loading dashboard: $e');
       if (mounted) {
@@ -381,11 +384,12 @@ class _DashboardModulestate extends State<DashboardPage> {
           inq = cached.inq;
           ud = cached.ud;
           ad = cached.ad; //  LOAD FROM CACHE
-          quickStats = cached.quickStats as Map<String, int>?;
+          externalToolsUsage = cached.externalToolsUsage;
+          quickStats = cached.quickStats ?? quickStats;
         });
       }
 
-      // Refresh in background if stale
+    
       if (cached.isStale) {
         _refreshInBackground();
       }
@@ -412,6 +416,7 @@ class _DashboardModulestate extends State<DashboardPage> {
           selectedTimeFrame,
           customDateRange,
         ),
+        _fetchExternalToolsUsage(),
       ]);
 
       if (!mounted) return;
@@ -419,6 +424,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       final adminData = results[0] as AdminDashboardData;
       final userDemoData = results[1] as UserDemographicsReportsData;
       final inquiryReportData = results[2] as InquiryReportsData;
+      final externalUsageData = results[3] as ExternalToolsUsageSummary?;
 
       //   Use inquiryReportData directly instead of creating from adminData
       final inquiryData = InquiryReportsData(
@@ -446,13 +452,16 @@ class _DashboardModulestate extends State<DashboardPage> {
         inq: inquiryData,
         ud: userDemoData,
         ad: adminData,
+        externalToolsUsage: externalUsageData,
         timestamp: DateTime.now(),
+        quickStats: quickStats,
       );
 
       setState(() {
         inq = inquiryData;
         ud = userDemoData;
         ad = adminData;
+        externalToolsUsage = externalUsageData;
 
         //  DEBUG PRINTS
         print(' Inquiry Data Updated:');
@@ -474,6 +483,18 @@ class _DashboardModulestate extends State<DashboardPage> {
       await _fetchAndCacheData();
     } catch (e) {
       print('Background refresh failed: $e');
+    }
+  }
+
+  Future<ExternalToolsUsageSummary?> _fetchExternalToolsUsage() async {
+    try {
+      return await fetchExternalToolsUsageFromFirestore(
+        timeFrame: selectedTimeFrame,
+        customDateRange: customDateRange,
+      );
+    } catch (e) {
+      print('Error loading external tools usage: $e');
+      return null;
     }
   }
 
@@ -577,6 +598,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       selectedTimeFrame = newValue;
       customDateRange = null;
       isLazyLoading = true;
+      showSkeleton = true;
     });
 
     try {
@@ -597,6 +619,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
+          showSkeleton = !_hasRequiredDashboardData;
         });
       }
     }
@@ -610,6 +633,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         customDateRange = null;
         selectedTimeFrame = 'This Month';
         isLazyLoading = true;
+        showSkeleton = true;
       });
     } else {
       // User selected a custom date range
@@ -617,6 +641,7 @@ class _DashboardModulestate extends State<DashboardPage> {
         customDateRange = range;
         selectedTimeFrame = 'Custom';
         isLazyLoading = true;
+        showSkeleton = true;
       });
     }
 
@@ -644,6 +669,7 @@ class _DashboardModulestate extends State<DashboardPage> {
       if (mounted) {
         setState(() {
           isLazyLoading = false;
+          showSkeleton = !_hasRequiredDashboardData;
         });
       }
     }
@@ -696,103 +722,66 @@ class _DashboardModulestate extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show skeleton during initial load
-    if (showSkeleton || userName == null) {
-      return Scaffold(
-        backgroundColor: _kPageBg,
-        body: _buildSkeletonDashboard(),
-      );
-    }
+    final isLoading = showSkeleton || !_hasRequiredDashboardData;
 
-    return Stack(
-      children: [
-        ResponsiveLayout(
-          mobileBody: MobileDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-          tabletBody: TabletDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-          desktopBody: DesktopDashboard(
-            selectedTimeFrame: selectedTimeFrame,
-            onTimeFrameChanged: _onTimeFrameChanged,
-            onRefresh: _refreshData,
-            isRefreshing: isRefreshing,
-            inq: inq,
-            ud: ud,
-            ad: ad,
-            userName: userName!,
-            quickStats: quickStats,
-            customDateRange: customDateRange,
-            onDateRangeChanged: _onDateRangeChanged,
-          ),
-        ),
-        if (isLazyLoading)
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.3),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      child: KeyedSubtree(
+        key: ValueKey(isLoading ? 'dashboard-loading' : 'dashboard-content'),
+        child:
+            isLoading
+                ? Scaffold(
+                  backgroundColor: _kPageBg,
+                  body: _buildSkeletonDashboard(),
+                )
+                : ResponsiveLayout(
+                      mobileBody: MobileDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        externalToolsUsage: externalToolsUsage,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ],
-                  ),
-                  child: const Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF6366F1),
-                        ),
-                        strokeWidth: 3,
+                      tabletBody: TabletDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        externalToolsUsage: externalToolsUsage,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                      SizedBox(height: 14),
-                      Text(
-                        'Loading data...',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                        ),
+                      desktopBody: DesktopDashboard(
+                        selectedTimeFrame: selectedTimeFrame,
+                        onTimeFrameChanged: _onTimeFrameChanged,
+                        onRefresh: _refreshData,
+                        isRefreshing: isRefreshing,
+                        inq: inq,
+                        ud: ud,
+                        ad: ad,
+                        externalToolsUsage: externalToolsUsage,
+                        userName: userName!,
+                        quickStats: quickStats,
+                        customDateRange: customDateRange,
+                        onDateRangeChanged: _onDateRangeChanged,
                       ),
-                    ],
-                  ),
                 ),
-              ),
-            ),
           ),
-      ],
+      
     );
   }
 
@@ -821,11 +810,15 @@ class _DashboardModulestate extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 12),
                     const SkeletonStatCard(),
+                    SizedBox(width: 12),
+                    Expanded(child: SkeletonStatCard()),
                   ],
                 );
               } else {
                 return const Row(
                   children: [
+                    Expanded(child: SkeletonStatCard()),
+                    SizedBox(width: 20),
                     Expanded(child: SkeletonStatCard()),
                     SizedBox(width: 20),
                     Expanded(child: SkeletonStatCard()),
@@ -867,64 +860,104 @@ class _DashboardModulestate extends State<DashboardPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    if (isMobile) {
-      //  MOBILE LAYOUT: Dropdown on the left, smaller arrangement
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SkeletonBox(
-                width: 140,
-                height: 38,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              const SizedBox(width: 12),
-              SkeletonBox(
-                width: 38,
-                height: 38,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Title centered or left (depending on your style)
-          const SkeletonBox(width: 180, height: 22),
-
-          const SizedBox(height: 8),
-          const SkeletonBox(width: 250, height: 14),
-        ],
-      );
-    }
-
-    // 💻 DESKTOP LAYOUT (unchanged)
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const SkeletonBox(width: 200, height: 24),
-            Row(
-              children: [
-                SkeletonBox(
-                  width: 120,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                const SizedBox(width: 12),
-                SkeletonBox(
-                  width: 40,
-                  height: 40,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.10),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        const SkeletonBox(width: 300, height: 14),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 18 : 24,
+            isMobile ? 18 : 22,
+            isMobile ? 18 : 24,
+            isMobile ? 18 : 22,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isMobile) ...[
+                _buildSkeletonHeaderTitle(isMobile),
+                const SizedBox(height: 16),
+                SkeletonBox(
+                  height: 40,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                const SizedBox(height: 10),
+                SkeletonBox(
+                  height: 40,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ] else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: _buildSkeletonHeaderTitle(isMobile)),
+                    const SizedBox(width: 18),
+                    Row(
+                      children: [
+                        SkeletonBox(
+                          width: 120,
+                          height: 40,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        const SizedBox(width: 8),
+                        SkeletonBox(
+                          width: 104,
+                          height: 40,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+              const Divider(color: _kBorder, height: 1),
+              const SizedBox(height: 14),
+              const SkeletonBox(width: 300, height: 14),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonHeaderTitle(bool isMobile) {
+    return Row(
+      children: [
+        SkeletonBox(
+          width: 42,
+          height: 42,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(
+                width: isMobile ? 190 : 240,
+                height: isMobile ? 20 : 24,
+              ),
+              const SizedBox(height: 8),
+              SkeletonBox(width: isMobile ? 230 : 280, height: 13),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -948,6 +981,7 @@ class DesktopDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -962,6 +996,7 @@ class DesktopDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -978,6 +1013,7 @@ class DesktopDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -994,6 +1030,7 @@ class TabletDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -1008,6 +1045,7 @@ class TabletDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -1024,6 +1062,7 @@ class TabletDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -1040,6 +1079,7 @@ class MobileDashboard extends StatelessWidget {
   final InquiryReportsData? inq;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final Map<String, int>? quickStats;
   final DateTimeRange? customDateRange;
@@ -1054,6 +1094,7 @@ class MobileDashboard extends StatelessWidget {
     this.inq,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     this.quickStats,
     required this.customDateRange,
@@ -1070,6 +1111,7 @@ class MobileDashboard extends StatelessWidget {
       inq,
       ud,
       ad,
+      externalToolsUsage,
       userName,
       quickStats,
       customDateRange,
@@ -1086,6 +1128,7 @@ Widget dashboardContents(
   InquiryReportsData? inq,
   UserDemographicsReportsData? ud,
   AdminDashboardData? ad,
+  ExternalToolsUsageSummary? externalToolsUsage,
   String userName,
   Map<String, int>? quickStats,
   DateTimeRange? customDateRange,
@@ -1102,8 +1145,7 @@ Widget dashboardContents(
         Widget statCards() {
           final totalMessages = inq?.totalMessages ?? 0;
           final totalUsers = ud?.totalUsers ?? 0;
-          final escalated = inq?.escalatedMessages ?? 0;
-          final resolved = inq?.resolvedMessages ?? 0;
+          final allEscalations = inq?.allEscalations ?? 0;
 
           // Calculate ratios
           final escalationRate = inq?.escalationRate ?? 0.0;
@@ -1206,7 +1248,7 @@ Widget dashboardContents(
                 Expanded(
                   child: buildStatCard(
                     'Escalated Messages',
-                    '${inq?.allEscalations}',
+                    '$allEscalations',
                     Colors.orange,
                     Icons.warning_amber_rounded,
                     onTap:
@@ -1318,6 +1360,7 @@ Widget dashboardContents(
                 GeminiBillingSection(
                   timeFrame: selectedTimeFrame,
                   customDateRange: customDateRange,
+                  initialData: externalToolsUsage,
                 ),
               ],
             );
@@ -1426,6 +1469,7 @@ Widget dashboardContents(
                 GeminiBillingSection(
                   timeFrame: selectedTimeFrame,
                   customDateRange: customDateRange,
+                  initialData: externalToolsUsage,
                 ),
               ],
             );
@@ -1473,12 +1517,18 @@ void _showMessagesDialog(
           title: 'Total Messages',
           headerColor: Colors.blue,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collectionGroup('messages')
                 .where('sender', isEqualTo: 'user')
-                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1519,13 +1569,19 @@ void _showAnsweredMessagesDialog(
           title: 'Answered Messages',
           headerColor: Colors.green,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collectionGroup('messages')
                 .where('sender', isEqualTo: 'user')
                 .where('isAnswered', isEqualTo: true)
-                .where('sent_at', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'sent_at',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1567,7 +1623,10 @@ void _showUsersDialog(
           headerColor: Colors.red,
           dataFetcher: (page, pageSize) async {
             Query query = FirebaseFirestore.instance.collection('users');
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
 
             if (timeFrame != 'All' || customDateRange != null) {
@@ -1805,11 +1864,17 @@ void _showEscalatedMessagesDialog(
           title: 'Escalated Messages',
           headerColor: Colors.orange,
           dataFetcher: (page, pageSize) async {
-            final startDate = _getStartDateForDialog(timeFrame, customDateRange);
+            final startDate = _getStartDateForDialog(
+              timeFrame,
+              customDateRange,
+            );
             final endDate = _getEndDateForDialog(timeFrame, customDateRange);
             Query query = FirebaseFirestore.instance
                 .collection('escalations')
-                .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+                .where(
+                  'createdAt',
+                  isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+                );
 
             if (endDate != null) {
               query = query.where(
@@ -1917,55 +1982,59 @@ class _ModernStatCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: lightColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: color, size: isMobile ? 18 : 20),
-                  ),
-                  if (onTap != null)
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: _kPageBg,
-                        borderRadius: BorderRadius.circular(6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: lightColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: color,
+                              size: isMobile ? 18 : 20,
+                            ),
+                          ),
+                          if (onTap != null)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: _kPageBg,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 11,
+                                color: _kTextSecondary,
+                              ),
+                            ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 11,
-                        color: _kTextSecondary,
+                      SizedBox(height: isMobile ? 12 : 16),
+                      Text(
+                        value,
+                        style: TextStyle(
+                          fontSize: isMobile ? 19 : 23,
+                          fontWeight: FontWeight.w700,
+                          color: _kTextPrimary,
+                          letterSpacing: -0.5,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                ],
-              ),
-              SizedBox(height: isMobile ? 12 : 16),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: isMobile ? 19 : 23,
-                  fontWeight: FontWeight.w700,
-                  color: _kTextPrimary,
-                  letterSpacing: -0.5,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: _kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: _kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -2053,115 +2122,194 @@ class _DashboardHeaderCard extends StatelessWidget {
     final subtitle =
         selectedTimeFrame == 'Custom' && customDateRange != null
             ? 'Showing data from ${_formatDate(customDateRange!.start)} to ${_formatDate(customDateRange!.end)}'
-            : 'Overview of OASP Assist — $selectedTimeFrame';
+            : 'Overview of OASP Assist - $selectedTimeFrame';
 
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 18 : 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _kBorder, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Greeting + controls row
-          isMobile
-              ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _greetingBlock(greeting),
-                  const SizedBox(height: 16),
-                  _controlsRow(context),
-                ],
-              )
-              : Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [_greetingBlock(greeting), _controlsRow(context)],
-              ),
-          const SizedBox(height: 16),
-          const Divider(color: _kBorder, height: 1),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-            Icon(
-              Icons.info_outline_rounded,
-              size: 14,
-              color: _kTextSecondary,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          border: Border.all(color: _kBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.withOpacity(0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _kTextSecondary,
-                    fontWeight: FontWeight.w400,
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: isMobile ? 4 : 5,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.green.withOpacity(0.65), Colors.green],
                   ),
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 18 : 24,
+                isMobile ? 18 : 22,
+                isMobile ? 18 : 24,
+                isMobile ? 18 : 22,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  isMobile
+                      ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _greetingBlock(greeting),
+                          const SizedBox(height: 16),
+                          _controlsRow(context),
+                        ],
+                      )
+                      : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(child: _greetingBlock(greeting)),
+                          const SizedBox(width: 18),
+                          _controlsRow(context),
+                        ],
+                      ),
+                  const SizedBox(height: 16),
+                  const Divider(color: _kBorder, height: 1),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 14,
+                        color: _kTextSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _kTextSecondary,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _greetingBlock(String greeting) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          '$greeting,',
-          style: const TextStyle(
-            fontSize: 13,
-            color: _kTextSecondary,
-            fontWeight: FontWeight.w400,
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 240, 255, 238),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.withOpacity(0.18)),
+          ),
+          child: const Icon(
+            Icons.dashboard_customize_rounded,
+            color: Colors.green,
+            size: 20,
           ),
         ),
-        const SizedBox(height: 3),
-        Row(
-          children: [
-            Text(
-              userName,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: _kTextPrimary,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-              decoration: BoxDecoration(
-                color: _kAccentLight,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _kAccent.withOpacity(0.45), width: 1),
-              ),
-              child: const Text(
-                'Admin',
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting, $userName',
                 style: TextStyle(
-                  fontSize: 11,
-                color: _kAccent,
-                fontWeight: FontWeight.w600,
+                  fontSize: isMobile ? 19 : 22,
+                  fontWeight: FontWeight.w700,
+                  color: _kTextPrimary,
+                  letterSpacing: -0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 5),
+              const Text(
+                'Dashboard insights and activity overview',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kTextSecondary,
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 
   Widget _controlsRow(BuildContext context) {
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomDropdownButton(
+            items: [
+              'All',
+              'Today',
+              'This Week',
+              'This Month',
+              'This Year',
+              'Custom',
+            ],
+            initialValue: selectedTimeFrame,
+            onChanged: onTimeFrameChanged,
+          ),
+          if (selectedTimeFrame == 'Custom') ...[
+            const SizedBox(height: 10),
+            DateRangeFilter(
+              selectedDateRange: customDateRange,
+              onDateRangeChanged: onDateRangeChanged,
+            ),
+          ],
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ExportButton(
+              pageType: 'dashboard',
+              timeFrame: selectedTimeFrame,
+              inq: inq,
+              ud: ud,
+              ad: ad,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         CustomDropdownButton(

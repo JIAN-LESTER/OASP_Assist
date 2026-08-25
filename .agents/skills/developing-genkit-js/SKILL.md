@@ -32,7 +32,7 @@ export const myFlow = ai.defineFlow({
   outputSchema: z.string(),
 }, async (subject) => {
   const response = await ai.generate({
-    model: googleAI.model('gemini-2.5-flash'),
+    model: googleAI.model('gemini-3.5-flash'),
     prompt: `Tell me a joke about ${subject}`,
   });
   return response.text;

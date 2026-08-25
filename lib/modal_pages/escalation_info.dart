@@ -23,6 +23,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     with SingleTickerProviderStateMixin {
   final TextEditingController _replyController = TextEditingController();
   bool _isSending = false;
+  bool _isDeleting = false;
   Map<String, dynamic>? _userData;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -230,6 +231,68 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
     }
   }
 
+  Future<void> _confirmDeleteEscalation() async {
+    final data = widget.escalationData;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete escalation?'),
+            content: Text(
+              'This will permanently delete "${data['question'] ?? 'this escalation'}".',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await _deleteEscalation();
+    }
+  }
+
+  Future<void> _deleteEscalation() async {
+    setState(() => _isDeleting = true);
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('escalations')
+          .doc(widget.escalationId)
+          .delete();
+
+      if (mounted) {
+        SnackbarUtil.showSuccess(context, 'Escalation deleted');
+        HapticFeedback.lightImpact();
+      }
+
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      if (mounted) {
+        await _animationController.reverse();
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackbarUtil.showError(context, 'Failed to delete escalation: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
   Future<void> _closeModal() async {
     await _animationController.reverse();
     if (mounted) {
@@ -246,6 +309,7 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
 
     return WillPopScope(
       onWillPop: () async {
+        if (_isSending || _isDeleting) return false;
         await _closeModal();
         return false;
       },
@@ -355,7 +419,35 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                             ),
                           ),
                           IconButton(
-                            onPressed: _isSending ? null : _closeModal,
+                            tooltip: 'Delete escalation',
+                            onPressed:
+                                _isSending || _isDeleting
+                                    ? null
+                                    : _confirmDeleteEscalation,
+                            icon:
+                                _isDeleting
+                                    ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.white,
+                                      size: 26,
+                                    ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              padding: const EdgeInsets.all(8),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed:
+                                _isSending || _isDeleting ? null : _closeModal,
                             icon: const Icon(
                               Icons.close_rounded,
                               color: Colors.white,
@@ -757,7 +849,10 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                             child: SizedBox(
                               height: 46,
                               child: OutlinedButton(
-                                onPressed: _isSending ? null : _closeModal,
+                                onPressed:
+                                    _isSending || _isDeleting
+                                        ? null
+                                        : _closeModal,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: const Color(0xFF6B7280),
                                   side: BorderSide(
@@ -784,7 +879,10 @@ class _EscalationDetailModalState extends State<EscalationDetailModal>
                               child: SizedBox(
                                 height: 46,
                                 child: ElevatedButton.icon(
-                                  onPressed: _isSending ? null : _sendReply,
+                                  onPressed:
+                                      _isSending || _isDeleting
+                                          ? null
+                                          : _sendReply,
                                   icon:
                                       _isSending
                                           ? const SizedBox(

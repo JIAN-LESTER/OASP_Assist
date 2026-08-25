@@ -63,9 +63,39 @@ class ChatProvider extends ChangeNotifier {
 
   bool _isDisposed = false;
 
-  static const int MAX_DAILY_MESSAGES = 5;
+  static const int MAX_DAILY_MESSAGES = 3;
+
+  DateTime _currentChatWindowStart() {
+    final now = DateTime.now();
+    final todayReset = DateTime(now.year, now.month, now.day, 8);
+
+    if (now.isBefore(todayReset)) {
+      return todayReset.subtract(const Duration(days: 1));
+    }
+
+    return todayReset;
+  }
+
+  DateTime _nextChatWindowStart() {
+    final now = DateTime.now();
+    final todayReset = DateTime(now.year, now.month, now.day, 8);
+
+    if (now.isBefore(todayReset)) {
+      return todayReset;
+    }
+
+    return DateTime(now.year, now.month, now.day + 1, 8);
+  }
+
+  bool _shouldResetMessageCount(DateTime? lastReset, [int? count]) {
+    if (lastReset == null) return (count ?? _userDailyMessageCount) > 0;
+    return lastReset.isBefore(_currentChatWindowStart());
+  }
+
+  Timer? _messageResetTimer;
 
   StreamSubscription<DocumentSnapshot>? _userMessageCountSubscription;
+  String? _userMessageCountSubscriptionUserId;
 
   int _userDailyMessageCount = 0;
   DateTime? _userLastResetDate;
@@ -91,8 +121,14 @@ class ChatProvider extends ChangeNotifier {
   void listenToUserMessageCount() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
+    if (_userMessageCountSubscriptionUserId == userId &&
+        _userMessageCountSubscription != null) {
+      return;
+    }
 
     _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscriptionUserId = userId;
+    _scheduleMessageResetTimer();
 
     _userMessageCountSubscription = _firestore
         .collection('users')
@@ -105,6 +141,15 @@ class ChatProvider extends ChangeNotifier {
               final newCount = data['dailyMessageCount'] ?? 0;
               final newResetDate =
                   (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+              if (_shouldResetMessageCount(newResetDate, newCount)) {
+                final now = DateTime.now();
+                _userDailyMessageCount = 0;
+                _userLastResetDate = now;
+                _saveCurrentUserMessageReset(now);
+                notifyListeners();
+                return;
+              }
 
               if (newCount != _userDailyMessageCount ||
                   newResetDate != _userLastResetDate) {
@@ -131,6 +176,48 @@ class ChatProvider extends ChangeNotifier {
         );
   }
 
+  void _scheduleMessageResetTimer() {
+    _messageResetTimer?.cancel();
+
+    final nextReset = _nextChatWindowStart();
+    final delay = nextReset.difference(DateTime.now());
+
+    _messageResetTimer = Timer(delay, () async {
+      await _resetCurrentUserMessageCountIfNeeded();
+      if (!_isDisposed) {
+        _scheduleMessageResetTimer();
+      }
+    });
+  }
+
+  Future<void> _resetCurrentUserMessageCountIfNeeded() async {
+    if (!_shouldResetMessageCount(_userLastResetDate)) return;
+
+    final now = DateTime.now();
+    _userDailyMessageCount = 0;
+    _userLastResetDate = now;
+
+    await _saveCurrentUserMessageReset(now);
+
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> _saveCurrentUserMessageReset(DateTime resetAt) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('users').doc(userId).set({
+        'dailyMessageCount': 0,
+        'lastMessageResetDate': Timestamp.fromDate(resetAt),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('❌ Error saving message reset: $e');
+    }
+  }
+
   void setScrollCallback(VoidCallback callback) {
     _onMessageAdded = callback;
   }
@@ -150,16 +237,11 @@ class ChatProvider extends ChangeNotifier {
       return true;
     }
 
-    if (_userLastResetDate != null) {
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-      final shouldReset =
-          now.isAfter(resetTime) && _userLastResetDate!.isBefore(resetTime);
-
-      if (shouldReset) {
-        print('ℹ️ Reset time reached - allowing message');
-        return true;
-      }
+    if (_shouldResetMessageCount(_userLastResetDate)) {
+      _userDailyMessageCount = 0;
+      _userLastResetDate = now;
+      print('ℹ️ Reset time reached - allowing message');
+      return true;
     }
 
     final canSend = _userDailyMessageCount < MAX_DAILY_MESSAGES;
@@ -175,6 +257,7 @@ class ChatProvider extends ChangeNotifier {
   static const int MAX_DAILY_ESCALATIONS = 2;
 
   StreamSubscription<DocumentSnapshot>? _userEscalationCountSubscription;
+  String? _userEscalationCountSubscriptionUserId;
 
   int _userDailyEscalationCount = 0;
   DateTime? _userLastEscalationResetDate;
@@ -307,8 +390,13 @@ class ChatProvider extends ChangeNotifier {
   void listenToUserEscalationCount() {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
+    if (_userEscalationCountSubscriptionUserId == userId &&
+        _userEscalationCountSubscription != null) {
+      return;
+    }
 
     _userEscalationCountSubscription?.cancel();
+    _userEscalationCountSubscriptionUserId = userId;
 
     _userEscalationCountSubscription = _firestore
         .collection('users')
@@ -386,9 +474,14 @@ class ChatProvider extends ChangeNotifier {
     _isDisposed = true;
 
     _messagesSubscription?.cancel();
+    _messagesSubscriptionConversationId = null;
     _escalationSubscription?.cancel();
+    _escalationSubscriptionConversationId = null;
     _userMessageCountSubscription?.cancel();
+    _userMessageCountSubscriptionUserId = null;
     _userEscalationCountSubscription?.cancel();
+    _userEscalationCountSubscriptionUserId = null;
+    _messageResetTimer?.cancel();
 
     _messages.clear();
     _streamingContent.clear();
@@ -418,7 +511,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> resetAllUserMessageCounts() async {
     try {
       final now = DateTime.now();
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
+      final resetTime = _currentChatWindowStart();
 
       final usersSnapshot = await _firestore.collection('users').get();
       final batch = _firestore.batch();
@@ -461,6 +554,7 @@ class ChatProvider extends ChangeNotifier {
     if (userId == null) return;
 
     try {
+      _scheduleMessageResetTimer();
       final userDoc = await _firestore.collection('users').doc(userId).get();
 
       if (userDoc.exists) {
@@ -468,6 +562,13 @@ class ChatProvider extends ChangeNotifier {
         _userDailyMessageCount = data['dailyMessageCount'] ?? 0;
         _userLastResetDate =
             (data['lastMessageResetDate'] as Timestamp?)?.toDate();
+
+        if (_shouldResetMessageCount(_userLastResetDate)) {
+          final now = DateTime.now();
+          _userDailyMessageCount = 0;
+          _userLastResetDate = now;
+          await _saveCurrentUserMessageReset(now);
+        }
 
         print(
           '✅ Loaded user message count: $_userDailyMessageCount/$MAX_DAILY_MESSAGES',
@@ -520,17 +621,9 @@ class ChatProvider extends ChangeNotifier {
       final currentCount = data['dailyMessageCount'] ?? 0;
       final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
 
-      final resetTime = DateTime(now.year, now.month, now.day, 8, 0, 0);
-
-      bool shouldReset = false;
-
-      if (lastReset == null) {
-        shouldReset = true;
-      } else {
-        if (lastReset.isBefore(resetTime) && now.isAfter(resetTime)) {
-          shouldReset = true;
-        }
-      }
+      final shouldReset =
+          lastReset == null ||
+          _shouldResetMessageCount(lastReset, currentCount);
 
       if (shouldReset) {
         await userRef.update({
@@ -563,6 +656,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   StreamSubscription<QuerySnapshot>? _messagesSubscription;
+  String? _messagesSubscriptionConversationId;
   bool _isSettingConversation = false;
 
   Future<void> setConversationId(String id) async {
@@ -583,8 +677,10 @@ class ChatProvider extends ChangeNotifier {
     try {
       _messagesSubscription?.cancel();
       _messagesSubscription = null;
+      _messagesSubscriptionConversationId = null;
       _escalationSubscription?.cancel();
       _escalationSubscription = null;
+      _escalationSubscriptionConversationId = null;
 
       _messages.clear();
       _processedMessages.clear();
@@ -600,17 +696,30 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners();
       });
 
-      await Future.delayed(Duration(milliseconds: 100));
-
       await loadConversationInfo();
+
+      if (currentConversation != null &&
+          currentConversation!.createdAt.isBefore(_currentChatWindowStart())) {
+        await _firestore.collection('conversations').doc(id).update({
+          'status': 'ended',
+          'endedAt': FieldValue.serverTimestamp(),
+        });
+
+        conversationId = null;
+        currentConversation = null;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return;
+      }
+
       await loadExistingMessages();
 
       listenToMessages();
       listenToEscalationResponses();
 
-      await loadUserEscalationCount();
-
-      await Future.delayed(Duration(milliseconds: 100));
+      unawaited(loadUserEscalationCount());
 
       print('✅ ChatProvider setup complete');
       print('   - Conversation ID: $conversationId');
@@ -726,13 +835,19 @@ class ChatProvider extends ChangeNotifier {
   }
 
   StreamSubscription<QuerySnapshot>? _escalationSubscription;
+  String? _escalationSubscriptionConversationId;
 
   void listenToEscalationResponses() {
     if (conversationId == null) return;
+    if (_escalationSubscriptionConversationId == conversationId &&
+        _escalationSubscription != null) {
+      return;
+    }
 
     print('👂 Starting escalation response listener for: $conversationId');
 
     _escalationSubscription?.cancel();
+    _escalationSubscriptionConversationId = conversationId;
 
     _escalationSubscription = _firestore
         .collection('escalations')
@@ -805,9 +920,15 @@ class ChatProvider extends ChangeNotifier {
 
   void listenToMessages() {
     if (conversationId == null) return;
+    if (_messagesSubscriptionConversationId == conversationId &&
+        _messagesSubscription != null) {
+      return;
+    }
 
     print('👂 Starting message listener for conversation: $conversationId');
 
+    _messagesSubscription?.cancel();
+    _messagesSubscriptionConversationId = conversationId;
     _messagesSubscription = _firestore
         .collection('conversations')
         .doc(conversationId!)
@@ -879,8 +1000,9 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> askQuestionWithStreaming(
     BuildContext context,
-    String question,
-  ) async {
+    String question, {
+    bool isFAQSelection = false,
+  }) async {
     if (_isLoading) return;
 
     if (isMessageLimitReached) {
@@ -954,18 +1076,14 @@ class ChatProvider extends ChangeNotifier {
         print('⚠️ Background count update error: $e');
       });
 
-      final embeddingFuture = _generateEmbeddingCached(question);
-      final faqFuture = _ensureFAQCacheLoaded();
-
-      await Future.wait([embeddingFuture, faqFuture]);
-      final currentEmbedding = await embeddingFuture;
-      final existingFAQ = _findBestFAQMatch(question, currentEmbedding);
+      List<double>? currentEmbedding;
 
       String questionCategory;
-      if (existingFAQ != null && existingFAQ['category'] != null) {
-        questionCategory = existingFAQ['category'] as String;
-      } else {
+      try {
         questionCategory = await _classifyQuestionCategoryFast(question);
+      } catch (e) {
+        print('⚠️ Category classification skipped: $e');
+        questionCategory = 'General';
       }
 
       userMessageRef.update({'category': questionCategory}).catchError((e) {
@@ -991,8 +1109,8 @@ class ChatProvider extends ChangeNotifier {
           _messages.where((m) => m.conversationId == conversationId).toList();
       allMessages.sort((a, b) => a.sentAt.compareTo(b.sentAt));
       final recentHistory =
-          allMessages.length > 10
-              ? allMessages.sublist(allMessages.length - 10)
+          allMessages.length > 4
+              ? allMessages.sublist(allMessages.length - 4)
               : allMessages;
 
       final botMessageId = "bot_${userMsg.id}";
@@ -1018,37 +1136,19 @@ class ChatProvider extends ChangeNotifier {
 
       String finalAnswer = "";
 
-      if (existingFAQ != null) {
-        final String answer = existingFAQ["answer"];
-        const int chunkSize = 50;
-
-        for (int i = 0; i < answer.length; i += chunkSize) {
-          final chunk = answer.substring(
-            i,
-            (i + chunkSize < answer.length) ? i + chunkSize : answer.length,
-          );
-
-          _streamingContent[botMessageId] =
-              _streamingContent[botMessageId]! + chunk;
-
-          notifyListeners();
-          _onMessageAdded?.call();
-
-          await Future.delayed(Duration(milliseconds: 20));
-        }
-
+      if (_isFastGeneralMessage(question)) {
+        final answer = _fastGeneralReply(question);
+        _streamingContent[botMessageId] = answer;
         finalAnswer = answer;
 
-        _incrementFAQSimilarityCountAsync(existingFAQ["question"]).catchError((
-          e,
-        ) {
-          print('⚠️ Background FAQ count error: $e');
-        });
+        notifyListeners();
+        _onMessageAdded?.call();
       } else {
         await for (final streamedText in _retriever.generateAnswerStream(
           question,
           conversationHistory: recentHistory,
           conversationId: conversationId!,
+          isFAQSelection: isFAQSelection,
         )) {
           _streamingContent[botMessageId] = streamedText;
 
@@ -1224,26 +1324,33 @@ $question
   ) {
     try {
       double highestSimilarity = 0.0;
+      double secondHighestSimilarity = 0.0;
       Map<String, dynamic>? bestMatch;
+      int validFaqCount = 0;
 
       print('🔍 Checking ${FAQCache.cache.length} FAQs for match');
       print('🔍 Question: "$question"');
 
       for (var entry in FAQCache.cache.entries) {
         final data = entry.value;
+        final faqQuestion = data['question'] as String?;
 
-        // FIX: Accept both 'embedding' (auto-promoted) and 'geminiEmbedding'
-        // (predefined/server-generated) so no FAQ is silently skipped.
-        final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
+        if (faqQuestion == null || faqQuestion.trim().isEmpty) {
+          print('⚠️ FAQ missing question');
+          continue;
+        }
+
+        final rawEmbedding =
+            data['contextEmbedding'] ?? data['faqContextEmbedding'];
 
         if (rawEmbedding == null) {
-          print('⚠️ FAQ missing embedding: ${data['question']}');
+          print('⚠️ FAQ missing embedding: $faqQuestion');
           continue;
         }
 
         final answer = data['answer'] as String?;
         if (answer == null || answer.trim().isEmpty) {
-          print('⚠️ FAQ has empty answer: ${data['question']}');
+          print('⚠️ FAQ has empty answer: $faqQuestion');
           continue;
         }
 
@@ -1253,7 +1360,7 @@ $question
             (rawEmbedding as List).map((e) => (e as num).toDouble()),
           );
         } catch (e) {
-          print('⚠️ Invalid embedding format for: ${data['question']}');
+          print('⚠️ Invalid embedding format for: $faqQuestion');
           continue;
         }
 
@@ -1269,24 +1376,41 @@ $question
         }
 
         final similarity = cosineSimilarity(questionEmbedding, faqEmbedding);
-
+        validFaqCount++;
         print(
-          '📊 FAQ: "${(data['question'] as String).substring(0, min(50, (data['question'] as String).length))}..."',
+          '📊 FAQ: "${faqQuestion.substring(0, min(50, faqQuestion.length))}..."',
         );
         print('   Answer length: ${answer.length} chars');
         print('   Category: ${data['category'] ?? 'N/A'}');
         print('   Similarity: ${similarity.toStringAsFixed(4)}');
 
-        if (similarity > 0.75 && similarity > highestSimilarity) {
+        if (similarity > highestSimilarity) {
+          secondHighestSimilarity = highestSimilarity;
           highestSimilarity = similarity;
-          bestMatch = {
-            'question': data['question'],
-            'answer': answer,
-            'category': data['category'] ?? 'General',
-            'similarity': similarity,
-          };
-          print('   🎯 NEW BEST MATCH!');
+          if (similarity >= 0.88) {
+            bestMatch = {
+              'question': faqQuestion,
+              'answer': answer,
+              'category': data['category'] ?? 'General',
+              'similarity': similarity,
+            };
+            print('   🎯 NEW BEST MATCH!');
+          }
+        } else if (similarity > secondHighestSimilarity) {
+          secondHighestSimilarity = similarity;
         }
+      }
+
+      if (bestMatch != null &&
+          validFaqCount > 1 &&
+          highestSimilarity < 0.92 &&
+          highestSimilarity - secondHighestSimilarity < 0.03) {
+        print(
+          '❌ FAQ match rejected as ambiguous '
+          '(best=${highestSimilarity.toStringAsFixed(4)}, '
+          'second=${secondHighestSimilarity.toStringAsFixed(4)})',
+        );
+        return null;
       }
 
       if (bestMatch != null) {
@@ -1310,6 +1434,10 @@ $question
   Future<String> _classifyQuestionCategoryFast(String question) async {
     final q = question.toLowerCase();
 
+    if (_isFastGeneralMessage(question)) {
+      return 'General';
+    }
+
     if (RegExp(
       r'\b(admission|admit|admitted|enroll|enrollment|application|apply|applying|entrance|entry|requirement|requirements|eligibility|qualify|acceptance|accepted|applicant)\b',
     ).hasMatch(q)) {
@@ -1328,35 +1456,50 @@ $question
       return 'Placement';
     }
 
-    try {
-      final prompt =
-          '''Classify this question into ONE category: Admission, Scholarship, Placement, or General.
+    return 'General';
+  }
 
-  Categories:
-  - Admission: enrollment, application process, requirements, eligibility, cmucat, 
-  - Scholarship: financial aid, grants, scholarships, tuition assistance
-  - Placement: jobs, internships, career services, OJT, employment
-  - General: anything else
+  bool _isFastGeneralMessage(String question) {
+    final q = question.trim().toLowerCase();
+    if (q.isEmpty) return true;
 
-  Question: "$question"
+    final normalized = q.replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
+    final compact = normalized.split(RegExp(r'\s+')).join(' ').trim();
+    final words = compact.split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
 
-  Return ONLY the category name (Admission, Scholarship, Placement, or General):''';
-
-      final category = await _cohere?.generateResponse(prompt);
-
-      if (category != null && category.trim().isNotEmpty) {
-        final normalized = category.trim().replaceAll(RegExp(r'[^a-zA-Z]'), '');
-
-        if (normalized.toLowerCase().contains('admission')) return 'Admission';
-        if (normalized.toLowerCase().contains('scholarship'))
-          return 'Scholarship';
-        if (normalized.toLowerCase().contains('placement')) return 'Placement';
-      }
-    } catch (e) {
-      print('❌ Classification error: $e');
+    if (words.length <= 3 &&
+        RegExp(
+          r'^(hi|hello|hey|yo|good morning|good afternoon|good evening|thanks|thank you|ok|okay|yes|no)$',
+        ).hasMatch(compact)) {
+      return true;
     }
 
-    return 'General';
+    return false;
+  }
+
+  String _fastGeneralReply(String question) {
+    final compact =
+        question
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+            .split(RegExp(r'\s+'))
+            .join(' ')
+            .trim();
+
+    if (compact == 'thanks' || compact == 'thank you') {
+      return "You're welcome! How else can I help?";
+    }
+
+    if (compact == 'ok' || compact == 'okay' || compact == 'yes') {
+      return 'Got it. How can I help you next?';
+    }
+
+    if (compact == 'no') {
+      return 'No problem. What would you like to ask?';
+    }
+
+    return 'Hi! How can I help you today?';
   }
 
   // =========================================================================
@@ -1394,9 +1537,8 @@ $question
             continue;
           }
 
-          // FIX: Accept both field names; normalise to 'embedding' in cache
-          // so _findBestFAQMatch always finds it under 'embedding'.
-          final rawEmbedding = data['embedding'] ?? data['geminiEmbedding'];
+          final rawEmbedding =
+              data['contextEmbedding'] ?? data['faqContextEmbedding'];
 
           if (rawEmbedding == null ||
               rawEmbedding is! List ||
@@ -1420,10 +1562,8 @@ $question
             continue;
           }
 
-          // Normalise: always store under 'embedding' key in memory cache.
           final normalisedData = Map<String, dynamic>.from(data);
           normalisedData['embedding'] = rawEmbedding;
-          normalisedData.remove('geminiEmbedding');
 
           validFAQs[doc.id] = normalisedData;
           print(
@@ -1462,24 +1602,53 @@ $question
     BuildContext context,
     String question,
     String answerText,
-    List<double> currentEmbedding,
+    List<double>? currentEmbedding,
     String category,
     String? userId,
   ) async {
     try {
-      await Future.wait([
+      final tasks = <Future<void>>[
         _logMessageAction(question, answerText),
         checkEscalation(context, answerText, userId, question),
-        _checkAndPromoteToFAQOptimized(
-          question,
-          currentEmbedding,
-          answerText,
-          category,
-        ),
         _updateConversationTitleIfNeeded(question),
-      ]);
+      ];
+
+      if (currentEmbedding != null) {
+        tasks.add(
+          _checkAndPromoteToFAQOptimized(
+            question,
+            currentEmbedding,
+            answerText,
+            category,
+          ),
+        );
+      } else if (_isQuestionWorthyOfFAQ(question) &&
+          _isAnswerWorthyOfFAQ(answerText)) {
+        tasks.add(_promoteToFAQAfterEmbedding(question, answerText, category));
+      }
+
+      await Future.wait(tasks);
     } catch (e) {
       print('Error in post-response tasks: $e');
+    }
+  }
+
+  Future<void> _promoteToFAQAfterEmbedding(
+    String question,
+    String answerText,
+    String category,
+  ) async {
+    try {
+      final embedding = await _generateEmbeddingCached(question);
+      await _ensureFAQCacheLoaded();
+      await _checkAndPromoteToFAQOptimized(
+        question,
+        embedding,
+        answerText,
+        category,
+      );
+    } catch (e) {
+      print('⚠️ Background FAQ promotion skipped: $e');
     }
   }
 
@@ -2728,15 +2897,21 @@ $question
 
   late final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
-  Future<List<double>> generateEmbedding(String question) async {
+  Future<List<double>> generateEmbedding(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     if (!kIsWeb && Platform.isWindows) {
-      return await _generateEmbeddingDirect(question);
+      return await _generateEmbeddingDirect(question, taskType: taskType);
     } else {
-      return await _generateEmbeddingFirebase(question);
+      return await _generateEmbeddingFirebase(question, taskType: taskType);
     }
   }
 
-  Future<List<double>> _generateEmbeddingDirect(String question) async {
+  Future<List<double>> _generateEmbeddingDirect(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     try {
       print('🪟 Windows: Generating Gemini embedding via Direct HTTP');
 
@@ -2750,12 +2925,18 @@ $question
         ),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
+          "model": "models/gemini-embedding-001",
           "content": {
             "parts": [
               {"text": question},
             ],
           },
+          "taskType": taskType,
           "outputDimensionality": 768,
+          "embedContentConfig": {
+            "taskType": taskType,
+            "outputDimensionality": 768,
+          },
         }),
       );
 
@@ -2785,14 +2966,20 @@ $question
     }
   }
 
-  Future<List<double>> _generateEmbeddingFirebase(String question) async {
+  Future<List<double>> _generateEmbeddingFirebase(
+    String question, {
+    String taskType = 'RETRIEVAL_DOCUMENT',
+  }) async {
     try {
       print('📱 Mobile/Web: Generating Gemini embedding via Firebase');
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'generateEmbedding',
       );
-      final result = await callable.call({'text': question});
+      final result = await callable.call({
+        'text': question,
+        'taskType': taskType,
+      });
 
       final embedding =
           (result.data['embedding'] as List)
@@ -2893,8 +3080,10 @@ $question
 
     _messagesSubscription?.cancel();
     _messagesSubscription = null;
+    _messagesSubscriptionConversationId = null;
     _escalationSubscription?.cancel();
     _escalationSubscription = null;
+    _escalationSubscriptionConversationId = null;
 
     _messages.clear();
     _processedMessages.clear();

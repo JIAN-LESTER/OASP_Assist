@@ -8,6 +8,10 @@ enum OnboardingStep {
   sidebar,
   sidebarContent,
   faqButton,
+  faqCards,
+  textInput,
+  chatBubbles,
+  escalationButton,
   audioButton,
   notifications,
   profile,
@@ -20,6 +24,8 @@ class OnboardingGuide extends StatefulWidget {
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
   final VoidCallback? onFinished;
 
@@ -31,19 +37,21 @@ class OnboardingGuide extends StatefulWidget {
     this.profileKey,
     this.bottomNavKey,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
     this.onFinished,
   });
 
   @override
-  State<OnboardingGuide> createState() => _OnboardingGuideState();
+  OnboardingGuideState createState() => OnboardingGuideState();
 
-  static _OnboardingGuideState? of(BuildContext context) {
-    return context.findAncestorStateOfType<_OnboardingGuideState>();
+  static OnboardingGuideState? of(BuildContext context) {
+    return context.findAncestorStateOfType<OnboardingGuideState>();
   }
 }
 
-class _OnboardingGuideState extends State<OnboardingGuide>
+class OnboardingGuideState extends State<OnboardingGuide>
     with SingleTickerProviderStateMixin {
   bool _showOnboarding = false;
   OnboardingStep _currentStep = OnboardingStep.sidebar;
@@ -94,7 +102,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
 
       if (!hasSeenLocal && !dbHasSeenOnboarding) {
         await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) {
+        if (mounted && !_showOnboarding) {
           setState(() {
             _showOnboarding = true;
           });
@@ -107,6 +115,7 @@ class _OnboardingGuideState extends State<OnboardingGuide>
   }
 
   void _showOverlay() {
+    if (_overlayEntry != null) return;
     _overlayEntry = _createOverlayEntry();
     Overlay.of(context).insert(_overlayEntry!);
   }
@@ -126,10 +135,13 @@ class _OnboardingGuideState extends State<OnboardingGuide>
             profileKey: widget.profileKey,
             bottomNavKey: widget.bottomNavKey,
             faqButtonKey: widget.faqButtonKey,
+            faqCardsKey: widget.faqCardsKey,
+            textInputKey: widget.textInputKey,
             audioButtonKey: widget.audioButtonKey,
             pulseAnimation: _pulseAnimation,
             onNext: _nextStep,
             onPrevious: _previousStep,
+            onClose: _closeOnboarding,
             onSkip: _skipOnboarding,
           ),
     );
@@ -139,104 +151,51 @@ class _OnboardingGuideState extends State<OnboardingGuide>
     return MediaQuery.of(context).size.width < 600;
   }
 
+  List<OnboardingStep> _availableSteps() {
+    final steps = <OnboardingStep>[
+      OnboardingStep.sidebar,
+      OnboardingStep.sidebarContent,
+      OnboardingStep.faqButton,
+    ];
+
+    if (widget.faqCardsKey?.currentContext != null) {
+      steps.add(OnboardingStep.faqCards);
+    }
+
+    steps.addAll(const [
+      OnboardingStep.textInput,
+      OnboardingStep.chatBubbles,
+      OnboardingStep.escalationButton,
+      OnboardingStep.audioButton,
+      OnboardingStep.notifications,
+      OnboardingStep.profile,
+    ]);
+    return steps;
+  }
+
   void _nextStep() {
     HapticFeedback.lightImpact();
-    setState(() {
-      if (_isMobile(context)) {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.notifications;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.profile;
-            break;
-          case OnboardingStep.profile:
-            _finishOnboarding();
-            return;
-        }
-      } else {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.notifications;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.profile;
-            break;
-          case OnboardingStep.profile:
-            _finishOnboarding();
-            return;
-        }
-      }
-    });
+    final steps = _availableSteps();
+    final currentIndex = steps.indexOf(_currentStep);
 
+    if (currentIndex == -1 || currentIndex == steps.length - 1) {
+      _finishOnboarding();
+      return;
+    }
+
+    setState(() => _currentStep = steps[currentIndex + 1]);
     _removeOverlay();
     _showOverlay();
   }
 
   void _previousStep() {
     HapticFeedback.lightImpact();
-    setState(() {
-      if (_isMobile(context)) {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            return;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.sidebar;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.profile:
-            _currentStep = OnboardingStep.notifications;
-            break;
-        }
-      } else {
-        switch (_currentStep) {
-          case OnboardingStep.sidebar:
-            return;
-          case OnboardingStep.sidebarContent:
-            _currentStep = OnboardingStep.sidebar;
-            break;
-          case OnboardingStep.faqButton:
-            _currentStep = OnboardingStep.sidebarContent;
-            break;
-          case OnboardingStep.audioButton:
-            _currentStep = OnboardingStep.faqButton;
-            break;
-          case OnboardingStep.notifications:
-            _currentStep = OnboardingStep.audioButton;
-            break;
-          case OnboardingStep.profile:
-            _currentStep = OnboardingStep.notifications;
-            break;
-        }
-      }
-    });
+    final steps = _availableSteps();
+    final currentIndex = steps.indexOf(_currentStep);
 
+    if (currentIndex <= 0) return;
+
+    setState(() => _currentStep = steps[currentIndex - 1]);
     _removeOverlay();
     _showOverlay();
   }
@@ -244,6 +203,15 @@ class _OnboardingGuideState extends State<OnboardingGuide>
   Future<void> _skipOnboarding() async {
     HapticFeedback.mediumImpact();
     await _finishOnboarding();
+  }
+
+  void _closeOnboarding() {
+    HapticFeedback.lightImpact();
+    _removeOverlay();
+    if (!mounted) return;
+    setState(() {
+      _showOnboarding = false;
+    });
   }
 
   Widget _buildWelcomeFeature(IconData icon, String title, String subtitle) {
@@ -360,21 +328,21 @@ class _OnboardingGuideState extends State<OnboardingGuide>
                     child: Column(
                       children: [
                         _buildWelcomeFeature(
-                          Icons.school,
-                          'Admission Information',
-                          'View admission requirements',
+                          Icons.chat_outlined,
+                          'Chat with OASP Assist',
+                          'Ask questions and get guided help',
                         ),
                         const SizedBox(height: 12),
                         _buildWelcomeFeature(
-                          Icons.card_giftcard,
-                          'Scholarship List',
-                          'Browse available scholarships',
+                          Icons.announcement_outlined,
+                          'Announcements',
+                          'View latest OASP updates',
                         ),
                         const SizedBox(height: 12),
                         _buildWelcomeFeature(
-                          Icons.work,
-                          'Placement Information',
-                          'Career placement details',
+                          Icons.notifications_outlined,
+                          'Notifications',
+                          'Stay updated on replies and announcements',
                         ),
                       ],
                     ),
@@ -474,10 +442,13 @@ class _OnboardingOverlay extends StatelessWidget {
   final GlobalKey? profileKey;
   final GlobalKey? bottomNavKey;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
   final Animation<double> pulseAnimation;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
+  final VoidCallback onClose;
   final VoidCallback onSkip;
 
   const _OnboardingOverlay({
@@ -487,10 +458,13 @@ class _OnboardingOverlay extends StatelessWidget {
     this.profileKey,
     this.bottomNavKey,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
     required this.pulseAnimation,
     required this.onNext,
     required this.onPrevious,
+    required this.onClose,
     required this.onSkip,
   });
 
@@ -511,6 +485,11 @@ class _OnboardingOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     if (currentStep == OnboardingStep.sidebarContent) {
       return _buildSidebarContentOverlay(context);
+    }
+
+    if (currentStep == OnboardingStep.chatBubbles ||
+        currentStep == OnboardingStep.escalationButton) {
+      return _buildChatPreviewOverlay(context);
     }
 
     final targetKey = _getTargetKey();
@@ -568,6 +547,143 @@ class _OnboardingOverlay extends StatelessWidget {
             child: _buildTooltip(context),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatPreviewOverlay(BuildContext context) {
+    final isEscalationStep = currentStep == OnboardingStep.escalationButton;
+
+    return Material(
+      color: Colors.black.withOpacity(0.72),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black38,
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chat preview',
+                    style: TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2E7D32),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: const Text(
+                        'How do I apply?',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(4),
+                        bottomRight: Radius.circular(16),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'You can submit your application through the admissions portal.',
+                      style: TextStyle(color: Color(0xFF374151), height: 1.4),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            isEscalationStep
+                                ? const Color(0xFFFFF7ED)
+                                : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color:
+                              isEscalationStep
+                                  ? const Color(0xFF4CAF50)
+                                  : Colors.grey.shade300,
+                          width: isEscalationStep ? 3 : 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.support_agent,
+                            size: 18,
+                            color: Color(0xFF4B5563),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Escalate to Staff',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF4B5563),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildTooltip(context),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -690,6 +806,13 @@ class _OnboardingOverlay extends StatelessWidget {
         return null;
       case OnboardingStep.faqButton:
         return faqButtonKey;
+      case OnboardingStep.faqCards:
+        return faqCardsKey;
+      case OnboardingStep.textInput:
+        return textInputKey;
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return null;
       case OnboardingStep.audioButton:
         return audioButtonKey;
       case OnboardingStep.notifications:
@@ -707,6 +830,12 @@ class _OnboardingOverlay extends StatelessWidget {
         return 0;
       case OnboardingStep.faqButton:
         return 8;
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        return 12;
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
       case OnboardingStep.audioButton:
         return 8;
       case OnboardingStep.notifications:
@@ -746,6 +875,21 @@ class _OnboardingOverlay extends StatelessWidget {
           return screenWidth - tooltipWidth - 20;
         }
         return centeredLeft;
+
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        final tooltipWidth =
+            isMobile ? (screenWidth - 40).clamp(280.0, 340.0) : 340.0;
+        final centeredLeft = offset.dx + (size.width / 2) - (tooltipWidth / 2);
+        if (centeredLeft < 20) return 20;
+        if (centeredLeft + tooltipWidth > screenWidth - 20) {
+          return screenWidth - tooltipWidth - 20;
+        }
+        return centeredLeft;
+
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
 
       case OnboardingStep.audioButton:
         // Center tooltip above the button (positioned to the right)
@@ -799,6 +943,16 @@ class _OnboardingOverlay extends StatelessWidget {
         }
         return proposedTop;
 
+      case OnboardingStep.faqCards:
+      case OnboardingStep.textInput:
+        final proposedTop = offset.dy - 210;
+        if (proposedTop < 80) return offset.dy + size.height + 24;
+        return proposedTop;
+
+      case OnboardingStep.chatBubbles:
+      case OnboardingStep.escalationButton:
+        return 0;
+
       case OnboardingStep.audioButton:
         // Position tooltip above the button with better spacing
         final tooltipHeight = 160.0;
@@ -828,8 +982,6 @@ class _OnboardingOverlay extends StatelessWidget {
   Widget _buildTooltip(BuildContext context) {
     final info = _getStepInfo(context);
     final isMobile = _isMobile(context);
-    final isTablet = _isTablet(context);
-    final isDesktop = _isDesktop(context);
     final isFirstStep = currentStep == OnboardingStep.sidebar;
     final isLastStep = _isLastStep(context);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -855,15 +1007,37 @@ class _OnboardingOverlay extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            info.title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1B5E20),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  info.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1B5E20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Close guide',
+                child: IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded),
+                  color: Colors.grey[600],
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             info.description,
             style: TextStyle(
@@ -877,25 +1051,15 @@ class _OnboardingOverlay extends StatelessWidget {
             _buildBulletPoint('Home - Your dashboard'),
             _buildBulletPoint('Chat with OASP Assist - AI assistant'),
             _buildBulletPoint('Announcements - Latest updates'),
-            _buildBulletPoint('Services - Admission, Scholarships, Placement'),
           ],
           const SizedBox(height: 20),
 
-          // Updated action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Previous/Skip button
-              if (!isFirstStep)
-                TextButton.icon(
-                  onPressed: onPrevious,
-                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                  label: const Text(
-                    'Previous',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
-                  ),
+          if (isMobile) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: onSkip,
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(
@@ -903,79 +1067,111 @@ class _OnboardingOverlay extends StatelessWidget {
                       vertical: 8,
                     ),
                   ),
-                )
-              else
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                ),
+                _buildPrimaryActions(context, isLastStep, isMobile),
+              ],
+            ),
+            if (!isFirstStep) ...[
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _buildPreviousButton(),
+              ),
+            ],
+          ] else
+            Row(
+              children: [
+                if (!isFirstStep) _buildPreviousButton(),
                 TextButton(
                   onPressed: onSkip,
                   style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
                       vertical: 8,
                     ),
                   ),
-                  child: Text(
-                    'Skip Tour',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.visible,
+                  child: const Text(
+                    'Skip',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 ),
+                const Spacer(),
+                _buildPrimaryActions(context, isLastStep, isMobile),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 
-              const Spacer(),
+  Widget _buildPreviousButton() {
+    return TextButton.icon(
+      onPressed: onPrevious,
+      icon: const Icon(Icons.arrow_back_rounded, size: 16),
+      label: const Text(
+        'Previous',
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        maxLines: 1,
+        overflow: TextOverflow.visible,
+      ),
+      style: TextButton.styleFrom(
+        foregroundColor: Colors.grey[600],
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      ),
+    );
+  }
 
-              // Step indicator and Next/Finish button
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildStepIndicator(context),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: onNext,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 16 : 20,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isLastStep ? 'Finish' : 'Next',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.visible,
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          isLastStep
-                              ? Icons.check_rounded
-                              : Icons.arrow_forward_rounded,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+  Widget _buildPrimaryActions(
+    BuildContext context,
+    bool isLastStep,
+    bool isMobile,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildStepIndicator(context),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: onNext,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 16 : 20,
+              vertical: 12,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isLastStep ? 'Finish' : 'Next',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                isLastStep ? Icons.check_rounded : Icons.arrow_forward_rounded,
+                size: 18,
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1009,11 +1205,29 @@ class _OnboardingOverlay extends StatelessWidget {
   }
 
   Widget _buildStepIndicator(BuildContext context) {
-    final isMobile = _isMobile(context);
-    final totalSteps = 6; // 6 steps total
+    final totalSteps = _availableSteps().length;
     final currentStepIndex = _getCurrentStepIndex();
 
+    if (totalSteps > 6) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F5E9),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '${currentStepIndex + 1}/$totalSteps',
+          style: const TextStyle(
+            color: Color(0xFF2E7D32),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: List.generate(totalSteps, (index) {
         final isActive = index == currentStepIndex;
         return Container(
@@ -1030,24 +1244,31 @@ class _OnboardingOverlay extends StatelessWidget {
   }
 
   int _getCurrentStepIndex() {
-    switch (currentStep) {
-      case OnboardingStep.sidebar:
-        return 0;
-      case OnboardingStep.sidebarContent:
-        return 1;
-      case OnboardingStep.faqButton:
-        return 2;
-      case OnboardingStep.audioButton:
-        return 3;
-      case OnboardingStep.notifications:
-        return 4;
-      case OnboardingStep.profile:
-        return 5;
-    }
+    return _availableSteps().indexOf(currentStep);
   }
 
   bool _isLastStep(BuildContext context) {
-    return currentStep == OnboardingStep.profile;
+    return _getCurrentStepIndex() == _availableSteps().length - 1;
+  }
+
+  List<OnboardingStep> _availableSteps() {
+    final steps = <OnboardingStep>[
+      OnboardingStep.sidebar,
+      OnboardingStep.sidebarContent,
+      OnboardingStep.faqButton,
+    ];
+    if (faqCardsKey?.currentContext != null) {
+      steps.add(OnboardingStep.faqCards);
+    }
+    steps.addAll(const [
+      OnboardingStep.textInput,
+      OnboardingStep.chatBubbles,
+      OnboardingStep.escalationButton,
+      OnboardingStep.audioButton,
+      OnboardingStep.notifications,
+      OnboardingStep.profile,
+    ]);
+    return steps;
   }
 
   _StepInfo _getStepInfo(BuildContext context) {
@@ -1089,6 +1310,33 @@ class _OnboardingOverlay extends StatelessWidget {
           title: 'Browse FAQs',
           description:
               'Toggle this button to view frequently asked questions. It\'s a quick way to find answers without typing.',
+        );
+
+      case OnboardingStep.faqCards:
+        return _StepInfo(
+          title: 'FAQ Categories',
+          description: 'Choose a category card to browse common questions. ',
+        );
+
+      case OnboardingStep.textInput:
+        return _StepInfo(
+          title: 'Ask a Question',
+          description:
+              'Type your question here, then use the arrow button or your keyboard to send it.',
+        );
+
+      case OnboardingStep.chatBubbles:
+        return _StepInfo(
+          title: 'Your Chat',
+          description:
+              'Your messages appear in green and OASP Assist replies in white, so it is easy to follow the conversation.',
+        );
+
+      case OnboardingStep.escalationButton:
+        return _StepInfo(
+          title: 'Escalate to Staff',
+          description:
+              'If an answer does not resolve your concern, use this button below an OASP Assist reply to ask staff for help.',
         );
 
       case OnboardingStep.audioButton:

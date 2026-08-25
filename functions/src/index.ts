@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 
+
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -19,6 +20,7 @@ export {
   queryPinecone,
   insertPineconeDocument,
   insertPineconeDocumentBatch,
+  logPineconeUsage,
 
   deletePineconeDocuments,
 
@@ -30,10 +32,6 @@ export {
   generateCohereEmbedding,
   generateCohereResponse,
   checkPineconeHealth,
-
-  analyzeCohereAdmission,
-  analyzeCohereScholarship,
-  analyzeCoherePlacement,
 
 } from "./documentCrud";
 
@@ -55,7 +53,6 @@ export {
 
   batchSyncCategoriesToInfoBank,
 
-
 } from "./announcement";
 
 // Facebook Token Management Functions
@@ -71,7 +68,7 @@ export {
   checkUpcomingDeadlines,
   cleanupOldNotifications,
   onEscalationCreated,
-  onEscalationReplied,
+  onEscalationRepliedV2,
 } from "./notification";
 
 // Health Check & Test Functions
@@ -86,3 +83,13 @@ export {
 
 
 } from "./fbTokenExpiry";
+
+export {
+  sendAppDistributionInvite,
+} from "./appDistributionInvite";
+
+export {
+  sendCustomEmailVerification,
+  sendCustomPasswordReset,
+  sendCustomEmailChangeVerification,
+} from "./authEmail";

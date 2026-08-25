@@ -6,9 +6,6 @@ import 'package:capstone_project/modules/authentication/onboarding/userOnboardin
 import 'package:capstone_project/modules/staff/staff_main_page.dart';
 import 'package:capstone_project/modules/user/announcement/user_announcement.dart';
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
-import 'package:capstone_project/modules/user/service_information/admission_info.dart';
-import 'package:capstone_project/modules/user/service_information/placement_info.dart';
-import 'package:capstone_project/modules/user/service_information/scholarship_list.dart';
 import 'package:capstone_project/modules/user/user_main_page.dart';
 
 import 'package:flutter/services.dart';
@@ -23,7 +20,6 @@ import 'package:capstone_project/services/answer_retrieval.dart';
 import 'package:capstone_project/services/cohere_service.dart';
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:capstone_project/services/notification_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -31,11 +27,31 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'firebase_options.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 
 import 'modules/staff/human_escalation/human_escalation.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+TextTheme _sturdyAppTextTheme(TextTheme base) {
+  final themed = base.apply(
+    fontFamily: 'Segoe UI',
+    bodyColor: const Color(0xFF111827),
+    displayColor: const Color(0xFF111827),
+  );
+
+  return themed.copyWith(
+    bodyLarge: themed.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+    bodyMedium: themed.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+    bodySmall: themed.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+    labelLarge: themed.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    labelMedium: themed.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+    labelSmall: themed.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+    titleLarge: themed.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    titleMedium: themed.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+    titleSmall: themed.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+  );
+}
 
 // Loading Overlay Widget
 class LoadingOverlay {
@@ -64,11 +80,11 @@ class LoadingOverlay {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF2E7D32),
-                      ),
-                      strokeWidth: 3,
+                    Image.asset(
+                      'lib/images/oasp.png',
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.contain,
                     ),
                     if (message != null) ...[
                       const SizedBox(height: 16),
@@ -521,29 +537,19 @@ Future<void> initializeServices() async {
 //  CRITICAL  Properly configure Firebase Functions for production
 void configureFirebaseFunctions() {
   try {
-    // Get the default Functions instance
+
     final functions = FirebaseFunctions.instance;
-
-    //  NEVER use emulator in production builds
-    // The emulator should ONLY be used during local development
-    // For production, Firebase Functions automatically connects to your deployed functions
-
     if (kDebugMode) {
       print(
         ' Firebase Functions configured for: ${functions.app.options.projectId}',
       );
-      print('   Region: us-central1 (default)');
-
-      //  ONLY uncomment these lines if you're actively developing locally with the emulator running
-      // Comment them out or remove them for production builds
-      // functions.useFunctionsEmulator('localhost', 5001);
-      // print(' Using Functions emulator at localhost:5001');
+      print('   Region: asia-southeast1');
     } else {
       print(' Firebase Functions configured for production');
       print('   Project: ${functions.app.options.projectId}');
     }
   } catch (e) {
-    print(' Error configuring Firebase Functions: $e');
+
   }
 }
 
@@ -552,15 +558,6 @@ void main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
 
-      //  Load environment variables FIRST
-      try {
-        await dotenv.load(fileName: '.env');
-        print(' Environment variables loaded');
-      } catch (e) {
-        print(' Could not load .env file: $e');
-        print('   Make sure .env exists in project root');
-      }
-
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
@@ -568,13 +565,19 @@ void main() async {
 
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.manual,
-        overlays: [SystemUiOverlay.top],
+        overlays: [],
       );
 
       //  Initialize Firebase FIRST
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      if (kIsWeb) {
+        FirebaseFirestore.instance.settings = const Settings(
+          persistenceEnabled: false,
+          webExperimentalAutoDetectLongPolling: true,
+        );
+      }
       print(' Firebase initialized');
 
       //  Wait a moment for Firebase to fully initialize
@@ -634,7 +637,12 @@ class MyApp extends StatelessWidget {
       title: 'OASP Assist',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        fontFamily: 'Roboto',
+        fontFamily: 'Segoe UI',
+        fontFamilyFallback: const ['Arial', 'Roboto', 'sans-serif'],
+        textTheme: _sturdyAppTextTheme(ThemeData.light().textTheme),
+        primaryTextTheme: _sturdyAppTextTheme(
+          ThemeData.light().primaryTextTheme,
+        ),
         visualDensity: VisualDensity.adaptivePlatformDensity,
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -693,9 +701,6 @@ class MyApp extends StatelessWidget {
         '/informationBank': (context) => InformationBankPage(),
         '/announcements': (context) => const UserAnnouncementPage(),
         '/announcements/detail': (context) => const UserAnnouncementPage(),
-        '/admission': (context) => AdmissionInfo(),
-        '/scholarships': (context) => ScholarshipList(),
-        '/placements': (context) => PlacementInfo(),
         '/staff/home': (context) {
           final args =
               ModalRoute.of(context)?.settings.arguments
@@ -850,13 +855,7 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-          ),
-        ),
+        color: const Color(0xFF2E7D32),
         child: Center(
           child: FadeTransition(
             opacity: _fadeAnimation,
@@ -897,12 +896,12 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   const SizedBox(height: 48),
-                  const SizedBox(
+                  SizedBox(
                     width: 40,
                     height: 40,
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      strokeWidth: 3,
+                    child: Image.asset(
+                      'lib/images/oasp.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 16),

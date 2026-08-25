@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class NotificationBadgeButton extends StatelessWidget {
+class NotificationBadgeButton extends StatefulWidget {
   final String role;
   final VoidCallback onTap;
 
@@ -13,21 +13,49 @@ class NotificationBadgeButton extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: onTap);
-    }
+  State<NotificationBadgeButton> createState() => _NotificationBadgeButtonState();
+}
 
-    final stream = FirebaseFirestore.instance
+class _NotificationBadgeButtonState extends State<NotificationBadgeButton> {
+  String? _uid;
+  late Stream<QuerySnapshot>? _notificationsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _uid = FirebaseAuth.instance.currentUser?.uid;
+    _notificationsStream = _buildStream();
+  }
+
+  @override
+  void didUpdateWidget(NotificationBadgeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != _uid || oldWidget.role != widget.role) {
+      _uid = uid;
+      _notificationsStream = _buildStream();
+    }
+  }
+
+  Stream<QuerySnapshot>? _buildStream() {
+    if (_uid == null) return null;
+    return FirebaseFirestore.instance
         .collection('notifications')
-        .where('targetRole', isEqualTo: role)
+        .where('targetRole', isEqualTo: widget.role)
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = _uid;
+    if (uid == null) {
+      return IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: widget.onTap);
+    }
 
     return StreamBuilder<QuerySnapshot>(
-      stream: stream,
+      stream: _notificationsStream,
       builder: (context, snapshot) {
         int unread = 0;
         if (snapshot.hasData) {
@@ -44,7 +72,7 @@ class NotificationBadgeButton extends StatelessWidget {
                 unread > 0 ? Icons.notifications_active : Icons.notifications_outlined,
                 color: unread > 0 ? const Color(0xFF2E7D32) : null,
               ),
-              onPressed: onTap,
+              onPressed: widget.onTap,
             ),
             if (unread > 0)
               Positioned(

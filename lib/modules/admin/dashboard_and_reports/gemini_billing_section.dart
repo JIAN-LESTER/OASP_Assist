@@ -5,10 +5,16 @@ import 'gemini_billing_service.dart';
 class GeminiBillingSection extends StatefulWidget {
   final String timeFrame;
   final DateTimeRange? customDateRange;
+  final ExternalToolsUsageSummary? initialData;
+  final bool showHeader;
+  final bool showReportDetails;
   const GeminiBillingSection({
     super.key,
     required this.timeFrame,
     this.customDateRange,
+    this.initialData,
+    this.showHeader = true,
+    this.showReportDetails = false,
   });
 
   @override
@@ -16,44 +22,21 @@ class GeminiBillingSection extends StatefulWidget {
 }
 
 class _GeminiBillingSectionState extends State<GeminiBillingSection> {
-  GeminiBillingSummary? _data;
-  bool _loading = true;
-  String? _error;
+  ExternalToolsUsageSummary? _data;
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final data = await fetchGeminiBillingFromFirestore(
-        timeFrame: widget.timeFrame,
-        customDateRange: widget.customDateRange,
-      );
-      setState(() {
-        _data = data;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+    _data = widget.initialData;
   }
 
   @override
   void didUpdateWidget(GeminiBillingSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.timeFrame != widget.timeFrame ||
-        oldWidget.customDateRange != widget.customDateRange) {
-      _load();
+    if (oldWidget.initialData != widget.initialData) {
+      setState(() {
+        _data = widget.initialData;
+      });
     }
   }
 
@@ -65,56 +48,35 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A73E8).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long,
-                    color: Color(0xFF1A73E8),
-                    size: 20,
-                  ),
+        if (widget.showHeader) ...[
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A73E8).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Gemini API Billing',
-                      style: TextStyle(
-                        fontSize: isMobile ? 16 : 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[900],
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  Icons.receipt_long,
+                  color: Color(0xFF1A73E8),
+                  size: 20,
                 ),
-              ],
-            ),
-            // if (!_loading)
-            //   TextButton.icon(
-            //     onPressed: _load,
-            //     icon: const Icon(Icons.refresh, size: 15),
-            //     label: const Text('Refresh'),
-            //     style: TextButton.styleFrom(
-            //       foregroundColor: const Color(0xFF1A73E8),
-            //     ),
-            //   ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        if (_loading)
-          const _BillingSkeleton()
-        else if (_error != null)
-          _BillingError(error: _error!, onRetry: _load)
-        else if (_data == null)
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'External Tools Usage',
+                style: TextStyle(
+                  fontSize: isMobile ? 16 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[900],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+        if (_data == null)
           const _BillingEmpty()
         else
           _BillingBody(
@@ -122,6 +84,7 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
             isMobile: isMobile,
             timeFrame: widget.timeFrame,
             customDateRange: widget.customDateRange,
+            showReportDetails: widget.showReportDetails,
           ),
       ],
     );
@@ -132,15 +95,17 @@ class _GeminiBillingSectionState extends State<GeminiBillingSection> {
 
 // Pass timeFrame into _BillingBody
 class _BillingBody extends StatelessWidget {
-  final GeminiBillingSummary data;
+  final ExternalToolsUsageSummary data;
   final bool isMobile;
   final String timeFrame; // ADD
   final DateTimeRange? customDateRange; // ADD
+  final bool showReportDetails;
   const _BillingBody({
     required this.data,
     required this.isMobile,
     required this.timeFrame,
     this.customDateRange,
+    required this.showReportDetails,
   });
 
   String _periodLabel(String timeFrame, DateTimeRange? range) {
@@ -160,6 +125,8 @@ class _BillingBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final period = _periodLabel(timeFrame, customDateRange);
+
     return Column(
       children: [
         // ── 2 stat cards ──────────────────────────────────────
@@ -169,7 +136,10 @@ class _BillingBody extends StatelessWidget {
               child: _BillingStatCard(
                 label: 'Total Cost',
                 value: data.formattedTotalCost,
-                sub: '${formatTokenCount(data.totalTokens)} tokens',
+                sub:
+                    showReportDetails
+                        ? '${formatTokenCount(data.gemini.totalTokens)} Gemini tokens'
+                        : 'Firebase, LLM, Genkit, Pinecone',
                 icon: Icons.attach_money,
                 color: const Color(0xFF1A73E8),
               ),
@@ -177,25 +147,42 @@ class _BillingBody extends StatelessWidget {
             SizedBox(width: isMobile ? 12 : 20),
             Expanded(
               child: _BillingStatCard(
-                label: 'Input Tokens',
-                value: formatTokenCount(data.totalInputTokens),
-                sub: 'for ${_periodLabel(timeFrame, customDateRange)}',
-                icon: Icons.login,
-                color: Colors.orange,
+                label: showReportDetails ? 'Input Tokens' : 'Firebase Cost',
+                value:
+                    showReportDetails
+                        ? formatTokenCount(data.gemini.totalInputTokens)
+                        : formatBillingCost(data.firebaseTotalCostUsd),
+                sub:
+                    showReportDetails
+                        ? 'for $period'
+                        : '${data.totalReads} reads, ${data.totalWrites} writes',
+                icon: showReportDetails ? Icons.login : Icons.storage_outlined,
+                color: showReportDetails ? Colors.orange : Colors.teal,
               ),
             ),
             SizedBox(width: isMobile ? 12 : 20),
             Expanded(
               child: _BillingStatCard(
-                label: 'Output Tokens',
-                value: formatTokenCount(data.totalOutputTokens),
-                sub: 'for ${_periodLabel(timeFrame, customDateRange)}',
-                icon: Icons.logout,
+                label: showReportDetails ? 'Output Tokens' : 'LLM Cost',
+                value:
+                    showReportDetails
+                        ? formatTokenCount(data.gemini.totalOutputTokens)
+                        : formatBillingCost(data.llmTotalCostUsd),
+                sub: showReportDetails ? 'for $period' : 'Gemini API billing',
+                icon: showReportDetails ? Icons.logout : Icons.psychology,
                 color: Colors.purple,
               ),
             ),
           ],
         ),
+
+        const SizedBox(height: 20),
+
+        if (showReportDetails) ...[
+          _ExternalToolsCard(tools: data.tools),
+          const SizedBox(height: 20),
+          _OperationCostCard(firebase: data.firebase),
+        ],
 
         const SizedBox(height: 20),
 
@@ -206,7 +193,7 @@ class _BillingBody extends StatelessWidget {
                 SizedBox(
                   height: 280,
                   child: _DailyTrendCard(
-                    trend: data.dailyTrend,
+                    trend: data.gemini.dailyTrend,
                     timeFrame: timeFrame,
                     customDateRange: customDateRange,
                   ),
@@ -214,7 +201,16 @@ class _BillingBody extends StatelessWidget {
                 const SizedBox(height: 20),
                 SizedBox(
                   height: 300,
-                  child: _ModelCard(models: data.byModel, timeFrame: timeFrame),
+                  child:
+                      showReportDetails
+                          ? _ModelCard(
+                            models: data.gemini.byModel,
+                            timeFrame: timeFrame,
+                          )
+                          : _FirebaseOpsTrendCard(
+                            trend: data.firebase.trend,
+                            showCosts: false,
+                          ),
                 ),
               ],
             )
@@ -223,23 +219,38 @@ class _BillingBody extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    flex: 2,
                     child: _DailyTrendCard(
-                      trend: data.dailyTrend,
+                      trend: data.gemini.dailyTrend,
                       timeFrame: timeFrame,
                       customDateRange: customDateRange,
                     ),
                   ),
                   const SizedBox(width: 20),
                   Expanded(
-                    child: _ModelCard(
-                      models: data.byModel,
-                      timeFrame: timeFrame,
-                    ),
+                    child:
+                        showReportDetails
+                            ? _ModelCard(
+                              models: data.gemini.byModel,
+                              timeFrame: timeFrame,
+                            )
+                            : _FirebaseOpsTrendCard(
+                              trend: data.firebase.trend,
+                              showCosts: false,
+                            ),
                   ),
                 ],
               ),
             ),
+        if (showReportDetails) ...[
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 320,
+            child: _FirebaseOpsTrendCard(
+              trend: data.firebase.trend,
+              showCosts: true,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -339,6 +350,150 @@ class _BillingStatCard extends StatelessWidget {
 
 // ── Daily trend — matches buildSystemLogsCard container style ─────
 
+class _ExternalToolsCard extends StatelessWidget {
+  final List<ExternalToolStat> tools;
+
+  const _ExternalToolsCard({required this.tools});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.hub_outlined,
+                  color: Colors.teal[700],
+                  size: isMobile ? 20 : 24,
+                ),
+              ),
+              SizedBox(width: isMobile ? 10 : 12),
+              Expanded(
+                child: Text(
+                  'Firebase, Genkit, and Pinecone',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[900],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 14 : 18),
+          isMobile
+              ? Column(
+                children:
+                    tools
+                        .map(
+                          (tool) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ExternalToolRow(tool: tool),
+                          ),
+                        )
+                        .toList(),
+              )
+              : Row(
+                children:
+                    tools
+                        .map(
+                          (tool) => Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: _ExternalToolRow(tool: tool),
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExternalToolRow extends StatelessWidget {
+  final ExternalToolStat tool;
+
+  const _ExternalToolRow({required this.tool});
+
+  @override
+  Widget build(BuildContext context) {
+    final isFirebase = tool.name == 'Firebase';
+    final detail =
+        isFirebase
+            ? '${tool.readCount} reads  ${tool.writeCount} writes  ${tool.deleteCount} deletes'
+            : '${tool.usageCount} usage logs';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  tool.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey[900],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                tool.formattedCost,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A73E8),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DailyTrendCard extends StatefulWidget {
   final List<GeminiDailyPoint> trend;
   final String timeFrame; // ADD
@@ -356,174 +511,151 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
   String _mode = 'cost';
 
   String _trendSubtitle() {
+    final buckets = _trendBars();
     return switch (widget.timeFrame) {
       'Today' => 'Hourly breakdown',
       'This Week' => 'Last 7 days',
-      'This Month' => '${widget.trend.length} days this month',
-      'This Year' => '${widget.trend.length} days this year',
+      'This Month' => '${buckets.length} weeks this month',
+      'This Year' => '${buckets.length} months this year',
       'All' => 'All recorded days',
       'Custom' => () {
         final r = widget.customDateRange;
         if (r == null) return '${widget.trend.length} days';
-        return '${r.end.difference(r.start).inDays + 1} days selected';
+        return '${buckets.length} ${buckets.length == 1 ? 'period' : 'periods'} selected';
       }(),
       _ => '${widget.trend.length} days',
     };
   }
 
-  String _getBarLabel(String date, int index) {
-    switch (widget.timeFrame) {
-      case 'Today':
-        if (index % 3 != 0) return '';
-        if (index == 0) return '12am';
-        if (index == 12) return '12pm';
-        final h = index % 12;
-        return '${h}${index < 12 ? 'am' : 'pm'}';
-
-      case 'This Week':
-        try {
-          final dt = DateTime.parse(date);
-          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
-              1];
-        } catch (_) {
-          return '';
-        }
-
-      case 'This Month':
-        final day = int.tryParse(date.substring(8)) ?? 0;
-        if (day == 1) return 'W1';
-        if (day == 8) return 'W2';
-        if (day == 15) return 'W3';
-        if (day == 22) return 'W4';
-        return '';
-
-      case 'This Year':
-        try {
-          final m = int.parse(date.substring(5, 7));
-          return [
-            'Jan',
-            'Feb',
-            'Mar',
-            'Apr',
-            'May',
-            'Jun',
-            'Jul',
-            'Aug',
-            'Sep',
-            'Oct',
-            'Nov',
-            'Dec',
-          ][m - 1];
-        } catch (_) {
-          return '';
-        }
-
-      case 'All':
-        try {
-          final dt = DateTime.parse(date);
-          return dt.month == 1 ? '${dt.year}' : '';
-        } catch (_) {
-          return '';
-        }
-
-      case 'Custom':
-        final days =
-            widget.customDateRange?.end
-                .difference(widget.customDateRange!.start)
-                .inDays ??
-            0;
-        if (days == 0) {
-          if (index % 3 != 0) return '';
-          if (index == 0) return '12am';
-          if (index == 12) return '12pm';
-          return '${index % 12}${index < 12 ? 'am' : 'pm'}';
-        } else if (days <= 7) {
-          try {
-            final dt = DateTime.parse(date);
-            return [
-              'Mon',
-              'Tue',
-              'Wed',
-              'Thu',
-              'Fri',
-              'Sat',
-              'Sun',
-            ][dt.weekday - 1];
-          } catch (_) {
-            return date.substring(8);
-          }
-        } else if (days <= 31) {
-          final day = int.tryParse(date.substring(8)) ?? 0;
-          return day % 5 == 1 ? '$day' : '';
-        } else {
-          try {
-            final m = int.parse(date.substring(5, 7));
-            return [
-              'Jan',
-              'Feb',
-              'Mar',
-              'Apr',
-              'May',
-              'Jun',
-              'Jul',
-              'Aug',
-              'Sep',
-              'Oct',
-              'Nov',
-              'Dec',
-            ][m - 1];
-          } catch (_) {
-            return '';
-          }
-        }
-
-      default:
-        return date.length >= 10 ? date.substring(8) : date;
+  List<_TrendBarPoint> _trendBars() {
+    if (widget.timeFrame == 'Today') {
+      final current = widget.trend.isEmpty ? null : widget.trend.first;
+      final now = DateTime.now();
+      return List.generate(24, (hour) {
+        final valueCost =
+            hour == now.hour && current != null ? current.costUsd : 0.0;
+        final valueTokens =
+            hour == now.hour && current != null ? current.tokens : 0;
+        return _TrendBarPoint(
+          label: _hourLabel(hour),
+          tooltip: _hourLabel(hour),
+          costUsd: valueCost,
+          tokens: valueTokens,
+          isToday: hour == now.hour,
+        );
+      });
     }
+
+    if (widget.timeFrame == 'This Month') {
+      return _bucketTrend((point) {
+        final dt = DateTime.tryParse(point.date);
+        if (dt == null) return 'Week 1';
+        return 'Week ${((dt.day - 1) ~/ 7) + 1}';
+      }, ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5']);
+    }
+
+    if (widget.timeFrame == 'This Year') {
+      return _bucketTrend((point) {
+        final dt = DateTime.tryParse(point.date);
+        return dt == null ? point.date : _monthLabel(dt.month);
+      }, List.generate(12, (i) => _monthLabel(i + 1)));
+    }
+
+    if (widget.timeFrame == 'Custom') {
+      final range = widget.customDateRange;
+      final days =
+          range == null
+              ? widget.trend.length
+              : range.end.difference(range.start).inDays + 1;
+      if (days > 365) {
+        return _bucketTrend((point) {
+          final dt = DateTime.tryParse(point.date);
+          return dt == null ? point.date : '${dt.year}';
+        }, null);
+      }
+      if (days > 31) {
+        return _bucketTrend((point) {
+          final dt = DateTime.tryParse(point.date);
+          return dt == null ? point.date : '${_monthLabel(dt.month)} ${dt.year}';
+        }, null);
+      }
+    }
+
+    return widget.trend.map((point) {
+      final dt = DateTime.tryParse(point.date);
+      final label =
+          widget.timeFrame == 'This Week' && dt != null
+              ? _weekdayLabel(dt.weekday)
+              : point.date.length >= 10
+                  ? point.date.substring(8)
+                  : point.date;
+      return _TrendBarPoint(
+        label: label,
+        tooltip: label,
+        costUsd: point.costUsd,
+        tokens: point.tokens,
+        isToday: point.date == _dateStr(DateTime.now()),
+      );
+    }).toList();
   }
 
-  String _tooltipDate(String date, String timeFrame) {
-    switch (timeFrame) {
-      case 'This Week':
-        try {
-          final dt = DateTime.parse(date);
-          return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dt.weekday -
-              1];
-        } catch (_) {
-          return date;
-        }
-      case 'This Year':
-        try {
-          final m = int.parse(date.substring(5, 7));
-          return [
-            'Jan',
-            'Feb',
-            'Mar',
-            'Apr',
-            'May',
-            'Jun',
-            'Jul',
-            'Aug',
-            'Sep',
-            'Oct',
-            'Nov',
-            'Dec',
-          ][m - 1];
-        } catch (_) {
-          return date;
-        }
-      default:
-        return date;
+  List<_TrendBarPoint> _bucketTrend(
+    String Function(GeminiDailyPoint point) labelFor,
+    List<String>? orderedLabels,
+  ) {
+    final buckets = <String, _TrendBarPoint>{};
+    for (final label in orderedLabels ?? const <String>[]) {
+      buckets[label] = _TrendBarPoint(label: label, tooltip: label);
     }
+
+    for (final point in widget.trend) {
+      final label = labelFor(point);
+      final bucket = buckets.putIfAbsent(
+        label,
+        () => _TrendBarPoint(label: label, tooltip: label),
+      );
+      bucket.costUsd += point.costUsd;
+      bucket.tokens += point.tokens;
+      bucket.isToday = bucket.isToday || point.date == _dateStr(DateTime.now());
+    }
+
+    return buckets.values.toList();
+  }
+
+  String _hourLabel(int hour) {
+    if (hour == 0) return '12am';
+    if (hour == 12) return '12pm';
+    return '${hour % 12}${hour < 12 ? 'am' : 'pm'}';
+  }
+
+  String _weekdayLabel(int weekday) {
+    return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][weekday - 1];
+  }
+
+  String _monthLabel(int month) {
+    return [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ][month - 1];
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final today = _dateStr(DateTime.now());
+    final bars = widget.trend.isEmpty ? <_TrendBarPoint>[] : _trendBars();
     final values =
-        widget.trend
+        bars
             .map((d) => _mode == 'cost' ? d.costUsd : d.tokens.toDouble())
             .toList();
     final maxVal =
@@ -611,7 +743,7 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
 
           Expanded(
             child:
-                widget.trend.isEmpty
+                bars.isEmpty
                     ? Center(
                       child: Text(
                         'No usage data yet',
@@ -624,29 +756,12 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                         return Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: List.generate(
-                            widget.timeFrame == 'Today'
-                                ? 24
-                                : widget.trend.length,
+                            bars.length,
                             (i) {
-                              final d =
-                                  widget.timeFrame == 'Today'
-                                      ? widget.trend.first
-                                      : widget.trend[i];
-                              final now = DateTime.now();
-                              final val =
-                                  (() {
-                                    if (widget.timeFrame == 'Today') {
-                                      // Only the current hour gets the value, rest are 0
-                                      return i == now.hour
-                                          ? (_mode == 'cost'
-                                              ? d.costUsd
-                                              : d.tokens.toDouble())
-                                          : 0.0;
-                                    }
-                                    return _mode == 'cost'
-                                        ? d.costUsd
-                                        : d.tokens.toDouble();
-                                  })();
+                              final d = bars[i];
+                              final val = _mode == 'cost'
+                                  ? d.costUsd
+                                  : d.tokens.toDouble();
 
                               final ratio = maxVal > 0 ? val / maxVal : 0.0;
                               final barH = (ratio * (box.maxHeight - 28)).clamp(
@@ -654,19 +769,11 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                 box.maxHeight - 28,
                               );
 
-                              final isToday =
-                                  widget.timeFrame == 'Today'
-                                      ? i == now.hour
-                                      : d.date == today;
-
-                              final label = _getBarLabel(d.date, i);
-                              final showLabel = label.isNotEmpty;
-
                               return Expanded(
                                 child: Tooltip(
                                   message:
-                                      '${_tooltipDate(d.date, widget.timeFrame)}\n'
-                                      '${_mode == 'cost' ? d.formattedCost : '${formatTokenCount(d.tokens)} tokens'}',
+                                      '${d.tooltip}\n'
+                                      '${_mode == 'cost' ? formatBillingCost(d.costUsd) : '${formatTokenCount(d.tokens)} tokens'}',
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.end,
                                     children: [
@@ -677,7 +784,7 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                         ),
                                         decoration: BoxDecoration(
                                           color:
-                                              isToday
+                                              d.isToday
                                                   ? Colors.deepOrange
                                                   : const Color(
                                                     0xFF1A73E8,
@@ -692,9 +799,9 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
                                       SizedBox(
                                         height: 16,
                                         child:
-                                            showLabel
+                                            d.label.isNotEmpty
                                                 ? Text(
-                                                  label,
+                                                  d.label,
                                                   style: TextStyle(
                                                     fontSize: 8,
                                                     color: Colors.grey[500],
@@ -737,6 +844,396 @@ class _DailyTrendCardState extends State<_DailyTrendCard> {
 }
 
 // ── Model breakdown ───────────────────────────────────────────────
+
+class _TrendBarPoint {
+  final String label;
+  final String tooltip;
+  double costUsd;
+  int tokens;
+  bool isToday;
+
+  _TrendBarPoint({
+    required this.label,
+    required this.tooltip,
+    this.costUsd = 0,
+    this.tokens = 0,
+    this.isToday = false,
+  });
+}
+
+class _OperationCostCard extends StatelessWidget {
+  final FirebaseUsageSummary firebase;
+
+  const _OperationCostCard({required this.firebase});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final items = [
+      _OperationCostItem(
+        label: 'Read',
+        count: firebase.stat.readCount,
+        cost: firebase.readCostUsd,
+        color: const Color(0xFF1A73E8),
+        icon: Icons.visibility_outlined,
+      ),
+      _OperationCostItem(
+        label: 'Write',
+        count: firebase.stat.writeCount,
+        cost: firebase.writeCostUsd,
+        color: Colors.teal,
+        icon: Icons.edit_outlined,
+      ),
+      _OperationCostItem(
+        label: 'Delete',
+        count: firebase.stat.deleteCount,
+        cost: firebase.deleteCostUsd,
+        color: Colors.redAccent,
+        icon: Icons.delete_outline,
+      ),
+    ];
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Cost by Operation',
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[900],
+            ),
+          ),
+          SizedBox(height: isMobile ? 14 : 18),
+          isMobile
+              ? Column(
+                children:
+                    items
+                        .map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: item,
+                          ),
+                        )
+                        .toList(),
+              )
+              : Row(
+                children:
+                    items
+                        .map(
+                          (item) => Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: item,
+                            ),
+                          ),
+                        )
+                        .toList(),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationCostItem extends StatelessWidget {
+  final String label;
+  final int count;
+  final double cost;
+  final Color color;
+  final IconData icon;
+
+  const _OperationCostItem({
+    required this.label,
+    required this.count,
+    required this.cost,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.16)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey[900],
+                  ),
+                ),
+                Text(
+                  '${formatTokenCount(count)} ops',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            formatBillingCost(cost),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirebaseOpsTrendCard extends StatelessWidget {
+  final List<FirebaseOperationPoint> trend;
+  final bool showCosts;
+
+  const _FirebaseOpsTrendCard({required this.trend, required this.showCosts});
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final values =
+        trend
+            .expand(
+              (point) =>
+                  showCosts
+                      ? [
+                        point.readCostUsd,
+                        point.writeCostUsd,
+                        point.deleteCostUsd,
+                      ]
+                      : [
+                        point.reads.toDouble(),
+                        point.writes.toDouble(),
+                        point.deletes.toDouble(),
+                      ],
+            )
+            .toList();
+    final maxVal =
+        values.isEmpty ? 1.0 : values.reduce((a, b) => a > b ? a : b);
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.stacked_bar_chart,
+                  color: Colors.teal[700],
+                  size: isMobile ? 20 : 24,
+                ),
+              ),
+              SizedBox(width: isMobile ? 10 : 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Firebase Operations Over Time',
+                      style: TextStyle(
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[900],
+                      ),
+                    ),
+                    Text(
+                      showCosts
+                          ? 'Read, write, delete costs'
+                          : 'Reads, writes, deletes',
+                      style: TextStyle(
+                        fontSize: isMobile ? 11 : 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: isMobile ? 14 : 20),
+          Expanded(
+            child:
+                trend.isEmpty
+                    ? Center(
+                      child: Text(
+                        'No Firebase usage data yet',
+                        style: TextStyle(color: Colors.grey[400]),
+                      ),
+                    )
+                    : LayoutBuilder(
+                      builder: (context, box) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children:
+                              trend.map((point) {
+                                final read =
+                                    showCosts
+                                        ? point.readCostUsd
+                                        : point.reads.toDouble();
+                                final write =
+                                    showCosts
+                                        ? point.writeCostUsd
+                                        : point.writes.toDouble();
+                                final delete =
+                                    showCosts
+                                        ? point.deleteCostUsd
+                                        : point.deletes.toDouble();
+                                return Expanded(
+                                  child: Tooltip(
+                                    message:
+                                        '${point.label}\n'
+                                        'Read: ${point.reads} (${formatBillingCost(point.readCostUsd)})\n'
+                                        'Write: ${point.writes} (${formatBillingCost(point.writeCostUsd)})\n'
+                                        'Delete: ${point.deletes} (${formatBillingCost(point.deleteCostUsd)})',
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        Expanded(
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              _OpsBar(
+                                                value: read,
+                                                maxValue: maxVal,
+                                                maxHeight: box.maxHeight - 28,
+                                                color: const Color(0xFF1A73E8),
+                                              ),
+                                              _OpsBar(
+                                                value: write,
+                                                maxValue: maxVal,
+                                                maxHeight: box.maxHeight - 28,
+                                                color: Colors.teal,
+                                              ),
+                                              _OpsBar(
+                                                value: delete,
+                                                maxValue: maxVal,
+                                                maxHeight: box.maxHeight - 28,
+                                                color: Colors.redAccent,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        SizedBox(
+                                          height: 16,
+                                          child: Text(
+                                            point.label,
+                                            style: TextStyle(
+                                              fontSize: 8,
+                                              color: Colors.grey[500],
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                        );
+                      },
+                    ),
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              _LegendDot(color: Color(0xFF1A73E8), label: 'Read'),
+              SizedBox(width: 12),
+              _LegendDot(color: Colors.teal, label: 'Write'),
+              SizedBox(width: 12),
+              _LegendDot(color: Colors.redAccent, label: 'Delete'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpsBar extends StatelessWidget {
+  final double value;
+  final double maxValue;
+  final double maxHeight;
+  final Color color;
+
+  const _OpsBar({
+    required this.value,
+    required this.maxValue,
+    required this.maxHeight,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = maxValue > 0 ? value / maxValue : 0.0;
+    final height =
+        value <= 0
+            ? 2.0
+            : (ratio * maxHeight).clamp(2.0, maxHeight).toDouble();
+
+    return Container(
+      width: 5,
+      height: height,
+      margin: const EdgeInsets.symmetric(horizontal: 1),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.72),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+      ),
+    );
+  }
+}
 
 class _ModelCard extends StatelessWidget {
   final List<GeminiModelStat> models;

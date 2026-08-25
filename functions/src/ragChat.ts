@@ -1,6 +1,6 @@
 /* eslint-disable no-empty */
 /* eslint-disable no-useless-catch */
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import {Pinecone} from "@pinecone-database/pinecone";
@@ -9,6 +9,12 @@ import {onSchedule} from "firebase-functions/scheduler";
 import {Firestore, FieldValue} from "@google-cloud/firestore";
 
 type JsonResponse = Record<string, any>;
+type FAQMatch = {
+  question: string;
+  answer: string;
+  similarity: number;
+  category: string;
+};
 
 // Secrets
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
@@ -34,6 +40,7 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
   // https://ai.google.dev/pricing
   const PRICES: Record<string, {input: number; output: number}> = {
     "gemini-2.5-flash": {input: 0.30, output: 2.50},
+    "gemini-2.5-flash-lite": {input: 0.10, output: 0.40},
     "gemini-embedding-001": {input: 0.15, output: 0.00},
     "gemini-2.0-flash": {input: 0.10, output: 0.40},
     "gemini-1.5-flash": {input: 0.075, output: 0.30},
@@ -61,7 +68,88 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
   });
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
+const MAX_CONTEXT_CHARS = 600;
+const MAX_HISTORY_CHARS = 140;
+const FAQ_SIMILARITY_THRESHOLD = 0.88;
+const FAQ_STRONG_SIMILARITY = 0.92;
+const FAQ_SIMILARITY_MARGIN = 0.03;
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
+
+type GeminiEmbeddingTaskType =
+  | "RETRIEVAL_QUERY"
+  | "RETRIEVAL_DOCUMENT"
+  | "SEMANTIC_SIMILARITY"
+  | "CLASSIFICATION"
+  | "CLUSTERING"
+  | "QUESTION_ANSWERING"
+  | "FACT_VERIFICATION"
+  | "CODE_RETRIEVAL_QUERY";
+
+function normalizeEmbeddingTaskType(taskType?: string): GeminiEmbeddingTaskType {
+  switch (taskType) {
+  case "search_query":
+  case "RETRIEVAL_QUERY":
+    return "RETRIEVAL_QUERY";
+  case "search_document":
+  case "RETRIEVAL_DOCUMENT":
+    return "RETRIEVAL_DOCUMENT";
+  case "SEMANTIC_SIMILARITY":
+  case "CLASSIFICATION":
+  case "CLUSTERING":
+  case "QUESTION_ANSWERING":
+  case "FACT_VERIFICATION":
+  case "CODE_RETRIEVAL_QUERY":
+    return taskType;
+  default:
+    return "RETRIEVAL_DOCUMENT";
+  }
+}
+
+function buildGeminiEmbeddingRequest(
+  text: string,
+  taskType?: string
+): JsonResponse {
+  return {
+    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
+    content: {
+      parts: [{text}],
+    },
+    taskType: normalizeEmbeddingTaskType(taskType),
+    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+    embedContentConfig: {
+      taskType: normalizeEmbeddingTaskType(taskType),
+      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+    },
+  };
+}
+
+function getAxiosErrorMessage(error: any): string {
+  return error.response?.data?.error?.message ??
+    error.message ??
+    "Unknown error";
+}
+
+function limitText(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.substring(0, maxChars).trim()}...`;
+}
+
+function buildFAQContext(question: string, answer: string): string {
+  return limitText(`Q: ${question}\nA: ${answer}`, 700);
+}
+
+function normalizeFAQText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
@@ -99,16 +187,11 @@ export const generateCohereEmbedding = onCall(
 async function generateGeminiEmbedding(
   text: string,
   apiKey: string,
-  _inputType: "search_document" | "search_query" = "search_document"
+  inputType: "search_document" | "search_query" = "search_document"
 ): Promise<number[]> {
   const response = await axios.post<JsonResponse>(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-    {
-      content: {
-        parts: [{text}],
-      },
-      outputDimensionality: 768,
-    },
+    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${apiKey}`,
+    buildGeminiEmbeddingRequest(text, inputType),
     {
       headers: {"Content-Type": "application/json"},
       timeout: 30000,
@@ -120,14 +203,17 @@ async function generateGeminiEmbedding(
     throw new Error("Invalid embedding response");
   }
 
-  if (embedding.length !== 768) {
-    throw new Error(`Unexpected embedding size: ${embedding.length} (expected 768)`);
+  if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+    throw new Error(
+      `Unexpected embedding size: ${embedding.length} ` +
+      `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+    );
   }
 
   await logGeminiUsage({
     userId: null,
     conversationId: null,
-    model: "gemini-embedding-001",
+    model: GEMINI_EMBEDDING_MODEL,
     inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
     outputTokens: 0,
   }).catch(() => undefined);
@@ -138,40 +224,49 @@ async function generateGeminiEmbedding(
 export const generateEmbedding = onCall(
   {secrets: [GEMINI_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-    const {text} = request.data;
-    if (!text) throw new Error("Text required");
+    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
+    const {text, taskType} = request.data;
+    if (typeof text !== "string" || text.trim().length === 0) {
+      throw new HttpsError("invalid-argument", "Text required");
+    }
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
+        buildGeminiEmbeddingRequest(text.trim(), taskType),
         {
-          content: {
-            parts: [{text}],
-          },
-          outputDimensionality: 768,
-        },
-        {timeout: 30000}
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
       );
 
       const embedding = response.data?.embedding?.values;
       if (!Array.isArray(embedding) || embedding.length === 0) {
         throw new Error("Invalid Gemini embedding response");
       }
-      if (embedding.length !== 768) {
-        throw new Error(`Unexpected embedding dimension: ${embedding.length} (expected 768)`);
+      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+        throw new Error(
+          `Unexpected embedding dimension: ${embedding.length} ` +
+          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+        );
       }
       await logGeminiUsage({
         userId: request.auth.uid ?? null,
         conversationId: null,
-        model: "gemini-embedding-001",
+        model: GEMINI_EMBEDDING_MODEL,
         inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
         outputTokens: 0,
       }).catch(() => undefined);
 
       return {embedding};
     } catch (error: any) {
-      throw new Error(`Embedding failed: ${error.message}`);
+      const msg = getAxiosErrorMessage(error);
+      console.error("Gemini embedding error:", msg);
+      console.error(
+        "Gemini embedding response:",
+        JSON.stringify(error.response?.data ?? {})
+      );
+      throw new HttpsError("internal", `Embedding failed: ${msg}`);
     }
   }
 );
@@ -199,8 +294,8 @@ async function findMatchingFAQ(
   _query: string,
   queryEmbedding: number[],
   geminiApiKey: string,
-  similarityThreshold = 0.75
-): Promise<{ question: string; answer: string; similarity: number; category: string } | null> {
+  similarityThreshold = FAQ_SIMILARITY_THRESHOLD
+): Promise<FAQMatch | null> {
   try {
     const faqSnapshot = await db
       .collection("faqs")
@@ -210,6 +305,8 @@ async function findMatchingFAQ(
 
     let bestMatch: any = null;
     let highestSimilarity = 0;
+    let secondHighestSimilarity = 0;
+    let validFaqCount = 0;
 
     for (const doc of faqSnapshot.docs) {
       const data = doc.data();
@@ -219,16 +316,24 @@ async function findMatchingFAQ(
       if (!faqQuestion || !faqAnswer) continue;
 
       let faqEmbedding: number[];
-      const storedEmbedding = data.embedding ?? data.geminiEmbedding;
+      const storedEmbedding =
+        data.contextEmbedding ??
+        data.faqContextEmbedding ??
+        data.embedding ??
+        data.geminiEmbedding;
 
       if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
         faqEmbedding = storedEmbedding as number[];
       } else {
-        faqEmbedding = await generateGeminiEmbedding(faqQuestion, geminiApiKey, "search_document");
+        faqEmbedding = await generateGeminiEmbedding(
+          buildFAQContext(faqQuestion, faqAnswer),
+          geminiApiKey,
+          "search_document"
+        );
 
         await doc.ref.update({
-          embedding: faqEmbedding,
-          geminiEmbedding: faqEmbedding,
+          contextEmbedding: faqEmbedding,
+          faqContextEmbedding: faqEmbedding,
           embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
@@ -238,16 +343,31 @@ async function findMatchingFAQ(
       }
 
       const similarity = cosineSimilarity(queryEmbedding, faqEmbedding);
+      validFaqCount++;
 
-      if (similarity > highestSimilarity && similarity >= similarityThreshold) {
+      if (similarity > highestSimilarity) {
+        secondHighestSimilarity = highestSimilarity;
         highestSimilarity = similarity;
-        bestMatch = {
-          question: faqQuestion,
-          answer: faqAnswer,
-          category: data.category || "General",
-          similarity: similarity,
-        };
+        if (similarity >= similarityThreshold) {
+          bestMatch = {
+            question: faqQuestion,
+            answer: faqAnswer,
+            category: data.category || "General",
+            similarity: similarity,
+          };
+        }
+      } else if (similarity > secondHighestSimilarity) {
+        secondHighestSimilarity = similarity;
       }
+    }
+
+    if (
+      bestMatch &&
+      validFaqCount > 1 &&
+      highestSimilarity < FAQ_STRONG_SIMILARITY &&
+      highestSimilarity - secondHighestSimilarity < FAQ_SIMILARITY_MARGIN
+    ) {
+      return null;
     }
 
     return bestMatch;
@@ -256,11 +376,92 @@ async function findMatchingFAQ(
   }
 }
 
+async function findDirectFAQMatch(query: string): Promise<FAQMatch | null> {
+  const trimmedQuery = query.trim();
+  const normalizedQuery = normalizeFAQText(trimmedQuery);
+
+  if (!normalizedQuery) return null;
+
+  try {
+    const exactSnapshot = await db
+      .collection("faqs")
+      .where("question", "==", trimmedQuery)
+      .limit(1)
+      .get();
+
+    for (const doc of exactSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+
+      if (question && answer && answer.trim()) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+
+    const normalizedSnapshot = await db
+      .collection("faqs")
+      .where("questionNormalized", "==", normalizedQuery)
+      .limit(1)
+      .get();
+
+    for (const doc of normalizedSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+
+      if (question && answer && answer.trim()) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+
+    const faqSnapshot = await db.collection("faqs").limit(200).get();
+
+    for (const doc of faqSnapshot.docs) {
+      const data = doc.data();
+      const answer = data.answer as string;
+      const question = data.question as string;
+      const storedNormalizedQuestion =
+        data.questionNormalized as string | undefined;
+      const normalizedQuestion =
+        storedNormalizedQuestion || normalizeFAQText(question || "");
+
+      if (
+        question &&
+        answer &&
+        answer.trim() &&
+        normalizedQuestion === normalizedQuery
+      ) {
+        return {
+          question,
+          answer,
+          category: data.category || "General",
+          similarity: 1,
+        };
+      }
+    }
+  } catch (error) {
+    console.warn("Direct FAQ lookup failed:", error);
+  }
+
+  return null;
+}
+
 async function retrieveRelevantDocuments(
   _query: string,
   queryEmbedding: number[],
   pineconeIndex: any,
-  topK = 8,
+  topK = 5,
   minSimilarityScore = 0.30
 ): Promise<Array<{
   ibID: string;
@@ -306,7 +507,7 @@ async function retrieveRelevantDocuments(
       const chunks = documentChunks[docId];
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-      const topChunks = chunks.slice(0, 3);
+      const topChunks = chunks.slice(0, 2);
       const combinedContent = topChunks
         .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
         .filter((text) => text.trim())
@@ -345,7 +546,11 @@ export const generateAnswer = onRequest(
   async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Accept, Authorization, X-Requested-With"
+    );
+    res.set("Access-Control-Max-Age", "3600");
 
     if (req.method === "OPTIONS") {
       res.status(204).send("");
@@ -357,8 +562,17 @@ export const generateAnswer = onRequest(
       return;
     }
 
+    let stage = "initializing";
+
     try {
-      const {query, conversationHistory = [], topK = 8, minSimilarityScore = 0.30, stream = true} = req.body;
+      const {
+        query,
+        conversationHistory = [],
+        topK = 5,
+        minSimilarityScore = 0.30,
+        stream = true,
+        isFAQSelection = false,
+      } = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
         res.status(400).json({
@@ -369,19 +583,57 @@ export const generateAnswer = onRequest(
         return;
       }
 
+      // Free-typed messages must not be classified as FAQs. FAQ matching is
+      // enabled only when the user selected an item from the FAQ section.
+      stage = "direct_faq_lookup";
+      const directFAQMatch = isFAQSelection ? await findDirectFAQMatch(query) : null;
+      if (directFAQMatch) {
+        if (stream) {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+
+          const answer = directFAQMatch.answer;
+          const chunkSize = 40;
+
+          for (let i = 0; i < answer.length; i += chunkSize) {
+            const chunk = answer.substring(i, Math.min(i + chunkSize, answer.length));
+            res.write(`data: ${JSON.stringify({
+              type: "content-delta",
+              delta: {message: {content: {text: chunk}}},
+            })}\n\n`);
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: "message-end",
+            metadata: {source: "faq", category: directFAQMatch.category},
+          })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+        } else {
+          res.json({
+            answer: directFAQMatch.answer,
+            source: "faq",
+            category: directFAQMatch.category,
+          });
+        }
+        return;
+      }
+
 
       const geminiKey = GEMINI_API_KEY.value();
       const pineconeKey = PINECONE_API_KEY.value();
 
-
+      stage = "query_embedding";
       const [queryEmbedding, pineconeClient] = await Promise.all([
         generateGeminiEmbedding(query, geminiKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
       ]);
 
-
+      stage = "semantic_faq_lookup";
       const [faqMatch, pineconeIndex] = await Promise.all([
-        findMatchingFAQ(query, queryEmbedding, geminiKey),
+        isFAQSelection ? findMatchingFAQ(query, queryEmbedding, geminiKey) : Promise.resolve(null),
         Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
       ]);
 
@@ -420,6 +672,7 @@ export const generateAnswer = onRequest(
       }
 
       // RETRIEVE DOCUMENTS FROM PINECONE
+      stage = "pinecone_retrieval";
       const results = await retrieveRelevantDocuments(
         query,
         queryEmbedding,
@@ -431,31 +684,12 @@ export const generateAnswer = onRequest(
       // NO DOCUMENTS FOUND - AI FALLBACK
       if (results.length === 0) {
         const conversationContext = buildConversationContext(conversationHistory);
-        const now = new Date();
-        const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
-          weekday: "long",
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })}`;
+        const dateInfo = new Date().toISOString().substring(0, 10);
 
-        const fallbackPrompt = `You are OASP Assist for Central Mindanao University.
-
-${dateInfo}
-
-${conversationContext ? `Recent conversation:\n${conversationContext}\n\n` : ""}Question: "${query}"
-
-IMPORTANT: My knowledge base doesn't have specific documents about this topic, but I should still try to help.
-
-Instructions:
-1. Use your general knowledge about universities, admissions, scholarships, and student services
-2. Provide helpful, accurate general information when possible
-3. Use the current date for time-sensitive queries
-4. If this is truly specific to CMU OASP policies I cannot answer, politely suggest contacting OASP staff
-5. Be helpful and professional
-6. Don't say "I don't have information" - try to provide useful guidance first
-
-Answer:`;
+        const fallbackPrompt = `OASP Assist, CMU. Date: ${dateInfo}
+${conversationContext ? `History:\n${conversationContext}\n` : ""}Q: ${query}
+Rules: Use general guidance only. If OASP-specific info is missing, say contact OASP staff.
+A:`;
 
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -463,6 +697,7 @@ Answer:`;
           res.setHeader("Connection", "keep-alive");
 
           try {
+            stage = "ai_fallback_stream";
             for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
               if (chunk && chunk.length > 0) {
                 res.write(`data: ${JSON.stringify({
@@ -490,6 +725,7 @@ Answer:`;
           }
         } else {
           try {
+            stage = "ai_fallback_generate";
             const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
             res.json({answer: answer.trim(), source: "ai_fallback"});
           } catch {
@@ -520,6 +756,7 @@ Answer:`;
         let streamSucceeded = false;
 
         try {
+          stage = "rag_stream";
           for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
             if (chunk && chunk.length > 0) {
               streamSucceeded = true;
@@ -544,6 +781,7 @@ Answer:`;
 
         // FALLBACK IF STREAMING FAILS
         try {
+          stage = "rag_generate_fallback";
           const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
 
           const chunkSize = 30;
@@ -570,6 +808,7 @@ Answer:`;
           res.end();
         }
       } else {
+        stage = "rag_generate";
         const answer = await generateGeminiResponse(prompt, geminiKey);
         res.json({
           answer: answer.trim(),
@@ -579,9 +818,43 @@ Answer:`;
         });
       }
     } catch (error: any) {
+      const errorMessage = getAxiosErrorMessage(error);
+      console.error(`generateAnswer failed during ${stage}:`, errorMessage);
+      if (error.response?.data) {
+        console.error(
+          "generateAnswer upstream response:",
+          JSON.stringify(error.response.data)
+        );
+      }
+
+      const answer =
+        "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.";
+
+      if (req.body?.stream && !res.writableEnded) {
+        if (!res.headersSent) {
+          res.status(200);
+          res.setHeader("Content-Type", "text/event-stream");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Connection", "keep-alive");
+          res.setHeader("X-Accel-Buffering", "no");
+        }
+
+        res.write(`data: ${JSON.stringify({
+          type: "content-delta",
+          delta: {message: {content: {text: answer}}},
+        })}\n\n`);
+        res.write(`data: ${JSON.stringify({
+          type: "error",
+          error: errorMessage,
+        })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+
       res.status(500).json({
-        error: error.message,
-        answer: "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.",
+        error: errorMessage,
+        answer,
         source: "error",
       });
     }
@@ -592,51 +865,67 @@ async function generateGeminiResponse(
   prompt: string,
   apiKey: string
 ): Promise<string> {
-  try {
-    const response = await axios.post<JsonResponse>(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4096,
-          topP: 0.95,
-          topK: 40,
+  let lastError: unknown;
+
+  for (const model of [GEMINI_MODEL, GEMINI_FALLBACK_MODEL]) {
+    try {
+      const response = await axios.post<JsonResponse>(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {
+            temperature: 0.3,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 1024,
+          },
         },
-      },
-      {
-        headers: {"Content-Type": "application/json"},
-        timeout: 30000,
+        {
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
+      );
+
+      const data: any = response.data;
+      const text = extractGeminiText(data);
+
+      if (!text) {
+        throw new Error(
+          data?.promptFeedback?.blockReason ?
+            `Gemini blocked the prompt: ${data.promptFeedback.blockReason}` :
+            "Empty response from Gemini"
+        );
       }
-    );
 
+      const usageMetadata = data?.usageMetadata;
+      if (usageMetadata) {
+        await logGeminiUsage({
+          userId: null,
+          conversationId: null,
+          model,
+          inputTokens: usageMetadata.promptTokenCount ?? 0,
+          outputTokens: usageMetadata.candidatesTokenCount ?? 0,
+        }).catch(() => undefined);
+      }
 
-    if (response.status !== 200) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+      return text;
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Gemini ${model} response failed:`, getAxiosErrorMessage(error));
     }
-
-    const data: any = response.data;
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    const usageMetadata = data?.usageMetadata;
-    if (usageMetadata) {
-      await logGeminiUsage({
-        userId: null,
-        conversationId: null,
-        model: GEMINI_MODEL,
-        inputTokens: usageMetadata.promptTokenCount ?? 0,
-        outputTokens: usageMetadata.candidatesTokenCount ?? 0,
-      }).catch(() => undefined);
-    }
-
-    if (!text) {
-      throw new Error("Empty response from Gemini");
-    }
-
-    return text;
-  } catch (error) {
-    throw error;
   }
+
+  throw lastError instanceof Error ? lastError : new Error("Gemini response failed");
+}
+
+function extractGeminiText(data: any): string {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return "";
+
+  return parts
+    .map((part: any) => typeof part?.text === "string" ? part.text : "")
+    .filter((text: string) => text.length > 0)
+    .join("");
 }
 
 
@@ -654,9 +943,9 @@ async function* generateGeminiResponseStream(
           contents: [{parts: [{text: prompt}]}],
           generationConfig: {
             temperature: 0.3,
-            maxOutputTokens: 4096,
             topP: 0.95,
             topK: 40,
+            maxOutputTokens: 1024,
           },
         }),
       }
@@ -697,7 +986,7 @@ async function* generateGeminiResponseStream(
 
         try {
           const data = JSON.parse(jsonStr);
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = extractGeminiText(data);
 
           if (text) {
             yield text;
@@ -709,6 +998,22 @@ async function* generateGeminiResponseStream(
           }
         } catch {
           continue;
+        }
+      }
+    }
+
+    // A final SSE event may not end with a newline.
+    const finalLine = buffer.trim();
+    if (finalLine && !finalLine.startsWith("event:") && finalLine !== "data: [DONE]") {
+      const jsonStr = finalLine.startsWith("data: ") ?
+        finalLine.substring(6) : finalLine;
+      if (jsonStr && jsonStr !== "[DONE]") {
+        try {
+          const data = JSON.parse(jsonStr);
+          const text = extractGeminiText(data);
+          if (text) yield text;
+        } catch {
+          // Ignore an incomplete final event.
         }
       }
     }
@@ -743,9 +1048,9 @@ function filterAndRankContext(
   const filtered = results.filter((r) => r.similarity_score >= qualityThreshold);
 
   const contexts = filtered
-    .slice(0, 5)
+    .slice(0, 2)
     .map((doc) => ({
-      content: doc.content,
+      content: limitText(doc.content, MAX_CONTEXT_CHARS),
       title: doc.ib_title,
       score: doc.similarity_score,
     }));
@@ -759,14 +1064,12 @@ function buildConversationContext(
 ): string {
   if (!conversationHistory || conversationHistory.length === 0) return "";
 
-  const recentHistory = conversationHistory.slice(-10);
+  const recentHistory = conversationHistory.slice(-3);
   const contextParts: string[] = [];
 
   for (const message of recentHistory) {
     const role = message.sender === "user" ? "User" : "Assistant";
-    const content = message.content.length > 500 ?
-      message.content.substring(0, 500) + "..." :
-      message.content;
+    const content = limitText(message.content, MAX_HISTORY_CHARS);
 
     contextParts.push(`${role}: ${content}`);
   }
@@ -786,64 +1089,17 @@ function buildContextAwarePrompt(
   });
 
   const historySection = conversationHistory ?
-    `Previous conversation context (use this to understand follow-up questions and maintain continuity):\n${conversationHistory}\n\n` :
+    `Recent conversation:\n${conversationHistory}\n\n` :
     "";
 
-  const now = new Date();
-  const dateInfo = `Current Date and Time: ${now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })}, ${now.toLocaleTimeString("en-US")}`;
+  const dateInfo = new Date().toISOString().substring(0, 10);
 
-  return `You are OASP Assist, the official AI assistant for Central Mindanao University's Office of Admissions, Scholarships, and Placement (OASP).
-
-${dateInfo}
-
-${historySection}Current question: "${query}"
-
-Knowledge Base Documents:
+  return `OASP Assist, CMU. Date: ${dateInfo}
+${historySection}Q: ${query}
+KB:
 ${knowledgeSection}
-
-CRITICAL INSTRUCTIONS:
-1. **Real-time Awareness**:
-   - You know the current date and time shown above
-   - Use this information to provide context-aware responses about deadlines, dates, and time-sensitive matters
-   - Calculate relative dates (e.g., "in 2 weeks", "next month") based on current date
-
-2. **Context Awareness**:
-   - If this is a follow-up question (indicated by conversation history), reference previous discussion
-   - Use pronouns and context clues from history to understand what "it", "that", "those" refer to
-   - Maintain continuity in your responses based on what was discussed before
-
-3. **Intelligent Fallback**:
-   - If the knowledge base has SOME relevant information, provide it comprehensively
-   - If the knowledge base lacks specific details but you can infer or provide general guidance, do so
-   - ONLY suggest contacting OASP if the question requires truly specific information not available
-
-4. **Comprehensiveness**: Provide detailed, thorough answers using ALL relevant information from the documents
-
-5. **Accuracy**: Prioritize information from the knowledge base, but use general knowledge when appropriate for:
-   - Date calculations and calendar information
-   - General university processes and procedures
-   - Common academic terminology and concepts
-
-6. **Structure**: Organize complex answers with clear explanations, including:
-   - Step-by-step procedures when applicable
-   - Specific requirements, dates, and deadlines
-   - All relevant details (fees, contacts, locations, etc.)
-
-7. **Natural Language**: Write as a knowledgeable university assistant would - friendly but professional
-
-8. **NO UNNECESSARY DISCLAIMERS**:
-   - Don't say "I don't have information" if you can provide helpful general guidance
-   - Don't suggest contacting OASP for information you can reasonably answer
-   - Be helpful and resourceful with the information available
-
-If this is a follow-up question, acknowledge the previous context naturally in your response.
-
-Answer:`;
+Rules: Use KB first. Use history only for follow-ups. If OASP-specific details are missing, say contact OASP staff.
+A:`;
 }
 
 function buildPartialInfoPrompt(
@@ -860,34 +1116,14 @@ function buildPartialInfoPrompt(
     `Recent conversation (use for context):\n${conversationHistory}\n\n` :
     "";
 
-  const now = new Date();
-  const dateInfo = `Current Date: ${now.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })}`;
+  const dateInfo = new Date().toISOString().substring(0, 10);
 
-  return `You are OASP Assist for Central Mindanao University.
-
-${dateInfo}
-
-${historySection}Question: "${query}"
-
-Available Information:
+  return `OASP Assist, CMU. Date: ${dateInfo}
+${historySection}Q: ${query}
+Info:
 ${knowledgeSection}
-
-Instructions:
-1. **Real-time Context**: You know today's date - use it to provide relevant time-based information
-2. If this is a follow-up question, use conversation history to understand the full context
-3. Provide whatever specific information IS available from the documents
-4. Be thorough with what you CAN answer
-5. If you can provide helpful general guidance even without specific details, do so
-6. Use your knowledge of university processes to supplement available information when appropriate
-7. Only suggest contacting OASP if truly critical specific information is genuinely unavailable
-8. Maintain natural conversation flow if there's prior context
-
-Answer:`;
+Rules: Use provided info first. If OASP-specific details are missing, say contact OASP staff.
+A:`;
 }
 
 

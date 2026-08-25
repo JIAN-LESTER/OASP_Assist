@@ -18,22 +18,34 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static const String _webClientId =
+      '13855273820-72hpqqhplltklr09mb40lqk84pn7ktke.apps.googleusercontent.com';
 
   /// Attempt silent login with Google
   Future<void> _trySilentGoogleLogin() async {
     try {
-      await _googleSignIn.initialize();
+      print(' Silent Google login initialize with serverClientId=$_webClientId');
+      await _googleSignIn.initialize(serverClientId: _webClientId);
+      print(' Silent Google login initialized');
       final attempt = _googleSignIn.attemptLightweightAuthentication();
+      print(' Silent Google login attempt available: ${attempt != null}');
       final googleUser = attempt == null ? null : await attempt;
       if (googleUser != null) {
+        print(' Silent Google login account: ${googleUser.email}');
         final googleAuth = googleUser.authentication;
+        print(' Silent Google login idToken present: ${googleAuth.idToken != null}');
         final credential = GoogleAuthProvider.credential(
           idToken: googleAuth.idToken,
         );
+        print(' Silent Firebase signInWithCredential starting');
         await FirebaseAuth.instance.signInWithCredential(credential);
+        print(' Silent Firebase signInWithCredential successful');
       } else {}
-      // ignore: empty_catches
-    } catch (e) {}
+    } on FirebaseAuthException catch (e) {
+      print(' Silent FirebaseAuthException: ${e.code} - ${e.message}');
+    } catch (e, st) {
+      print(' Silent Google login error: $e\n$st');
+    }
   }
 
   @override
@@ -53,6 +65,7 @@ class _AuthPageState extends State<AuthPage> {
 
             // CHECK EMAIL VERIFICATION FIRST
             if (!user.emailVerified) {
+              FirebaseAuth.instance.signOut();
               return const LoginPage();
             }
 
@@ -79,18 +92,7 @@ class RoleBasedRouter extends StatelessWidget {
       future: _getUserDataAndLogEvent(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Color(0xFF2E7D32)),
-                  SizedBox(height: 16),
-                  Text('Loading...', style: TextStyle(fontSize: 16)),
-                ],
-              ),
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError || !snapshot.hasData) {

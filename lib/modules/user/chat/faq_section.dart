@@ -14,12 +14,14 @@ class FAQSection extends StatefulWidget {
   final bool isLoading;
   final TextEditingController?
   messageController; // Add controller to update text field
+  final GlobalKey? faqCardsKey;
 
   const FAQSection({
     Key? key,
     required this.onFAQSelected,
     this.isLoading = false,
     this.messageController,
+    this.faqCardsKey,
   }) : super(key: key);
 
   @override
@@ -430,11 +432,12 @@ class FAQSectionState extends State<FAQSection>
   }
 
   /// Builds desktop category card (always expanded with scrollable list)
-  Widget _buildDesktopCategoryCard(String category) {
+  Widget _buildDesktopCategoryCard(String category, {Key? key}) {
     final faqItems = faqCategories[category] ?? [];
     final icon = _getIconForCategory(category);
 
     return Container(
+      key: key,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -542,12 +545,13 @@ class FAQSectionState extends State<FAQSection>
   }
 
   /// Builds mobile/tablet category card (collapsible with dropdown)
-  Widget _buildMobileTabletCategoryCard(String category) {
+  Widget _buildMobileTabletCategoryCard(String category, {Key? key}) {
     final isExpanded = _expandedCategory == category;
     final faqItems = faqCategories[category] ?? [];
     final icon = _getIconForCategory(category);
 
     return Container(
+      key: key,
       margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -804,7 +808,10 @@ class FAQSectionState extends State<FAQSection>
                     for (var i = 0; i < displayCategories.length; i++) ...[
                       if (i > 0) SizedBox(width: spacing),
                       Expanded(
-                        child: _buildDesktopCategoryCard(displayCategories[i]),
+                        child: _buildDesktopCategoryCard(
+                          displayCategories[i],
+                          key: i == 0 ? widget.faqCardsKey : null,
+                        ),
                       ),
                     ],
                   ],
@@ -848,12 +855,15 @@ class FAQSectionState extends State<FAQSection>
             _buildHeader(),
             SizedBox(height: 32),
             //  Center the FAQ cards
-            ...displayCategories.map(
-              (category) => Container(
+            ...displayCategories.asMap().entries.map(
+              (entry) => Container(
                 constraints: BoxConstraints(
                   maxWidth: 600,
                 ), //  Max width for centering
-                child: _buildMobileTabletCategoryCard(category),
+                child: _buildMobileTabletCategoryCard(
+                  entry.value,
+                  key: entry.key == 0 ? widget.faqCardsKey : null,
+                ),
               ),
             ),
             SizedBox(height: 40),
@@ -868,23 +878,7 @@ class FAQSectionState extends State<FAQSection>
   Widget _buildEmptyState() {
     //  Don't show empty state while loading
     if (_isLoadingFAQs) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF2E7D32)),
-            SizedBox(height: 16),
-            Text(
-              'Loading FAQs...',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Center(
@@ -916,7 +910,7 @@ class FAQSectionState extends State<FAQSection>
           child: SizedBox(
             width: 150,
             height: 150,
-          
+
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Transform.scale(
@@ -929,7 +923,7 @@ class FAQSectionState extends State<FAQSection>
         SizedBox(height: 28),
         // Title
         Text(
-          'Welcome to OASP Assist',
+          'Chat with OASP Assist',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w800,
@@ -943,9 +937,7 @@ class FAQSectionState extends State<FAQSection>
         Container(
           constraints: BoxConstraints(maxWidth: 500),
           child: Text(
-            _isDesktop(context)
-                ? 'Browse frequently asked questions by category'
-                : 'Select a category below to explore frequently asked questions',
+            'Ask OASP Assist about admissions, scholarships, placements, and other OASP-related questions',
             style: TextStyle(
               fontSize: 15,
               color: Colors.grey.shade600,
@@ -1043,19 +1035,7 @@ class FAQSectionState extends State<FAQSection>
   @override
   Widget build(BuildContext context) {
     if (_isLoadingFAQs) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF2E7D32)),
-            SizedBox(height: 16),
-            Text(
-              'Loading FAQs...',
-              style: TextStyle(fontSize: 15, color: Colors.grey.shade600),
-            ),
-          ],
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     if (_isDesktop(context)) {
@@ -1117,6 +1097,7 @@ class FAQInputSection extends StatefulWidget {
   final VoidCallback? onMicrophoneTap;
   final bool isListening;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
 
   const FAQInputSection({
@@ -1129,6 +1110,7 @@ class FAQInputSection extends StatefulWidget {
     this.onMicrophoneTap,
     this.isListening = false,
     this.faqButtonKey,
+    this.textInputKey,
     this.audioButtonKey,
   }) : super(key: key);
 
@@ -1245,134 +1227,14 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                 horizontal: horizontalPadding,
                 vertical: verticalPadding,
               ),
-              child: Container(
-                constraints: BoxConstraints(maxWidth: 900),
-                child: Row(
-                  children: [
-                    // FAQ Toggle Button
-                    Tooltip(
-                      message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
-                      preferBelow: true,
-                      verticalOffset: 12,
-                      textStyle: TextStyle(
-                        color: Colors.white,
-                        fontSize: fontSize - 2,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Container(
-                        key: widget.faqButtonKey,
-                        width: buttonSize,
-                        height: buttonSize,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Color(0xFFE0E0E0),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              widget.onFAQToggle();
-                            },
-                            borderRadius: BorderRadius.circular(8),
-                            splashColor: Colors.grey.withOpacity(0.1),
-                            highlightColor: Colors.grey.withOpacity(0.05),
-                            child: Center(
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: Icon(
-                                  widget.showFAQs
-                                      ? Icons.chat_bubble_outline_rounded
-                                      : Icons.help_outline_rounded,
-                                  key: ValueKey(widget.showFAQs),
-                                  color: Color(0xFF666666),
-                                  size: iconSize,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-
-                    // Text Input Field
-                    Expanded(
-                      child: Container(
-                        constraints: BoxConstraints(
-                          minHeight: buttonSize,
-                          maxHeight: 100,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(borderRadius),
-                          border: Border.all(color: borderColor, width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 12,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: widget.controller,
-                          focusNode: _textFieldFocusNode,
-                          maxLines: null,
-                          minLines: 1,
-                          textAlignVertical: TextAlignVertical.center,
-                          textInputAction: TextInputAction.send,
-
-                          style: TextStyle(
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade900,
-                            height: 1.4,
-                          ),
-
-                          decoration: InputDecoration(
-                            hintText: 'Ask something...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: fontSize,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            isDense: true,
-                          ),
-
-                          onSubmitted: (_) => _handleSendMessage(),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-
-                    // Microphone Button
-                    if (widget.onMicrophoneTap != null)
+              child: Center(
+                child: Container(
+                  constraints: BoxConstraints(maxWidth: 900),
+                  child: Row(
+                    children: [
+                      // FAQ Toggle Button
                       Tooltip(
-                        message:
-                            widget.isListening
-                                ? 'Stop listening'
-                                : 'Voice input',
+                        message: widget.showFAQs ? 'Hide FAQs' : 'Show FAQs',
                         preferBelow: true,
                         verticalOffset: 12,
                         textStyle: TextStyle(
@@ -1385,29 +1247,20 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Container(
-                          key: widget.audioButtonKey,
+                          key: widget.faqButtonKey,
                           width: buttonSize,
                           height: buttonSize,
                           decoration: BoxDecoration(
-                            color:
-                                widget.isListening
-                                    ? primaryColor
-                                    : Color(0xFFF5F5F5),
+                            color: Color(0xFFF5F5F5),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color:
-                                  widget.isListening
-                                      ? primaryColor
-                                      : Color(0xFFE0E0E0),
+                              color: Color(0xFFE0E0E0),
                               width: 1.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    widget.isListening
-                                        ? primaryColor.withOpacity(0.3)
-                                        : Colors.black.withOpacity(0.06),
-                                blurRadius: widget.isListening ? 12 : 8,
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 8,
                                 offset: Offset(0, 2),
                               ),
                             ],
@@ -1416,30 +1269,21 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () {
-                                HapticFeedback.mediumImpact();
-                                widget.onMicrophoneTap!();
+                                HapticFeedback.lightImpact();
+                                widget.onFAQToggle();
                               },
                               borderRadius: BorderRadius.circular(8),
-                              splashColor:
-                                  widget.isListening
-                                      ? Colors.white.withOpacity(0.2)
-                                      : Colors.grey.withOpacity(0.1),
-                              highlightColor:
-                                  widget.isListening
-                                      ? Colors.white.withOpacity(0.1)
-                                      : Colors.grey.withOpacity(0.05),
+                              splashColor: Colors.grey.withOpacity(0.1),
+                              highlightColor: Colors.grey.withOpacity(0.05),
                               child: Center(
                                 child: AnimatedSwitcher(
                                   duration: const Duration(milliseconds: 200),
                                   child: Icon(
-                                    widget.isListening
-                                        ? Icons.mic
-                                        : Icons.mic_none,
-                                    key: ValueKey(widget.isListening),
-                                    color:
-                                        widget.isListening
-                                            ? Colors.white
-                                            : Color(0xFF666666),
+                                    widget.showFAQs
+                                        ? Icons.chat_bubble_outline_rounded
+                                        : Icons.help_outline_rounded,
+                                    key: ValueKey(widget.showFAQs),
+                                    color: Color(0xFF666666),
                                     size: iconSize,
                                   ),
                                 ),
@@ -1448,50 +1292,195 @@ class _FAQInputSectionState extends State<FAQInputSection> {
                           ),
                         ),
                       ),
-                    SizedBox(width: 10),
+                      SizedBox(width: 10),
 
-                    //  FIXED: Send Button - Now properly tracks text changes
-                    AnimatedOpacity(
-                      duration: Duration(milliseconds: 200),
-                      opacity: _hasText ? 1.0 : 0.5,
-                      child: Container(
-                        width: buttonSize,
-                        height: buttonSize,
-                        decoration: BoxDecoration(
-                          color: primaryColor,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow:
-                              _hasText
-                                  ? [
-                                    BoxShadow(
-                                      color: primaryColor.withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: Offset(0, 2),
-                                    ),
-                                  ]
-                                  : [],
+                      // Text Input Field
+                      Expanded(
+                        child: Container(
+                          key: widget.textInputKey,
+                          constraints: BoxConstraints(
+                            minHeight: buttonSize,
+                            maxHeight: 100,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(borderRadius),
+                            border: Border.all(color: borderColor, width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 12,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: widget.controller,
+                            focusNode: _textFieldFocusNode,
+                            maxLines: null,
+                            minLines: 1,
+                            textAlignVertical: TextAlignVertical.center,
+                            textInputAction: TextInputAction.send,
+
+                            style: TextStyle(
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade900,
+                              height: 1.4,
+                            ),
+
+                            decoration: InputDecoration(
+                              hintText: 'Ask something...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: fontSize,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              isDense: true,
+                            ),
+
+                            onSubmitted: (_) => _handleSendMessage(),
+                          ),
                         ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _hasText ? _handleSendMessage : null,
+                      ),
+                      SizedBox(width: 10),
+
+                      // Microphone Button
+                      if (widget.onMicrophoneTap != null)
+                        Tooltip(
+                          message:
+                              widget.isListening
+                                  ? 'Stop listening'
+                                  : 'Voice input',
+                          preferBelow: true,
+                          verticalOffset: 12,
+                          textStyle: TextStyle(
+                            color: Colors.white,
+                            fontSize: fontSize - 2,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade800,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Container(
+                            key: widget.audioButtonKey,
+                            width: buttonSize,
+                            height: buttonSize,
+                            decoration: BoxDecoration(
+                              color:
+                                  widget.isListening
+                                      ? primaryColor
+                                      : Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color:
+                                    widget.isListening
+                                        ? primaryColor
+                                        : Color(0xFFE0E0E0),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      widget.isListening
+                                          ? primaryColor.withOpacity(0.3)
+                                          : Colors.black.withOpacity(0.06),
+                                  blurRadius: widget.isListening ? 12 : 8,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  widget.onMicrophoneTap!();
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                splashColor:
+                                    widget.isListening
+                                        ? Colors.white.withOpacity(0.2)
+                                        : Colors.grey.withOpacity(0.1),
+                                highlightColor:
+                                    widget.isListening
+                                        ? Colors.white.withOpacity(0.1)
+                                        : Colors.grey.withOpacity(0.05),
+                                child: Center(
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      widget.isListening
+                                          ? Icons.mic
+                                          : Icons.mic_none,
+                                      key: ValueKey(widget.isListening),
+                                      color:
+                                          widget.isListening
+                                              ? Colors.white
+                                              : Color(0xFF666666),
+                                      size: iconSize,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      SizedBox(width: 10),
+
+                      //  FIXED: Send Button - Now properly tracks text changes
+                      AnimatedOpacity(
+                        duration: Duration(milliseconds: 200),
+                        opacity: _hasText ? 1.0 : 0.5,
+                        child: Container(
+                          width: buttonSize,
+                          height: buttonSize,
+                          decoration: BoxDecoration(
+                            color: primaryColor,
                             borderRadius: BorderRadius.circular(10),
-                            splashColor:
-                                _hasText ? Colors.white.withOpacity(0.2) : null,
-                            highlightColor:
-                                _hasText ? Colors.white.withOpacity(0.1) : null,
-                            child: Center(
-                              child: Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: iconSize,
+                            boxShadow:
+                                _hasText
+                                    ? [
+                                      BoxShadow(
+                                        color: primaryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ]
+                                    : [],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _hasText ? _handleSendMessage : null,
+                              borderRadius: BorderRadius.circular(10),
+                              splashColor:
+                                  _hasText
+                                      ? Colors.white.withOpacity(0.2)
+                                      : null,
+                              highlightColor:
+                                  _hasText
+                                      ? Colors.white.withOpacity(0.1)
+                                      : null,
+                              child: Center(
+                                child: Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: Colors.white,
+                                  size: iconSize,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/profile.dart';
+import 'package:capstone_project/services/auth_email_service.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showEditProfileModal(
@@ -509,12 +510,16 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
         final fullName =
             '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+        final currentEmail = (user.email ?? '').trim().toLowerCase();
+        final requestedEmail = _emailController.text.trim().toLowerCase();
+        final emailChanged =
+            requestedEmail.isNotEmpty && requestedEmail != currentEmail;
 
         Map<String, dynamic> updateData = {
           'name': fullName.trim(),
           'firstName': _firstNameController.text.trim(),
           'lastName': _lastNameController.text.trim(),
-          'email': _emailController.text.trim(),
+          'email': emailChanged ? currentEmail : requestedEmail,
           'profileCompleted': true,
           'onboardingCompleted': true,
           'hasSeenOnboardingGuide': true,
@@ -619,7 +624,16 @@ class _EditProfileModalState extends State<EditProfileModal> {
             .doc(user.uid)
             .update(updateData);
 
-        if (passwordUpdated) {
+        if (emailChanged) {
+          await AuthEmailService().sendEmailChangeVerification(requestedEmail);
+        }
+
+        if (emailChanged) {
+          SnackbarUtil.showSuccess(
+            context,
+            'Profile updated. Check your new email to confirm the address change.',
+          );
+        } else if (passwordUpdated) {
           SnackbarUtil.showSuccess(
             context,
             'Profile and password updated successfully!',

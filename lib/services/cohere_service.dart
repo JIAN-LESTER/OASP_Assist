@@ -21,7 +21,7 @@ class CohereService {
       _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
       if (_cohereApiKey.isEmpty || _geminiApiKey.isEmpty) {
-        throw Exception('Cohere/Gemini API keys not found in .env file');
+        throw Exception('Cohere/Gemini API access is not configured for this client.');
       }
 
       _chatUrl = Uri.parse('https://api.cohere.ai/v1/chat');
@@ -77,6 +77,12 @@ class CohereService {
             'parts': [
               {'text': text},
             ],
+          },
+          'taskType': taskType,
+          'outputDimensionality': 768,
+          'embedContentConfig': {
+            'taskType': taskType,
+            'outputDimensionality': 768,
           },
         }),
       );

@@ -11,6 +11,45 @@ const PINECONE_HOST = defineSecret("PINECONE_HOST");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
+const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
+const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
+
+function normalizeEmbeddingTaskType(taskType?: string): string {
+  switch (taskType) {
+  case "search_query":
+  case "RETRIEVAL_QUERY":
+    return "RETRIEVAL_QUERY";
+  case "search_document":
+  case "RETRIEVAL_DOCUMENT":
+    return "RETRIEVAL_DOCUMENT";
+  case "SEMANTIC_SIMILARITY":
+  case "CLASSIFICATION":
+  case "CLUSTERING":
+  case "QUESTION_ANSWERING":
+  case "FACT_VERIFICATION":
+  case "CODE_RETRIEVAL_QUERY":
+    return taskType;
+  default:
+    return "RETRIEVAL_DOCUMENT";
+  }
+}
+
+function buildGeminiEmbeddingRequest(
+  text: string,
+  taskType?: string
+): JsonResponse {
+  return {
+    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
+    content: {parts: [{text}]},
+    taskType: normalizeEmbeddingTaskType(taskType),
+    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+    embedContentConfig: {
+      taskType: normalizeEmbeddingTaskType(taskType),
+      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+    },
+  };
+}
 
 export const checkPineconeHealth = onCall(
   {
@@ -46,18 +85,19 @@ export const generateGeminiEmbedding = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
 
-    const { text } = request.data;
-    if (!text) throw new HttpsError("invalid-argument", "Text required");
+    const { text, taskType } = request.data;
+    if (typeof text !== "string" || text.trim().length === 0) {
+      throw new HttpsError("invalid-argument", "Text required");
+    }
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
+        buildGeminiEmbeddingRequest(text.trim(), taskType),
         {
-          model: "models/gemini-embedding-001",
-          content: { parts: [{ text }] },
-          outputDimensionality: 768,
-        },
-        { timeout: 30000 }
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
       );
 
       const embedding = response.data?.embedding?.values;
@@ -65,14 +105,25 @@ export const generateGeminiEmbedding = onCall(
       await logGeminiUsage({
         userId: request.auth.uid ?? null,
         conversationId: null,
-        model: "gemini-embedding-001",
-        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
+        model: GEMINI_EMBEDDING_MODEL,
+        inputTokens: response.data?.usageMetadata?.promptTokenCount ??
+          Math.ceil(text.length / 4),
         outputTokens: 0,
       }).catch(() => undefined);
 
       if (!Array.isArray(embedding) || embedding.length === 0) {
-        console.error(" Unexpected Gemini response:", JSON.stringify(response.data));
+        console.error(
+          " Unexpected Gemini response:",
+          JSON.stringify(response.data)
+        );
         throw new HttpsError("internal", "No embedding returned from Gemini");
+      }
+      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
+        throw new HttpsError(
+          "internal",
+          `Unexpected embedding dimension: ${embedding.length} ` +
+          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
+        );
       }
 
       console.log(` Embedding generated: ${embedding.length} dimensions`);
@@ -80,9 +131,14 @@ export const generateGeminiEmbedding = onCall(
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
 
-      const msg = error.response?.data?.error?.message ?? error.message;
+      const msg = error.response?.data?.error?.message ??
+        error.message ??
+        "Unknown error";
       console.error(" Gemini embedding error:", msg);
-      console.error(" Full Gemini error:", JSON.stringify(error.response?.data ?? {}));
+      console.error(
+        " Full Gemini error:",
+        JSON.stringify(error.response?.data ?? {})
+      );
       throw new HttpsError("internal", `Gemini embedding failed: ${msg}`);
     }
   }
@@ -98,7 +154,7 @@ export const generateGeminiResponse = onCall(
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY.value()}`,
         {
           contents: [{parts: [{text: prompt}]}],
           generationConfig: {
@@ -196,270 +252,67 @@ export const generateCohereResponse = onCall(
   }
 );
 
-export const analyzeCohereAdmission = onCall(
-  {secrets: [COHERE_API_KEY]},
-  async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-
-    const {message} = request.data;
-    if (!message) throw new Error("Message required");
-
-    const prompt = `
-Analyze the following admission document and extract the admission type, academic year, ALL contact information, ALL admission steps, ALL requirements, ALL links, and ANY schedules if present.
-
-Admission Document: "${message}"
-
-CRITICAL INSTRUCTIONS:
-- First, identify the TYPE of admission test:
-  * CMUCAT (Central Mindanao University College Admission Test)
-  * GSAT (Graduate School Admission Test)
-  * ULHSAT (School of Law and Hospitality Studies Admission Test)
-  * If no specific test is mentioned, set type to null
-
-- Extract EVERY SINGLE step mentioned (usually numbered [1] to [11])
-- Extract ALL requirements (documents needed)
-- Preserve the original order and numbering
-- Extract all valid contact information and websites
-- Extract schedules with dates and locations
-
-Return valid JSON only in this exact format:
-{
-  "type": "CMUCAT",
-  "contacts": [
-    {"type": "email", "value": "admissions@cmu.edu.ph"},
-    {"type": "phone", "value": "+639123456789"}
-  ],
-  "steps": [
-    "Step 1: Fill out the online application form",
-    "Step 2: Submit all required documents"
-  ],
-  "requirements": [
-    "Form 137 (Original Copy)",
-    "Form 138 (Original Copy)"
-  ],
-  "academicYear": "2024-2025",
-  "links": [
-    "https://cmu.edu.ph"
-  ],
-  "schedules": [
-    {
-      "date": "OCT 4, 2025",
-      "dayOfWeek": "SATURDAY",
-      "locations": ["Kalilangan, Bukidnon"]
-    }
-  ]
-}
-`;
-
-    try {
-      const response = await axios.post<JsonResponse>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 3500,
-          temperature: 0.0,
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
-      );
-
-      const generatedText = response.data?.text?.trim();
-      if (!generatedText) {
-        return {success: false};
-      }
-
-      let cleanedResponse = generatedText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      const startIndex = cleanedResponse.indexOf("{");
-      const endIndex = cleanedResponse.lastIndexOf("}");
-
-      if (startIndex !== -1 && endIndex !== -1) {
-        cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
-      }
-
-      const result = JSON.parse(cleanedResponse);
-      return {success: true, ...result};
-    } catch (error: any) {
-      console.error(" Cohere admission analysis error:", error.message);
-      return {success: false};
-    }
-  }
-);
-
-export const analyzeCohereScholarship = onCall(
-  {secrets: [COHERE_API_KEY]},
-  async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-
-    const {message} = request.data;
-    if (!message) throw new Error("Message required");
-
-    const prompt = `
-Analyze the following text and extract ALL scholarship information found.
-
-Text: "${message}"
-
-Extract each scholarship with these exact fields:
-- name: Official scholarship title
-- description: Brief explanation
-- scholarshipProvider: Organization offering it
-- eligibilityRequirements: Combined list of eligibility criteria and required documents
-- privileges: Benefits provided
-- deadline: Application deadline (YYYY-MM-DD format)
-- application_link: URL to apply
-
-Respond in valid JSON format only:
-{
-  "scholarships": [
-    {
-      "name": "Scholarship Title",
-      "description": "What the scholarship is about",
-      "scholarshipProvider": "Organization name",
-      "eligibilityRequirements": ["requirement 1", "requirement 2"],
-      "privileges": ["benefit 1", "benefit 2"],
-      "deadline": "2024-12-31",
-      "application_link": "https://example.com"
-    }
-  ]
-}
-`;
-
-    try {
-      const response = await axios.post<JsonResponse>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 3500,
-          temperature: 0.0,
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
-      );
-
-      const generatedText = response.data?.text?.trim();
-      if (!generatedText) {
-        return {scholarships: []};
-      }
-
-      let cleanedResponse = generatedText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      const startIndex = cleanedResponse.indexOf("{");
-      const endIndex = cleanedResponse.lastIndexOf("}");
-
-      if (startIndex !== -1 && endIndex !== -1) {
-        cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
-      }
-
-      const result = JSON.parse(cleanedResponse);
-      return result;
-    } catch (error: any) {
-      console.error(" Cohere scholarship analysis error:", error.message);
-      return {scholarships: []};
-    }
-  }
-);
-
-export const analyzeCoherePlacement = onCall(
-  {secrets: [COHERE_API_KEY]},
-  async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-
-    const {message} = request.data;
-    if (!message) throw new Error("Message required");
-
-    const prompt = `
-Analyze the following text and extract ALL placement information found.
-
-Text: "${message}"
-
-Extract placement information with these fields:
-- placementID: Generate unique ID or use existing reference
-- partnerCompany: Company or organization name
-- contacts: List of contact details
-- positions: List of available positions/roles
-- deadline: Application deadline (YYYY-MM-DD format)
-- createdAt: Current timestamp
-
-Respond in valid JSON format only:
-{
-  "placements": [
-    {
-      "placementID": "unique-id",
-      "partnerCompany": "Company Name",
-      "contacts": ["contact@company.com"],
-      "positions": ["Position 1"],
-      "deadline": "2024-12-31",
-      "createdAt": "2025-09-08T10:15:30Z"
-    }
-  ]
-}
-`;
-
-    try {
-      const response = await axios.post<JsonResponse>(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-r-08-2024",
-          message: prompt,
-          max_tokens: 3500,
-          temperature: 0.0,
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
-      );
-
-      const generatedText = response.data?.text?.trim();
-      if (!generatedText) {
-        return {placements: []};
-      }
-
-      let cleanedResponse = generatedText
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      const startIndex = cleanedResponse.indexOf("{");
-      const endIndex = cleanedResponse.lastIndexOf("}");
-
-      if (startIndex !== -1 && endIndex !== -1) {
-        cleanedResponse = cleanedResponse.substring(startIndex, endIndex + 1);
-      }
-
-      const result = JSON.parse(cleanedResponse);
-      return result;
-    } catch (error: any) {
-      console.error(" Cohere placement analysis error:", error.message);
-      return {placements: []};
-    }
-  }
-);
-
 // ============================================================================
 // PINECONE FUNCTIONS
 // ============================================================================
+
+type PineconeUsageOperation = "upsert" | "delete" | "query" | "fetch";
+
+async function writePineconeUsage({
+  userId,
+  operation,
+  count,
+  namespace,
+  source,
+}: {
+  userId: string | null;
+  operation: PineconeUsageOperation;
+  count: number;
+  namespace?: string | null;
+  source?: string | null;
+}) {
+  const safeCount = Math.max(0, Number(count) || 0);
+
+  await admin.firestore().collection("pinecone_usage").add({
+    userId: userId ?? null,
+    tool: "Pinecone",
+    index: "oasp-assist-gemini",
+    operation,
+    source: source ?? "document_upload",
+    namespace: namespace ?? null,
+    usageCount: safeCount,
+    calls: 1,
+    writes: operation === "upsert" ? safeCount : 0,
+    upserts: operation === "upsert" ? safeCount : 0,
+    deletes: operation === "delete" ? safeCount : 0,
+    costUsd: 0,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    date: new Date().toISOString().substring(0, 10),
+  });
+}
+
+export const logPineconeUsage = onCall(
+  async (request) => {
+    if (!request.auth) throw new Error("Unauthorized");
+
+    const {
+      operation = "upsert",
+      count = 1,
+      namespace,
+      source = "document_upload",
+    } = request.data ?? {};
+
+    await writePineconeUsage({
+      userId: request.auth.uid ?? null,
+      operation,
+      count,
+      namespace,
+      source,
+    });
+
+    return {success: true};
+  }
+);
 
 export const queryPinecone = onCall(
   {secrets: [PINECONE_API_KEY]},
@@ -507,7 +360,7 @@ export const insertPineconeDocument = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {id, embedding, metadata} = request.data;
+    const {id, embedding, metadata, namespace} = request.data;
     if (!id || !embedding || !metadata) {
       throw new Error("ID, embedding, and metadata required");
     }
@@ -521,6 +374,14 @@ export const insertPineconeDocument = onCall(
         values: embedding,
         metadata,
       }]);
+
+      await writePineconeUsage({
+        userId: request.auth.uid ?? null,
+        operation: "upsert",
+        count: 1,
+        namespace,
+        source: "document_upload",
+      }).catch(() => undefined);
 
       return {success: true, id};
     } catch (error: any) {
@@ -539,7 +400,7 @@ export const insertPineconeDocumentBatch = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {documents} = request.data;
+    const {documents, namespace} = request.data;
 
     if (!documents || !Array.isArray(documents) || documents.length === 0) {
       throw new Error("Documents array required");
@@ -569,6 +430,14 @@ export const insertPineconeDocumentBatch = onCall(
         totalInserted += batch.length;
         console.log(` Inserted batch: ${totalInserted}/${vectors.length}`);
       }
+
+      await writePineconeUsage({
+        userId: request.auth.uid ?? null,
+        operation: "upsert",
+        count: totalInserted,
+        namespace,
+        source: "document_batch_upload",
+      }).catch(() => undefined);
 
       return {
         success: true,

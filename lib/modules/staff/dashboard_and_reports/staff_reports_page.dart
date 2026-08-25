@@ -236,10 +236,6 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoadingUser) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return ResponsiveLayout(
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -249,7 +245,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isLoading: isLoadingInquiry,
         inq: inq,
         ad: ad,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -264,7 +260,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isLoading: isLoadingInquiry,
         inq: inq,
         ad: ad,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -279,7 +275,7 @@ class _StaffReportsPageState extends State<StaffReportsPage> {
         isLoading: isLoadingInquiry,
         inq: inq,
         ad: ad,
-        userName: userName!,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -466,34 +462,43 @@ class DesktopDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              onTimeFrameChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              ad,
-            ),
-            const SizedBox(height: 32),
-            if (isLoading)
-              ...buildSkeletonReport(isMobile: false)
-            else
-              ...buildInquiryTrendsReport(
-                inq,
-                ad,
-                selectedTimeFrame: selectedTimeFrame,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedTimeFrame-desktop'),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  onTimeFrameChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  ad,
+                ),
+              const SizedBox(height: 32),
+              if (isLoading)
+                ...buildSkeletonReport(isMobile: false)
+              else
+                ...buildInquiryTrendsReport(
+                  inq,
+                  ad,
+                  selectedTimeFrame: selectedTimeFrame,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -536,35 +541,44 @@ class TabletDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              onTimeFrameChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              ad,
-            ),
-            const SizedBox(height: 32),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedTimeFrame-tablet'),
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  onTimeFrameChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  ad,
+                ),
+              const SizedBox(height: 32),
 
-            if (isLoading)
-              ...buildSkeletonReport(isMobile: false)
-            else
-              ...buildInquiryTrendsReport(
-                inq,
-                ad,
-                selectedTimeFrame: selectedTimeFrame,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(isMobile: false)
+              else
+                ...buildInquiryTrendsReport(
+                  inq,
+                  ad,
+                  selectedTimeFrame: selectedTimeFrame,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -608,39 +622,153 @@ class MobileDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              onTimeFrameChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              ad,
-            ),
-            const SizedBox(height: 24),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedTimeFrame-mobile'),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: true)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  onTimeFrameChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  ad,
+                ),
+              const SizedBox(height: 24),
 
-            if (isLoading)
-              ...buildSkeletonReport(isMobile: true)
-            else
-              ...buildInquiryTrendsReport(
-                inq,
-                ad,
-                selectedTimeFrame: selectedTimeFrame,
-                isMobile: true,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(isMobile: true)
+              else
+                ...buildInquiryTrendsReport(
+                  inq,
+                  ad,
+                  selectedTimeFrame: selectedTimeFrame,
+                  isMobile: true,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+Widget buildSkeletonHeader({bool isMobile = false}) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(18),
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          isMobile ? 18 : 24,
+          isMobile ? 18 : 22,
+          isMobile ? 18 : 24,
+          isMobile ? 18 : 22,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isMobile) ...[
+              _buildSkeletonHeaderTitle(isMobile: isMobile),
+              const SizedBox(height: 16),
+              SkeletonLoader(
+                height: 40,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(height: 10),
+              SkeletonLoader(
+                height: 40,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ] else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: _buildSkeletonHeaderTitle(isMobile: isMobile),
+                  ),
+                  const SizedBox(width: 18),
+                  Row(
+                    children: [
+                      SkeletonLoader(
+                        width: 120,
+                        height: 40,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      const SizedBox(width: 8),
+                      SkeletonLoader(
+                        width: 104,
+                        height: 40,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFE2E8F0), height: 1),
+            const SizedBox(height: 14),
+            SkeletonLoader(height: 14, width: isMobile ? 260 : 340),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildSkeletonHeaderTitle({required bool isMobile}) {
+  return Row(
+    children: [
+      SkeletonLoader(
+        width: 42,
+        height: 42,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SkeletonLoader(
+              width: isMobile ? 190 : 240,
+              height: isMobile ? 20 : 24,
+            ),
+            const SizedBox(height: 8),
+            SkeletonLoader(width: isMobile ? 220 : 270, height: 13),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 List<Widget> buildSkeletonReport({bool isMobile = false}) {
@@ -1021,83 +1149,121 @@ Widget buildHeader(
               ? 'Showing data from ${_formatDate(customDateRange.start)} to ${_formatDate(customDateRange.end)}'
               : _getReportDescription(selectedTimeFrame, customDateRange);
 
-      return Container(
-        padding: EdgeInsets.all(isMobile ? 18 : 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            isMobile
-                ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildGreetingBlock(isMobile: true),
-                    const SizedBox(height: 16),
-                    _buildControlsRow(
-                      context,
-                      selectedTimeFrame,
-                      onTimeFrameChanged,
-                      customDateRange,
-                      onDateRangeChanged,
-                      userName,
-                      inq,
-                      ad,
-                      isMobile: true,
-                    ),
-                  ],
-                )
-                : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildGreetingBlock(isMobile: false),
-                    _buildControlsRow(
-                      context,
-                      selectedTimeFrame,
-                      onTimeFrameChanged,
-                      customDateRange,
-                      onDateRangeChanged,
-                      userName,
-                      inq,
-                      ad,
-                      isMobile: false,
-                    ),
-                  ],
-                ),
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFFE2E8F0), height: 1),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
-                  size: 14,
-                  color: const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
-                      fontWeight: FontWeight.w400,
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withOpacity(0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: isMobile ? 4 : 5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF6366F1).withOpacity(0.65),
+                        const Color(0xFF6366F1),
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isMobile ? 18 : 24,
+                  isMobile ? 18 : 22,
+                  isMobile ? 18 : 24,
+                  isMobile ? 18 : 22,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    isMobile
+                        ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildGreetingBlock(isMobile: true),
+                            const SizedBox(height: 16),
+                            _buildControlsRow(
+                              context,
+                              selectedTimeFrame,
+                              onTimeFrameChanged,
+                              customDateRange,
+                              onDateRangeChanged,
+                              userName,
+                              inq,
+                              ad,
+                              isMobile: true,
+                            ),
+                          ],
+                        )
+                        : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: _buildGreetingBlock(isMobile: false)),
+                            const SizedBox(width: 18),
+                            _buildControlsRow(
+                              context,
+                              selectedTimeFrame,
+                              onTimeFrameChanged,
+                              customDateRange,
+                              onDateRangeChanged,
+                              userName,
+                              inq,
+                              ad,
+                              isMobile: false,
+                            ),
+                          ],
+                        ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFFE2E8F0), height: 1),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     },
@@ -1105,45 +1271,53 @@ Widget buildHeader(
 }
 
 Widget _buildGreetingBlock({required bool isMobile}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFF6366F1).withOpacity(0.25),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF6366F1).withOpacity(0.45),
+            color: const Color(0xFF6366F1).withOpacity(0.18),
             width: 1,
           ),
         ),
-        child: const Text(
-          'Reports & Analytics',
-          style: TextStyle(
-            fontSize: 11,
-            color: Color(0xFF4F46E5),
-            fontWeight: FontWeight.w600,
-          ),
+        child: const Icon(
+          Icons.analytics_rounded,
+          color: Color(0xFF6366F1),
+          size: 20,
         ),
       ),
-      const SizedBox(height: 10),
-      Text(
-        'Inquiry Trends Report',
-        style: TextStyle(
-          fontSize: isMobile ? 18 : 22,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF0F172A),
-          letterSpacing: -0.4,
-        ),
-      ),
-      const SizedBox(height: 3),
-      Text(
-        'Analyze and export inquiry trend reports',
-        style: TextStyle(
-          fontSize: isMobile ? 12 : 13,
-          color: const Color(0xFF64748B),
-          fontWeight: FontWeight.w400,
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Inquiry Trends Report',
+              style: TextStyle(
+                fontSize: isMobile ? 19 : 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Analyze and export inquiry trend reports',
+              style: TextStyle(
+                fontSize: isMobile ? 12 : 13,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w400,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     ],

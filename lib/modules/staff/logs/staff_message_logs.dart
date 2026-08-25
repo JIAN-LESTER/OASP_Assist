@@ -28,6 +28,23 @@ class _StaffMessageLogsPageState extends State<StaffMessageLogsPage> {
   int currentPage = 1;
   int itemsPerPage = 10;
   final List<Map<String, dynamic>> messages = [];
+  late final Stream<QuerySnapshot> _messageLogsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageLogsStream =
+        FirebaseFirestore.instance
+            .collection('message_logs')
+            .orderBy('time', descending: true)
+            .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _onDateRangeChanged(DateTimeRange? dateRange) {
     setState(() {
@@ -90,6 +107,7 @@ class _StaffMessageLogsPageState extends State<StaffMessageLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        messageLogsStream: _messageLogsStream,
       ),
       tabletBody: TabletAdminMessageLogsPage(
         selectedDateRange: selectedDateRange,
@@ -103,6 +121,7 @@ class _StaffMessageLogsPageState extends State<StaffMessageLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        messageLogsStream: _messageLogsStream,
       ),
       desktopBody: DesktopAdminMessageLogsPage(
         selectedDateRange: selectedDateRange,
@@ -116,6 +135,7 @@ class _StaffMessageLogsPageState extends State<StaffMessageLogsPage> {
         onPageChanged: _onPageChanged,
         onItemsPerPageChanged: _onItemsPerPageChanged,
         messages: messages,
+        messageLogsStream: _messageLogsStream,
       ),
     );
   }
@@ -133,6 +153,7 @@ class DesktopAdminMessageLogsPage extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> messageLogsStream;
 
   const DesktopAdminMessageLogsPage({
     super.key,
@@ -147,6 +168,7 @@ class DesktopAdminMessageLogsPage extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.messageLogsStream,
   });
 
   @override
@@ -173,6 +195,7 @@ class _DesktopAdminMessageLogsPageState
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.messageLogsStream,
       context,
       24.0,
 
@@ -193,6 +216,7 @@ class TabletAdminMessageLogsPage extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> messageLogsStream;
 
   const TabletAdminMessageLogsPage({
     super.key,
@@ -207,6 +231,7 @@ class TabletAdminMessageLogsPage extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.messageLogsStream,
   });
 
   @override
@@ -233,6 +258,7 @@ class _TabletAdminMessageLogsPageState
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.messageLogsStream,
       context,
       20.0,
 
@@ -253,6 +279,7 @@ class MobileAdminMessageLogsPage extends StatefulWidget {
   final ValueChanged<int> onPageChanged;
   final ValueChanged<int> onItemsPerPageChanged;
   final List<Map<String, dynamic>> messages;
+  final Stream<QuerySnapshot> messageLogsStream;
 
   const MobileAdminMessageLogsPage({
     super.key,
@@ -267,6 +294,7 @@ class MobileAdminMessageLogsPage extends StatefulWidget {
     required this.onPageChanged,
     required this.onItemsPerPageChanged,
     required this.messages,
+    required this.messageLogsStream,
   });
 
   @override
@@ -293,6 +321,7 @@ class _MobileAdminMessageLogsPageState
       widget.onPageChanged,
       widget.onItemsPerPageChanged,
       widget.messages,
+      widget.messageLogsStream,
       context,
       16.0,
 
@@ -429,6 +458,7 @@ Widget mainContent(
   ValueChanged<int> onPageChanged,
   ValueChanged<int> onItemsPerPageChanged,
   List<Map<String, dynamic>> messages,
+  Stream<QuerySnapshot> messageLogsStream,
   BuildContext context,
   double padding,
   VoidCallback onSearchChanged, // 🔹 new param instead of setState
@@ -472,14 +502,10 @@ Widget mainContent(
 
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
-                    stream:
-                        FirebaseFirestore.instance
-                            .collection('message_logs')
-                            .orderBy('time', descending: true)
-                            .snapshots(),
+                    stream: messageLogsStream,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return _buildLogsTableSkeleton();
                       }
 
                       if (snapshot.hasError) {
@@ -594,6 +620,74 @@ Widget _buildTableHeader() {
         ),
       );
     },
+  );
+}
+
+Widget _buildLogsTableSkeleton() {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 600;
+
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: ListView.separated(
+          key: const ValueKey('staff-message-logs-skeleton'),
+          padding: EdgeInsets.zero,
+          itemCount: 8,
+          separatorBuilder: (_, __) => const SizedBox(height: 6),
+          itemBuilder:
+              (_, index) => Container(
+                height: isMobile ? 64 : 58,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: index.isOdd ? const Color(0xFFF6FFFC) : Colors.white,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    if (!isMobile) const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _logSkeletonBox(width: 128, height: 13),
+                          const SizedBox(height: 7),
+                          _logSkeletonBox(width: 92, height: 11),
+                        ],
+                      ),
+                    ),
+                    if (!isMobile) ...[
+                      Expanded(flex: 3, child: _logSkeletonBox(width: 240, height: 13)),
+                      Expanded(flex: 4, child: _logSkeletonBox(width: 170, height: 13)),
+                    ],
+                    _logSkeletonBox(width: 26, height: 12),
+                  ],
+                ),
+              ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _logSkeletonBox({
+  double? width,
+  required double height,
+  double radius = 8,
+}) {
+  return Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xFFE2E8F0),
+      borderRadius: BorderRadius.circular(radius),
+    ),
   );
 }
 

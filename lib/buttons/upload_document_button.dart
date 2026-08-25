@@ -1,8 +1,5 @@
 
 import 'package:capstone_project/modules/admin/information_bank/ib_add.dart';
-import 'package:capstone_project/modules/admin/service_information/admission/add_edit_admission.dart';
-import 'package:capstone_project/modules/admin/service_information/placement/add_edit_placement.dart';
-import 'package:capstone_project/modules/admin/service_information/scholarship/add_edit_scholarship.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -89,56 +86,50 @@ class UploadDocumentButton extends StatelessWidget {
     );
   }
 
-   void _showOptionsModal(BuildContext context) {
+  void _showOptionsModal(BuildContext context) {
     HapticFeedback.mediumImpact();
 
-    if (formType != null) {
-      // Show specific form dialog
-      _showFormDialog(context, formType!);
-    } else {
-      // Show the general upload document modal
-      showDialog(
-        context: context,
-        barrierDismissible: true,
-        barrierColor: Colors.black.withOpacity(0.5),
-        builder: (BuildContext context) {
-          return const UploadDocumentModal();
-        },
-      ).then((result) {
-        if (result == true && onUploadComplete != null) {
-          onUploadComplete!();
-        }
-      });
-    }
-  }
-
-    void _showFormDialog(BuildContext context, String type) {
-    Widget dialog;
-    
-    switch (type) {
-      case 'admission':
-        dialog = AdmissionFormDialog(isEdit: false);
-        break;
-      case 'scholarship':
-        dialog = ScholarshipFormDialog(isEdit: false);
-        break;
-      case 'placement':
-        dialog = PlacementFormDialog(isEdit: false);
-        break;
-      default:
-        return;
-    }
-
-    showDialog(
+    showGeneralDialog(
       context: context,
       barrierDismissible: true,
+      barrierLabel: 'Upload Document',
       barrierColor: Colors.black.withOpacity(0.5),
-      builder: (BuildContext context) => dialog,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return UploadDocumentModal(initialCategory: _categoryForFormType());
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.1),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          ),
+        );
+      },
     ).then((result) {
       if (result == true && onUploadComplete != null) {
         onUploadComplete!();
       }
     });
+  }
+
+  String? _categoryForFormType() {
+    switch (formType?.toLowerCase()) {
+      case 'admission':
+        return 'Admission';
+      case 'scholarship':
+        return 'Scholarship';
+      case 'placement':
+        return 'Placement';
+      default:
+        return null;
+    }
   }
 }
 

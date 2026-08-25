@@ -4,6 +4,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/escalation_
 import 'package:capstone_project/modules/admin/dashboard_and_reports/inquiry_trends_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/staff_dashboard_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/user_demographics_data.dart';
+import 'package:capstone_project/services/firebase_usage_logger.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +32,15 @@ class ChartData {
   }
 }
 
+DateTime _readDateTime(dynamic value, {DateTime? fallback}) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is String) {
+    return DateTime.tryParse(value) ?? fallback ?? DateTime.now();
+  }
+  return fallback ?? DateTime.now();
+}
+
 class SystemLog {
   final String user;
   final DateTime time;
@@ -42,7 +52,7 @@ class SystemLog {
     return SystemLog(
       user: map['user'] ?? '',
       action: map['action'] ?? '',
-      time: (map['time'] as Timestamp).toDate(),
+      time: _readDateTime(map['time']),
     );
   }
 }
@@ -65,7 +75,7 @@ class MessageLogs {
       user: map['user'] ?? '',
       message: map['message'] ?? '',
       reply: map['reply'] ?? '',
-      time: (map['time'] as Timestamp).toDate(),
+      time: _readDateTime(map['time']),
     );
   }
 }
@@ -95,6 +105,20 @@ class FirebaseService {
 
   void _updateCacheTimestamp(String cacheKey) {
     _cacheTimestamps[cacheKey] = DateTime.now();
+  }
+
+  Future<void> _logDisplayedReads(
+    String source,
+    Map<String, List<QueryDocumentSnapshot>> groups,
+  ) async {
+    for (final entry in groups.entries) {
+      if (entry.value.isEmpty) continue;
+      await FirebaseUsageLogger.logRead(
+        collection: entry.key,
+        count: entry.value.length,
+        source: source,
+      );
+    }
   }
 
   bool _isUserLookupCacheValid() {
@@ -167,6 +191,22 @@ class FirebaseService {
       if (faqs.isEmpty) {
         faqs = await _getTopFAQsAllTime();
       }
+      await _logDisplayedReads('inquiry_reports', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+        ],
+        'escalations': [
+          ...results[3],
+          ...results[4],
+          ...results[8],
+          ...results[9],
+        ],
+        'faqs': faqs,
+        'logs': results[6],
+        'message_logs': results[7],
+      });
       final data = _processInquiryReportsData(
         totalMessages: results[0],
         userMessages: results[1],
@@ -188,6 +228,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading inquiry reports data: $e');
       return getEmptyInquiryReportsData();
     }
   }
@@ -215,6 +256,14 @@ class FirebaseService {
         _getUnansweredMessages(startDate, endDate),
         _getUsersWithLimitData(startDate, endDate), // NEW
       ]);
+      await _logDisplayedReads('chatbot_usage_reports', {
+        'conversations': results[0],
+        'messages': [
+          ...results[1],
+          ...results[2],
+        ],
+        'users': results[3],
+      });
 
       final data = _processChatbotUsageReportsData(
         conversations: results[0],
@@ -231,6 +280,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading chatbot usage reports data: $e');
       return getEmptyChatbotUsageReportsData();
     }
   }
@@ -259,6 +309,15 @@ class FirebaseService {
         _getMessages(startDate, endDate, 'user'),
         _getAllUsersWithTimestamps(), // For user growth over time
       ]);
+      await _logDisplayedReads('user_demographics_reports', {
+        'users': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+          ...results[4],
+        ],
+        'messages': results[3],
+      });
 
       final data = _processUserDemographicsReportsData(
         users: results[0], // Users in timeframe
@@ -277,6 +336,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading user demographics reports data: $e');
       return getEmptyUserDemographicsReportsData();
     }
   }
@@ -308,6 +368,20 @@ class FirebaseService {
         _getLogs(startDate, endDate),
         _getMessageLogs(startDate, endDate),
       ]);
+      await _logDisplayedReads('admin_dashboard', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+        ],
+        'users': results[2],
+        'escalations': [
+          ...results[3],
+          ...results[4],
+          ...results[5],
+        ],
+        'logs': results[6],
+        'message_logs': results[7],
+      });
 
       final data = _processAdminDashboardData(
         userMessages: results[0],
@@ -328,6 +402,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading admin dashboard data: $e');
       return getEmptyAdminDashboardData();
     }
   }
@@ -359,6 +434,19 @@ class FirebaseService {
         _getAllEscalations(startDate, endDate),
         _getMessageLogs(startDate, endDate),
       ]);
+      await _logDisplayedReads('staff_dashboard', {
+        'messages': [
+          ...results[0],
+          ...results[1],
+        ],
+        'escalations': [
+          ...results[2],
+          ...results[3],
+          ...results[4],
+          ...results[5],
+        ],
+        'message_logs': results[6],
+      });
 
       final data = _processStaffDashboardData(
         userMessages: results[0],
@@ -378,6 +466,7 @@ class FirebaseService {
 
       return data;
     } catch (e) {
+      debugPrint('Error loading staff dashboard data: $e');
       return getEmptyStaffDashboardData();
     }
   }
@@ -1512,6 +1601,7 @@ class FirebaseService {
         'totalUsers': usersSnapshot.count ?? 0,
       };
     } catch (e) {
+      debugPrint('Error loading quick stats: $e');
       return {'totalMessages': 0, 'answered': 0, 'totalUsers': 0};
     }
   }
@@ -1984,7 +2074,6 @@ class FirebaseService {
 
       case 'daily':
         // Generate all days in the range
-        final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         var currentDate = DateTime(
           startDate.year,
           startDate.month,
@@ -1995,7 +2084,7 @@ class FirebaseService {
         while (currentDate.isBefore(end.add(const Duration(days: 1)))) {
           final dateKey =
               "${currentDate.year}-${currentDate.month.toString().padLeft(2, '0')}-${currentDate.day.toString().padLeft(2, '0')}";
-          final displayKey = dayNames[currentDate.weekday - 1];
+          final displayKey = _formatDayLabel(currentDate);
 
           dataPoints.add(
             ChartData(date: displayKey, count: dataCounts[dateKey] ?? 0),
@@ -2370,7 +2459,7 @@ List<ChartData> _buildResponseTimeTrend(
 
       while (!currentDate.isAfter(end)) {
         final dateKey = _dateKey(currentDate);
-        final dayName = _getDayName(currentDate.weekday);
+        final dayName = _formatDayLabel(currentDate);
         final times = responseTimeByDate[dateKey] ?? [];
         final avgTime =
             times.isNotEmpty
@@ -2847,11 +2936,38 @@ Map<String, int> _generatePeakUsageByMonth(
 
   // Determine if we should show weeks or months
   final daysDiff = endDate.difference(startDate).inDays;
-  final showWeeks = timeFrame == 'This Month' || daysDiff <= 31;
+  final showDays = timeFrame == 'Custom' && daysDiff <= 31;
+  final showWeeks =
+      timeFrame == 'This Month' ||
+      (timeFrame == 'Custom' && daysDiff <= 90) ||
+      (timeFrame != 'Custom' && daysDiff <= 31);
 
-  if (showWeeks) {
+  if (showDays) {
+    var currentDate = DateTime(startDate.year, startDate.month, startDate.day);
+    final end = DateTime(endDate.year, endDate.month, endDate.day);
+
+    while (!currentDate.isAfter(end)) {
+      monthCounts[_formatDayLabel(currentDate)] = 0;
+      currentDate = currentDate.add(const Duration(days: 1));
+    }
+
+    for (final doc in conversations) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = data['createdAt'] as Timestamp?;
+      if (timestamp != null) {
+        final date = timestamp.toDate();
+
+        if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
+
+        final dayKey = _formatDayLabel(date);
+        monthCounts[dayKey] = (monthCounts[dayKey] ?? 0) + 1;
+      }
+    }
+  } else if (showWeeks) {
     // Initialize weeks
-    for (int week = 1; week <= 5; week++) {
+    final weeksCount =
+        timeFrame == 'This Month' ? 5 : _weekCountForRange(startDate, endDate);
+    for (int week = 1; week <= weeksCount; week++) {
       monthCounts['Week $week'] = 0;
     }
 
@@ -2865,8 +2981,11 @@ Map<String, int> _generatePeakUsageByMonth(
         // Filter by date range
         if (date.isBefore(startDate) || date.isAfter(endDate)) continue;
 
-        final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
-        final weekKey = 'Week $weekOfMonth';
+        final week =
+            timeFrame == 'This Month'
+                ? ((date.day - 1) ~/ 7) + 1
+                : _getWeekInRange(date, startDate);
+        final weekKey = 'Week $week';
         monthCounts[weekKey] = (monthCounts[weekKey] ?? 0) + 1;
       }
     }
@@ -2974,7 +3093,7 @@ List<ChartData> _generateTrendData(
 
       while (!currentDate.isAfter(end)) {
         final dateKey = _dateKey(currentDate);
-        final dayName = _getDayName(currentDate.weekday);
+        final dayName = _formatDayLabel(currentDate);
 
         final categoryBreakdown =
             timeCategoryCounts[dateKey] ?? <String, int>{};
@@ -3193,7 +3312,7 @@ List<ChartData> _generateSimpleTrendData(
 
       while (!currentDate.isAfter(end)) {
         final dateKey = _dateKey(currentDate);
-        final dayName = _getDayName(currentDate.weekday);
+        final dayName = _formatDayLabel(currentDate);
 
         final count = timeCounts[dateKey] ?? 0;
         trendData.add(ChartData(date: dayName, count: count));
@@ -3335,10 +3454,10 @@ String _getDataGroupingInterval(DateTime startDate, DateTime endDate) {
 
   if (daysDifference <= 1) {
     return 'hourly'; // Same day
-  } else if (daysDifference <= 7) {
-    return 'daily'; // Up to 7 days
-  } else if (daysDifference <= 35 || oneMonthRange) {
-    return 'weekly'; // Up to 31 days
+  } else if (daysDifference <= 31) {
+    return 'daily'; // Up to 31 days
+  } else if (daysDifference <= 90 || oneMonthRange) {
+    return 'weekly'; // Up to 90 days
   } else if (daysDifference <= 365) {
     return 'monthly'; // Up to 1 year
   } else {
@@ -3515,7 +3634,7 @@ List<ChartData> _generateCustomRangeTrend(
 
       while (currentDate.isBefore(end.add(const Duration(days: 1)))) {
         final dateKey = _dateKey(currentDate);
-        final displayKey = _getDayName(currentDate.weekday);
+        final displayKey = _formatDayLabel(currentDate);
         final categoryBreakdown =
             timeCategoryCounts[dateKey] ?? <String, int>{};
         final totalCount = categoryBreakdown.values.fold(
@@ -3811,7 +3930,6 @@ int _inclusiveDays(DateTime startDate, DateTime endDate) {
 int _weekCountForRange(DateTime startDate, DateTime endDate) {
   final weeks = (_inclusiveDays(startDate, endDate) + 6) ~/ 7;
   if (weeks < 1) return 1;
-  if (weeks > 5) return 5;
   return weeks;
 }
 
@@ -3827,6 +3945,10 @@ DateTime _addMonths(DateTime date, int months) {
 
 String _dateKey(DateTime dateTime) {
   return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}";
+}
+
+String _formatDayLabel(DateTime dateTime) {
+  return "${dateTime.month}/${dateTime.day}";
 }
 
 String _monthKey(DateTime dateTime) {

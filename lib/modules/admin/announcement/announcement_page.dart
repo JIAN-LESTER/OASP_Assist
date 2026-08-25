@@ -29,6 +29,7 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
   final ScrollController _announcementScrollController = ScrollController();
   final Map<String, GlobalKey> _announcementKeys = {};
   late final Stream<QuerySnapshot> announcementStream;
+  late final Stream<QuerySnapshot> recentAnnouncementStream;
 
   // Facebook Integration Helper
   final fbHelper = FacebookIntegrationHelper();
@@ -40,6 +41,13 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     _initializeFacebookIntegration();
 
     announcementStream =
+        FirebaseFirestore.instance
+            .collection('announcements')
+            .where('deleted', isEqualTo: false)
+            .orderBy('created_time', descending: true)
+            .snapshots();
+
+    recentAnnouncementStream =
         FirebaseFirestore.instance
             .collection('announcements')
             .where('deleted', isEqualTo: false)
@@ -258,123 +266,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showSyncSettingsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Container(
-              width: 480,
-              constraints: const BoxConstraints(maxHeight: 600),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.orange[600]!, Colors.orange[700]!],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.settings_suggest_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Sync Settings',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Auto-create documents & Vision OCR',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white70),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Content
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Info banner
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            margin: const EdgeInsets.only(bottom: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.orange[50],
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.orange[200]!),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(
-                                  Icons.document_scanner_rounded,
-                                  color: Colors.orange[700],
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    'When enabled, synced Facebook posts with images will use '
-                                    'Google Vision OCR to extract text, then automatically '
-                                    'create structured Admission, Scholarship, or Placement documents.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.orange[900],
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const AnnouncementSyncSettings(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
     );
   }
 
@@ -625,42 +516,6 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
               ),
           ],
         ),
-        // Sync Settings Button
-        Tooltip(
-          message: 'Sync Settings (Auto-create & Vision OCR)',
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.orange[600]!, Colors.orange[700]!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.orange.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => _showSyncSettingsDialog(context),
-                child: Padding(
-                  padding: EdgeInsets.all(buttonPadding),
-                  child: Icon(
-                    Icons.settings_suggest_rounded,
-                    color: Colors.white,
-                    size: iconSize,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
         // Manual Sync Button
         Tooltip(
           message: 'Manual Sync Facebook Posts',
@@ -756,35 +611,11 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   Widget _buildMainContent({required bool isDesktop}) {
     return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('announcements')
-              .where('deleted', isEqualTo: false)
-              .orderBy('created_time', descending: true)
-              .snapshots(),
+      stream: announcementStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-                  strokeWidth: 3,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Loading announcements...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _AnnouncementListSkeleton(isDesktop: isDesktop);
         }
 
         if (snapshot.hasError) {
@@ -799,7 +630,27 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
         _announcementKeys.removeWhere((id, _) => !visibleIds.contains(id));
 
         if (displayedAnnouncements.isEmpty) {
-          return Center(child: Text('No announcements found'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.announcement_outlined,
+                  size: isDesktop ? 64 : 48,
+                  color: Colors.grey[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No announcements found',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 20 : 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         return RefreshIndicator(
@@ -895,12 +746,10 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: StreamBuilder<QuerySnapshot>(
-                stream: announcementStream,
+                stream: recentAnnouncementStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    );
+                    return const _AnnouncementSidebarSkeleton();
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1061,87 +910,161 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
     final saved = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Edit Announcement'),
-            content: SizedBox(
-              width: 520,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: messageController,
-                      minLines: 5,
-                      maxLines: 10,
-                      decoration: const InputDecoration(
-                        labelText: 'Message',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: categoryController,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: deadlineController,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        labelText: 'Deadline',
-                        hintText: 'No deadline',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.event_busy_outlined),
-                              onPressed: () => deadlineController.clear(),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.calendar_month_outlined),
-                              onPressed: () async {
-                                final initialDate =
-                                    data['deadline'] is Timestamp
-                                        ? (data['deadline'] as Timestamp)
-                                            .toDate()
-                                        : DateTime.now();
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: initialDate,
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime(2100),
-                                );
-                                if (picked != null) {
-                                  deadlineController.text = DateFormat(
-                                    'yyyy-MM-dd',
-                                  ).format(picked);
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+      builder: (context) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 32,
+                  offset: const Offset(0, 16),
                 ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(isMobile ? 20 : 28),
+                    color: const Color(0xFF2E7D32),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.edit_document,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Edit Announcement',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Update the message details shown to users',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          tooltip: 'Close',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(isMobile ? 20 : 28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildEditAnnouncementField(
+                            controller: messageController,
+                            label: 'Message',
+                            hint: 'Write the announcement message',
+                            icon: Icons.article_outlined,
+                            minLines: 5,
+                            maxLines: 9,
+                          ),
+                          const SizedBox(height: 18),
+                          _buildEditAnnouncementField(
+                            controller: categoryController,
+                            label: 'Category',
+                            hint: 'General',
+                            icon: Icons.category_outlined,
+                          ),
+                          const SizedBox(height: 18),
+                          _buildEditAnnouncementDeadlineField(
+                            context: context,
+                            controller: deadlineController,
+                            initialDeadline: data['deadline'],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: EdgeInsets.all(isMobile ? 16 : 20),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF9FAFB),
+                      border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(
+                                color: Color(0xFFD1D5DB),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Color(0xFF374151)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => Navigator.pop(context, true),
+                            icon: const Icon(Icons.save_outlined, size: 18),
+                            label: const Text('Save'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Save'),
-              ),
-            ],
           ),
+        );
+      },
     );
 
     if (saved != true) {
@@ -1182,12 +1105,242 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     }
   }
 
+  Widget _buildEditAnnouncementField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    int minLines = 1,
+    int maxLines = 1,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          minLines: minLines,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF), size: 20),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditAnnouncementDeadlineField({
+    required BuildContext context,
+    required TextEditingController controller,
+    required dynamic initialDeadline,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Deadline',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          readOnly: true,
+          decoration: InputDecoration(
+            hintText: 'No deadline',
+            prefixIcon: const Icon(
+              Icons.event_outlined,
+              color: Color(0xFF9CA3AF),
+              size: 20,
+            ),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Clear deadline',
+                  icon: const Icon(Icons.event_busy_outlined),
+                  onPressed: controller.clear,
+                ),
+                IconButton(
+                  tooltip: 'Choose deadline',
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  onPressed: () async {
+                    final initialDate =
+                        initialDeadline is Timestamp
+                            ? initialDeadline.toDate()
+                            : DateTime.now();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: initialDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      controller.text = DateFormat('yyyy-MM-dd').format(picked);
+                    }
+                  },
+                ),
+              ],
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF9FAFB),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _deleteAnnouncement(DocumentSnapshot announcement) async {
     showDeleteConfirmation(
       context,
       announcement,
       DeleteConfigs.announcement,
       'announcements',
+    );
+  }
+}
+
+class _AnnouncementListSkeleton extends StatelessWidget {
+  final bool isDesktop;
+
+  const _AnnouncementListSkeleton({required this.isDesktop});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding:
+          isDesktop
+              ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+              : const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 5,
+      separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 24 : 16),
+      itemBuilder: (_, __) => const _AnnouncementSkeletonCard(),
+    );
+  }
+}
+
+class _AnnouncementSidebarSkeleton extends StatelessWidget {
+  const _AnnouncementSidebarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      itemCount: 5,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder:
+          (_, __) => const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+              SizedBox(height: 8),
+              _AnnouncementSkeletonBox(width: 130, height: 12),
+            ],
+          ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonCard extends StatelessWidget {
+  const _AnnouncementSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _AnnouncementSkeletonBox(width: 42, height: 42, radius: 12),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AnnouncementSkeletonBox(width: 160, height: 16),
+                    SizedBox(height: 8),
+                    _AnnouncementSkeletonBox(width: 110, height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 18),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: 220, height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _AnnouncementSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
+      ),
     );
   }
 }
@@ -1272,7 +1425,7 @@ class _AnnouncementSyncSettingsState extends State<AnnouncementSyncSettings> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

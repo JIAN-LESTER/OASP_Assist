@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:capstone_project/buttons/add_faq_button.dart';
 import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_candidate_tab.dart';
 
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/faq_category_dropdown_button.dart';
 import 'package:capstone_project/widgets/pagination.dart';
 import 'package:capstone_project/widgets/search_field.dart';
@@ -19,6 +22,12 @@ import 'package:capstone_project/modules/admin/faqs/faq_info.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
 import 'package:flutter/material.dart';
+
+final Stream<QuerySnapshot> _faqManagementStream =
+    FirebaseFirestore.instance
+        .collection('faqs')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
 
 class FaqManagementPage extends StatefulWidget {
   const FaqManagementPage({super.key});
@@ -45,6 +54,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   // ── Pending-candidate badge count ───────────────────────────────────────
   int _pendingCandidateCount = 0;
+  StreamSubscription<QuerySnapshot>? _pendingCandidateSubscription;
 
   @override
   void initState() {
@@ -57,6 +67,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   @override
   void dispose() {
+    _pendingCandidateSubscription?.cancel();
     _tabController.dispose();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
@@ -65,7 +76,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
 
   // ── Badge listener ──────────────────────────────────────────────────────
   void _listenToPendingCandidateCount() {
-    FirebaseFirestore.instance
+    _pendingCandidateSubscription = FirebaseFirestore.instance
         .collection('faq_candidates')
         .where('status', isEqualTo: 'pending')
         .snapshots()
@@ -146,18 +157,12 @@ class _FaqManagementPageState extends State<FaqManagementPage>
   // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
-      body: Column(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 4, showTabs: true),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF0F4F8),
+        body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Tab bar ──
@@ -175,6 +180,7 @@ class _FaqManagementPageState extends State<FaqManagementPage>
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -552,15 +558,11 @@ class MobileFaqManagement extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('faqs')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
+        stream: _faqManagementStream,
         builder: (context, snapshot) {
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
           if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
@@ -627,7 +629,12 @@ class MobileFaqManagement extends StatelessWidget {
                         Expanded(
                           child:
                               allDocs.isEmpty
-                                  ? const Center(child: Text('No FAQs found.'))
+                                  ? buildManagementEmptyState(
+                                    hasFilters: false,
+                                    isMobileOrTablet:
+                                        MediaQuery.of(context).size.width < 900,
+                                    item: 'FAQs',
+                                  )
                                   : _buildFAQList(
                                     context: context,
                                     getAllFAQs: allDocs,
@@ -677,15 +684,11 @@ Widget mainContent(
   return Scaffold(
     backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('faqs')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: _faqManagementStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
@@ -750,7 +753,12 @@ Widget mainContent(
                       Expanded(
                         child:
                             allDocs.isEmpty
-                                ? const Center(child: Text('No FAQs found.'))
+                                ? buildManagementEmptyState(
+                                  hasFilters: false,
+                                  isMobileOrTablet:
+                                      MediaQuery.of(context).size.width < 900,
+                                  item: 'FAQs',
+                                )
                                 : _buildFAQList(
                                   context: context,
                                   getAllFAQs: allDocs,
@@ -1115,8 +1123,12 @@ Widget _buildFAQList({
       Expanded(
         child:
             currentPageFAQs.isEmpty
-                ? const Center(
-                  child: Text('No FAQs match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters:
+                      searchQuery.isNotEmpty ||
+                      selectedCategory != 'All Categories',
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'FAQs',
                 )
                 : ListView.builder(
                   shrinkWrap: false,

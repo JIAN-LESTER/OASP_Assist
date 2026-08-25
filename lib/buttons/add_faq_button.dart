@@ -1,12 +1,10 @@
-
-
 import 'package:capstone_project/modules/admin/faqs/add_faq_modal.dart';
 import 'package:flutter/material.dart';
 
 class AddFaqButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
-  const AddFaqButton({Key? key, this.onPressed}) : super(key: key);
+  const AddFaqButton({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +15,6 @@ class AddFaqButton extends StatelessWidget {
         // Using the same breakpoints as ResponsiveLayout
         bool isMobile = screenWidth < 600;
         bool isTablet = screenWidth >= 600 && screenWidth < 1100;
-
 
         // Responsive dimensions
         double height = isMobile ? 44 : (isTablet ? 46 : 48);
@@ -33,7 +30,7 @@ class AddFaqButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
+                color: Colors.grey.withValues(alpha: 0.1),
                 spreadRadius: 1,
                 blurRadius: isMobile ? 2 : 3,
                 offset: const Offset(0, 1),

@@ -1,5 +1,7 @@
 import 'package:capstone_project/modules/admin/dashboard_and_reports/admin_dashboard_data.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/export_button.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_section.dart';
+import 'package:capstone_project/modules/admin/dashboard_and_reports/gemini_billing_service.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/paginated_list.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/charts.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/chatbot_usage_charts.dart';
@@ -37,6 +39,7 @@ class _ReportsPageState extends State<ReportsPage> {
   ChatbotUsageReportsData? cb;
   UserDemographicsReportsData? ud;
   AdminDashboardData? ad;
+  ExternalToolsUsageSummary? externalToolsUsage;
   String? userName;
 
   DateTimeRange? customDateRange;
@@ -47,12 +50,14 @@ class _ReportsPageState extends State<ReportsPage> {
   bool isLoadingInquiry = false;
   bool isLoadingChatbot = false;
   bool isLoadingDemographics = false;
+  bool isLoadingExternalTools = false;
   bool isRefreshing = false;
 
   // Track which data has been loaded
   bool inquiryDataLoaded = false;
   bool chatbotDataLoaded = false;
   bool demographicsDataLoaded = false;
+  bool externalToolsDataLoaded = false;
 
   DateTime startDate = DateTime.now();
   String timeFrame = "This Month";
@@ -87,19 +92,22 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!inquiryDataLoaded) {
           setState(() => isLoadingInquiry = true);
           try {
-            final data = await _firebaseService.getInquiryReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
-
-            final escalatedData = await _firebaseService.getAdminDashboardData(
-              selectedTimeFrame,
-              customDateRange,
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getInquiryReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _firebaseService.getAdminDashboardData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              inq = data;
-              ad = escalatedData;
+              inq = results[0] as InquiryReportsData;
+              ad = results[1] as AdminDashboardData;
+              _setExternalToolsUsage(results[2] as ExternalToolsUsageSummary?);
               isLoadingInquiry = false;
               inquiryDataLoaded = true;
             });
@@ -115,13 +123,17 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!chatbotDataLoaded) {
           setState(() => isLoadingChatbot = true);
           try {
-            final data = await _firebaseService.getChatbotUsageReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getChatbotUsageReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              cb = data;
+              cb = results[0] as ChatbotUsageReportsData;
+              _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
               isLoadingChatbot = false;
               chatbotDataLoaded = true;
             });
@@ -137,13 +149,17 @@ class _ReportsPageState extends State<ReportsPage> {
         if (!demographicsDataLoaded) {
           setState(() => isLoadingDemographics = true);
           try {
-            final data = await _firebaseService.getUserDemographicsReportsData(
-              selectedTimeFrame,
-              customDateRange, // Pass custom date range
-            );
+            final results = await Future.wait<Object?>([
+              _firebaseService.getUserDemographicsReportsData(
+                selectedTimeFrame,
+                customDateRange,
+              ),
+              _fetchExternalToolsUsageIfNeeded(),
+            ]);
             if (!mounted) return;
             setState(() {
-              ud = data;
+              ud = results[0] as UserDemographicsReportsData;
+              _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
               isLoadingDemographics = false;
               demographicsDataLoaded = true;
             });
@@ -154,7 +170,46 @@ class _ReportsPageState extends State<ReportsPage> {
           }
         }
         break;
+
+      case 'External Tools Usage':
+        if (!externalToolsDataLoaded) {
+          setState(() => isLoadingExternalTools = true);
+          try {
+            final data = await _fetchExternalToolsUsageIfNeeded();
+            if (!mounted) return;
+            setState(() {
+              _setExternalToolsUsage(data);
+              isLoadingExternalTools = false;
+            });
+          } catch (e) {
+            print('Error loading external tools data: $e');
+            if (!mounted) return;
+            setState(() => isLoadingExternalTools = false);
+          }
+        }
+        break;
     }
+  }
+
+  Future<ExternalToolsUsageSummary?> _fetchExternalToolsUsageIfNeeded({
+    bool force = false,
+  }) async {
+    if (!force && externalToolsDataLoaded) return externalToolsUsage;
+    try {
+      return await fetchExternalToolsUsageFromFirestore(
+        timeFrame: selectedTimeFrame,
+        customDateRange: customDateRange,
+      );
+    } catch (e) {
+      print('Error loading external tools data: $e');
+      return null;
+    }
+  }
+
+  void _setExternalToolsUsage(ExternalToolsUsageSummary? data) {
+    if (data == null) return;
+    externalToolsUsage = data;
+    externalToolsDataLoaded = true;
   }
 
   //  When report type changes, load only that data
@@ -194,6 +249,8 @@ class _ReportsPageState extends State<ReportsPage> {
     setState(() {
       selectedTimeFrame = newValue;
       customDateRange = null;
+      externalToolsDataLoaded = false;
+      externalToolsUsage = null;
 
       // Invalidate loaded data flags to force reload
       switch (selectedReportType) {
@@ -218,6 +275,8 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() {
         customDateRange = null;
         selectedTimeFrame = 'This Month';
+        externalToolsDataLoaded = false;
+        externalToolsUsage = null;
 
         // Invalidate current report data
         switch (selectedReportType) {
@@ -237,6 +296,8 @@ class _ReportsPageState extends State<ReportsPage> {
       setState(() {
         customDateRange = range;
         selectedTimeFrame = 'Custom';
+        externalToolsDataLoaded = false;
+        externalToolsUsage = null;
 
         // Invalidate current report data
         switch (selectedReportType) {
@@ -266,37 +327,58 @@ class _ReportsPageState extends State<ReportsPage> {
       // Only refresh the selected report type
       switch (selectedReportType) {
         case 'Inquiry Trends':
-          final data = await _firebaseService.getInquiryReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getInquiryReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            inq = data;
+            inq = results[0] as InquiryReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
             isRefreshing = false;
           });
           break;
 
         case 'Chatbot Usage':
-          final data = await _firebaseService.getChatbotUsageReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getChatbotUsageReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            cb = data;
+            cb = results[0] as ChatbotUsageReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
             isRefreshing = false;
           });
           break;
 
         case 'User Demographics':
-          final data = await _firebaseService.getUserDemographicsReportsData(
-            selectedTimeFrame,
-            customDateRange, // Pass custom date range
-          );
+          final results = await Future.wait<Object?>([
+            _firebaseService.getUserDemographicsReportsData(
+              selectedTimeFrame,
+              customDateRange,
+            ),
+            _fetchExternalToolsUsageIfNeeded(force: true),
+          ]);
           if (!mounted) return;
           setState(() {
-            ud = data;
+            ud = results[0] as UserDemographicsReportsData;
+            _setExternalToolsUsage(results[1] as ExternalToolsUsageSummary?);
+            isRefreshing = false;
+          });
+          break;
+
+        case 'External Tools Usage':
+          final data = await _fetchExternalToolsUsageIfNeeded(force: true);
+          if (!mounted) return;
+          setState(() {
+            _setExternalToolsUsage(data);
             isRefreshing = false;
           });
           break;
@@ -394,6 +476,8 @@ class _ReportsPageState extends State<ReportsPage> {
         return isLoadingChatbot;
       case 'User Demographics':
         return isLoadingDemographics;
+      case 'External Tools Usage':
+        return isLoadingExternalTools;
       default:
         return false;
     }
@@ -401,10 +485,6 @@ class _ReportsPageState extends State<ReportsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoadingUser) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return ResponsiveLayout(
       mobileBody: MobileDashboard(
         selectedTimeFrame: selectedTimeFrame,
@@ -418,7 +498,8 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
-        userName: userName!,
+        externalToolsUsage: externalToolsUsage,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -437,7 +518,8 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
-        userName: userName!,
+        externalToolsUsage: externalToolsUsage,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -456,7 +538,8 @@ class _ReportsPageState extends State<ReportsPage> {
         cb: cb,
         ud: ud,
         ad: ad,
-        userName: userName!,
+        externalToolsUsage: externalToolsUsage,
+        userName: userName ?? 'User',
         startDate: startDate,
         timeCategoryCounts: timeCategoryCounts,
         timeFrame: timeFrame,
@@ -620,6 +703,7 @@ class DesktopDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -640,6 +724,7 @@ class DesktopDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -652,45 +737,55 @@ class DesktopDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              selectedReportType,
-              onTimeFrameChanged,
-              onReportTypeChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              cb,
-              ud,
-              ad,
-            ),
-            const SizedBox(height: 32),
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-desktop'),
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 32),
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: false)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -709,6 +804,7 @@ class TabletDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -729,6 +825,7 @@ class TabletDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.startDate,
     required this.timeCategoryCounts,
     required this.timeFrame,
@@ -741,46 +838,56 @@ class TabletDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              selectedReportType,
-              onTimeFrameChanged,
-              onReportTypeChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              cb,
-              ud,
-              ad,
-            ),
-            const SizedBox(height: 32),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-tablet'),
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: false)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 32),
 
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: false)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: false,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: false)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: false,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -799,6 +906,7 @@ class MobileDashboard extends StatelessWidget {
   final ChatbotUsageReportsData? cb;
   final UserDemographicsReportsData? ud;
   final AdminDashboardData? ad;
+  final ExternalToolsUsageSummary? externalToolsUsage;
   final String userName;
   final DateTime startDate;
   final String timeFrame;
@@ -819,6 +927,7 @@ class MobileDashboard extends StatelessWidget {
     this.cb,
     this.ud,
     this.ad,
+    this.externalToolsUsage,
     required this.userName,
     required this.startDate,
     required this.timeCategoryCounts,
@@ -831,50 +940,184 @@ class MobileDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDF0F7),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            buildHeader(
-              selectedTimeFrame,
-              selectedReportType,
-              onTimeFrameChanged,
-              onReportTypeChanged,
-              onRefresh,
-              isRefreshing,
-              userName,
-              customDateRange,
-              onDateRangeChanged,
-              inq,
-              cb,
-              ud,
-              ad,
-            ),
-            const SizedBox(height: 24),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: SingleChildScrollView(
+          key: ValueKey('${isLoading ? 'loading' : 'content'}-$selectedReportType-mobile'),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isLoading)
+                buildSkeletonHeader(isMobile: true)
+              else
+                buildHeader(
+                  selectedTimeFrame,
+                  selectedReportType,
+                  onTimeFrameChanged,
+                  onReportTypeChanged,
+                  onRefresh,
+                  isRefreshing,
+                  userName,
+                  customDateRange,
+                  onDateRangeChanged,
+                  inq,
+                  cb,
+                  ud,
+                  ad,
+                ),
+              const SizedBox(height: 24),
 
-            if (isLoading)
-              ...buildSkeletonReport(selectedReportType, isMobile: true)
-            else
-              ...ReportsHelper.buildReportContent(
-                selectedReportType,
-                inq,
-                ad,
-                cb,
-                selectedTimeFrame,
-                ud,
-                startDate,
-                timeFrame,
-                timeCategoryCounts,
-                customDateRange,
-                isMobile: true,
-                context: context,
-              ),
-          ],
+              if (isLoading)
+                ...buildSkeletonReport(selectedReportType, isMobile: true)
+              else
+                ...ReportsHelper.buildReportContent(
+                  selectedReportType,
+                  inq,
+                  ad,
+                  cb,
+                  selectedTimeFrame,
+                  ud,
+                  externalToolsUsage,
+                  startDate,
+                  timeFrame,
+                  timeCategoryCounts,
+                  customDateRange,
+                  isMobile: true,
+                  context: context,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+Widget buildSkeletonHeader({bool isMobile = false}) {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(18),
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.10),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          isMobile ? 18 : 24,
+          isMobile ? 18 : 22,
+          isMobile ? 18 : 24,
+          isMobile ? 18 : 22,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isMobile) ...[
+              _buildSkeletonHeaderTitle(isMobile: isMobile),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: SkeletonLoader(
+                      height: 40,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SkeletonLoader(
+                      height: 40,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SkeletonLoader(
+                height: 40,
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ] else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: _buildSkeletonHeaderTitle(isMobile: isMobile),
+                  ),
+                  const SizedBox(width: 18),
+                  Row(
+                    children: [
+                      SkeletonLoader(
+                        width: 168,
+                        height: 40,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      const SizedBox(width: 8),
+                      SkeletonLoader(
+                        width: 120,
+                        height: 40,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      const SizedBox(width: 8),
+                      SkeletonLoader(
+                        width: 104,
+                        height: 40,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFE2E8F0), height: 1),
+            const SizedBox(height: 14),
+            SkeletonLoader(height: 14, width: isMobile ? 260 : 340),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _buildSkeletonHeaderTitle({required bool isMobile}) {
+  return Row(
+    children: [
+      SkeletonLoader(
+        width: 42,
+        height: 42,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SkeletonLoader(
+              width: isMobile ? 190 : 240,
+              height: isMobile ? 20 : 24,
+            ),
+            const SizedBox(height: 8),
+            SkeletonLoader(width: isMobile ? 220 : 270, height: 13),
+          ],
+        ),
+      ),
+    ],
+  );
 }
 
 //  Build Skeleton based on Report Type
@@ -939,6 +1182,7 @@ class ReportsHelper {
     ChatbotUsageReportsData? cb,
     String selectedTimeFrame,
     UserDemographicsReportsData? ud,
+    ExternalToolsUsageSummary? externalToolsUsage,
     DateTime startDate,
     String timeFrame,
     Map<String, Map<String, int>> timeCategoryCounts,
@@ -974,6 +1218,16 @@ class ReportsHelper {
           context: context,
           isMobile: isMobile,
         );
+      case 'External Tools Usage':
+        return [
+          GeminiBillingSection(
+            timeFrame: selectedTimeFrame,
+            customDateRange: customDateRange,
+            initialData: externalToolsUsage,
+            showHeader: false,
+            showReportDetails: true,
+          ),
+        ];
       default:
         return buildInquiryTrendsReport(
           inq,
@@ -2503,14 +2757,14 @@ Widget buildHeader(
       double screenWidth = MediaQuery.of(context).size.width;
       bool isMobile = screenWidth < 600;
 
-      const greeting = '';
-
       String pageType =
           selectedReportType == 'Inquiry Trends'
               ? 'inquiry'
               : selectedReportType == 'Chatbot Usage'
               ? 'chatbot'
-              : 'demographics';
+              : selectedReportType == 'User Demographics'
+              ? 'demographics'
+              : 'external';
 
       final subtitle =
           selectedTimeFrame == 'Custom' && customDateRange != null
@@ -2521,143 +2775,187 @@ Widget buildHeader(
                 customDateRange,
               );
 
-      return Container(
-        padding: EdgeInsets.all(isMobile ? 18 : 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            isMobile
-                ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildGreetingBlock(greeting, userName, isMobile: true),
-                    const SizedBox(height: 16),
-                    _buildControlsRow(
-                      context,
-                      selectedTimeFrame,
-                      selectedReportType,
-                      onTimeFrameChanged,
-                      onReportTypeChanged,
-                      customDateRange,
-                      onDateRangeChanged,
-                      pageType,
-                      userName,
-                      inq,
-                      cb,
-                      ud,
-                      ad,
-                      isMobile: true,
-                    ),
-                  ],
-                )
-                : Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildGreetingBlock(greeting, userName, isMobile: false),
-                    _buildControlsRow(
-                      context,
-                      selectedTimeFrame,
-                      selectedReportType,
-                      onTimeFrameChanged,
-                      onReportTypeChanged,
-                      customDateRange,
-                      onDateRangeChanged,
-                      pageType,
-                      userName,
-                      inq,
-                      cb,
-                      ud,
-                      ad,
-                      isMobile: false,
-                    ),
-                  ],
-                ),
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFFE2E8F0), height: 1),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
-                  size: 14,
-                  color: const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
-                      fontWeight: FontWeight.w400,
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF6366F1).withOpacity(0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: isMobile ? 4 : 5,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                         Colors.green.withOpacity(0.65),
+                         Colors.green,
+                      ],
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isMobile ? 18 : 24,
+                  isMobile ? 18 : 22,
+                  isMobile ? 18 : 24,
+                  isMobile ? 18 : 22,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    isMobile
+                        ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildGreetingBlock(isMobile: true),
+                            const SizedBox(height: 16),
+                            _buildControlsRow(
+                              context,
+                              selectedTimeFrame,
+                              selectedReportType,
+                              onTimeFrameChanged,
+                              onReportTypeChanged,
+                              customDateRange,
+                              onDateRangeChanged,
+                              pageType,
+                              userName,
+                              inq,
+                              cb,
+                              ud,
+                              ad,
+                              isMobile: true,
+                            ),
+                          ],
+                        )
+                        : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: _buildGreetingBlock(isMobile: false),
+                            ),
+                            const SizedBox(width: 18),
+                            _buildControlsRow(
+                              context,
+                              selectedTimeFrame,
+                              selectedReportType,
+                              onTimeFrameChanged,
+                              onReportTypeChanged,
+                              customDateRange,
+                              onDateRangeChanged,
+                              pageType,
+                              userName,
+                              inq,
+                              cb,
+                              ud,
+                              ad,
+                              isMobile: false,
+                            ),
+                          ],
+                        ),
+                    const SizedBox(height: 16),
+                    const Divider(color: Color(0xFFE2E8F0), height: 1),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 14,
+                          color: const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       );
     },
   );
 }
 
-Widget _buildGreetingBlock(
-  String greeting,
-  String userName, {
-  required bool isMobile,
-}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
+Widget _buildGreetingBlock({required bool isMobile}) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFF6366F1).withOpacity(0.25),
-          borderRadius: BorderRadius.circular(20),
+          color: const Color.fromARGB(255, 240, 255, 238),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF6366F1).withOpacity(0.45),
+            color: Colors.green.withOpacity(0.18),
             width: 1,
           ),
         ),
-        child: const Text(
-          'Reports & Analytics',
-          style: TextStyle(
-            fontSize: 11,
-            color: Color(0xFF4F46E5),
-            fontWeight: FontWeight.w600,
-          ),
+        child: const Icon(
+          Icons.analytics_rounded,
+          color: Colors.green,
+          size: 20,
         ),
       ),
-      const SizedBox(height: 10),
-      Text(
-        'Data Overview',
-        style: TextStyle(
-          fontSize: isMobile ? 18 : 22,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF0F172A),
-          letterSpacing: -0.4,
-        ),
-      ),
-      const SizedBox(height: 3),
-      Text(
-        'Analyze and export system reports',
-        style: TextStyle(
-          fontSize: isMobile ? 12 : 13,
-          color: const Color(0xFF64748B),
-          fontWeight: FontWeight.w400,
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reports & Analytics',
+              style: TextStyle(
+                fontSize: isMobile ? 19 : 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              'Analyze and export system reports',
+              style: TextStyle(
+                fontSize: isMobile ? 12 : 13,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w400,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     ],
@@ -2687,7 +2985,12 @@ Widget _buildControlsRow(
         Row(
           children: [
             CustomDropdownButton(
-              items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+              items: [
+                'Inquiry Trends',
+                'Chatbot Usage',
+                'User Demographics',
+                'External Tools Usage',
+              ],
               initialValue: selectedReportType,
               onChanged: onReportTypeChanged,
             ),
@@ -2714,18 +3017,19 @@ Widget _buildControlsRow(
           ),
         ],
         const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ExportButton(
-            pageType: pageType,
-            timeFrame: selectedTimeFrame,
-            userName: userName,
-            inq: inq,
-            cb: cb,
-            ud: ud,
-            ad: ad,
+        if (pageType != 'external')
+          SizedBox(
+            width: double.infinity,
+            child: ExportButton(
+              pageType: pageType,
+              timeFrame: selectedTimeFrame,
+              userName: userName,
+              inq: inq,
+              cb: cb,
+              ud: ud,
+              ad: ad,
+            ),
           ),
-        ),
       ],
     );
   }
@@ -2733,7 +3037,12 @@ Widget _buildControlsRow(
   return Row(
     children: [
       CustomDropdownButton(
-        items: ['Inquiry Trends', 'Chatbot Usage', 'User Demographics'],
+        items: [
+          'Inquiry Trends',
+          'Chatbot Usage',
+          'User Demographics',
+          'External Tools Usage',
+        ],
         initialValue: selectedReportType,
         onChanged: onReportTypeChanged,
       ),
@@ -2758,15 +3067,16 @@ Widget _buildControlsRow(
         ),
       ],
       const SizedBox(width: 8),
-      ExportButton(
-        pageType: pageType,
-        timeFrame: selectedTimeFrame,
-        userName: userName,
-        inq: inq,
-        cb: cb,
-        ud: ud,
-        ad: ad,
-      ),
+      if (pageType != 'external')
+        ExportButton(
+          pageType: pageType,
+          timeFrame: selectedTimeFrame,
+          userName: userName,
+          inq: inq,
+          cb: cb,
+          ud: ud,
+          ad: ad,
+        ),
     ],
   );
 }
@@ -2791,6 +3101,8 @@ String _getReportDescription(
       return "Chatbot performance metrics and usage statistics $timeFrameText.";
     case 'User Demographics':
       return "User demographics and engagement patterns $timeFrameText.";
+    case 'External Tools Usage':
+      return "Gemini API billing and Firebase, Genkit, and Pinecone usage $timeFrameText.";
     default:
       return "Here's a complete reports and analytics of OASP Assist $timeFrameText.";
   }

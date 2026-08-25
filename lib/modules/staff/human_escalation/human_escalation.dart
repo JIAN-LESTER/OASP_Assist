@@ -491,15 +491,8 @@ class _HumanEscalationState extends State<HumanEscalation>
                       stream: _escalationsStream,
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
-                          return Container(
-                            height: isTablet ? 66 : 58,
-                            margin: EdgeInsets.only(bottom: isTablet ? 12 : 8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(
-                                isTablet ? 16 : 12,
-                              ),
-                            ),
+                          return _EscalationStatSkeletonRow(
+                            isCompact: !isTablet,
                           );
                         }
 
@@ -586,12 +579,7 @@ class _HumanEscalationState extends State<HumanEscalation>
                 stream: _escalationsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF0F172A),
-                        strokeWidth: 3,
-                      ),
-                    );
+                    return _EscalationListSkeleton(isCompact: !isTablet);
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -972,6 +960,112 @@ String _formatDateTime(Timestamp? timestamp) {
   final minute = date.minute.toString().padLeft(2, '0');
 
   return '${months[date.month - 1]} ${date.day}, ${date.year} ${hour}:${minute} $period';
+}
+
+class _EscalationStatSkeletonRow extends StatelessWidget {
+  final bool isCompact;
+
+  const _EscalationStatSkeletonRow({required this.isCompact});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: isCompact ? 8 : 12),
+      child: Row(
+        children: [
+          for (var i = 0; i < 3; i++) ...[
+            Expanded(
+              child: Container(
+                height: isCompact ? 58 : 66,
+                padding: EdgeInsets.all(isCompact ? 8 : 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FFFE),
+                  borderRadius: BorderRadius.circular(isCompact ? 10 : 12),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _EscalationSkeletonBox(width: isCompact ? 42 : 84, height: 12),
+                    const Spacer(),
+                    _EscalationSkeletonBox(width: 36, height: isCompact ? 16 : 20),
+                  ],
+                ),
+              ),
+            ),
+            if (i != 2) SizedBox(width: isCompact ? 6 : 10),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _EscalationListSkeleton extends StatelessWidget {
+  final bool isCompact;
+
+  const _EscalationListSkeleton({required this.isCompact});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: EdgeInsets.zero,
+      itemCount: 6,
+      separatorBuilder: (_, __) => SizedBox(height: isCompact ? 10 : 12),
+      itemBuilder:
+          (_, __) => Container(
+            padding: EdgeInsets.all(isCompact ? 12 : 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(isCompact ? 12 : 14),
+            ),
+            child: Row(
+              children: [
+                _EscalationSkeletonBox(width: isCompact ? 38 : 44, height: isCompact ? 38 : 44, radius: 12),
+                SizedBox(width: isCompact ? 12 : 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EscalationSkeletonBox(width: double.infinity, height: 14),
+                      const SizedBox(height: 8),
+                      _EscalationSkeletonBox(width: 180, height: 12),
+                    ],
+                  ),
+                ),
+                if (!isCompact) ...[
+                  const SizedBox(width: 16),
+                  _EscalationSkeletonBox(width: 90, height: 28, radius: 8),
+                ],
+              ],
+            ),
+          ),
+    );
+  }
+}
+
+class _EscalationSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _EscalationSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {

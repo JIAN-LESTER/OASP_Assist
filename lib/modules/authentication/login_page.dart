@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:capstone_project/components/square_tile.dart';
+import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
+import 'app_distribution_qr_button.dart';
 import 'forgot_password_page.dart';
 import 'onboarding/green_snow_animation.dart';
 import 'register_page.dart';
@@ -25,6 +27,7 @@ class _LoginPageState extends State<LoginPage>
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _showSigningInOverlay = false;
   bool _obscurePassword = true;
   String? _emailError;
   String? _passwordError;
@@ -127,7 +130,10 @@ class _LoginPageState extends State<LoginPage>
 
     if (!isEmailValid || !isPasswordValid) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _showSigningInOverlay = false;
+    });
 
     try {
       UserCredential userCredential = await FirebaseAuth.instance
@@ -142,26 +148,35 @@ class _LoginPageState extends State<LoginPage>
       final user = userCredential.user;
       if (user == null) {
         _setGeneralError('Sign in failed. Please try again.');
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _showSigningInOverlay = false;
+        });
         return;
       }
 
       if (!user.emailVerified) {
-        await FirebaseAuth.instance.signOut();
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isLoading = false;
+            _showSigningInOverlay = false;
+          });
           _setVerificationError(
             'Email not verified. Please check your inbox and verify your email address before signing in.',
           );
         }
+        await FirebaseAuth.instance.signOut();
         return;
       }
+
+      if (mounted) setState(() => _showSigningInOverlay = true);
 
       try {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .update({
+              'email': user.email ?? email,
               'isVerified': true,
               'emailVerified': true,
               'verifiedAt': FieldValue.serverTimestamp(),
@@ -226,7 +241,12 @@ class _LoginPageState extends State<LoginPage>
         'An unexpected error occurred. Please try again or contact support.',
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _showSigningInOverlay = false;
+        });
+      }
     }
   }
 
@@ -678,11 +698,13 @@ class _LoginPageState extends State<LoginPage>
         ),
       ],
     );
+    final maxLogoSize = MediaQuery.sizeOf(context).shortestSide * 0.28;
+    final effectiveIconSize = iconSize > maxLogoSize ? maxLogoSize : iconSize;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
         horizontal: horizontalPadding,
-        vertical: 40,
+        vertical: 10,
       ),
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
@@ -690,24 +712,27 @@ class _LoginPageState extends State<LoginPage>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: iconSize,
-              height: iconSize,
+              width: effectiveIconSize,
+              height: effectiveIconSize,
               child: Transform.scale(
-                scale: 1.8,
-                child: Image.asset(
-                  'lib/images/oasp.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Icon(
-                      Icons.smart_toy_outlined,
-                      color: primaryColor,
-                      size: iconSize * 0.8,
-                    );
-                  },
+                scale: 1.5,
+                child: Transform.translate(
+                  offset: Offset(0, effectiveIconSize * 0.14),
+                  child: Image.asset(
+                    'lib/images/oasp.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.smart_toy_outlined,
+                        color: primaryColor,
+                        size: effectiveIconSize * 0.5,
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 5),
             Text(
               "OASP Assist",
               style: TextStyle(
@@ -786,7 +811,11 @@ class _LoginPageState extends State<LoginPage>
               ),
             ),
           ),
-          GreenSnowAnimation(animation: _snowController, color: primaryColor),
+          GreenSnowAnimation(
+            animation: _snowController,
+            color: primaryColor,
+            flakeCount: 18,
+          ),
           child,
         ],
       ),
@@ -815,7 +844,7 @@ class _LoginPageState extends State<LoginPage>
     _snowController = AnimationController(
       duration: const Duration(seconds: 12),
       vsync: this,
-    )..repeat();
+    );
   }
 
   @override
@@ -835,34 +864,43 @@ class _LoginPageState extends State<LoginPage>
     return Scaffold(
       backgroundColor: const Color(0xFFEAF1FF),
       body: SafeArea(
-        child: ResponsiveLayout(
-          mobileBody: _buildMobileBody(),
-          tabletBody: _buildDecoratedBody(
-            child: Center(
-              child: _buildContent(
-                maxWidth: 500,
-                horizontalPadding: 32,
-                iconSize: 145,
-                titleFontSize: 28,
-                descriptionFontSize: 15,
-                cardPadding: 32,
-                useFormCard: true,
+        child: Stack(
+          children: [
+            ResponsiveLayout(
+              mobileBody: _buildMobileBody(),
+              tabletBody: _buildDecoratedBody(
+                child: Center(
+                  child: _buildContent(
+                    maxWidth: 500,
+                    horizontalPadding: 32,
+                    iconSize: 145,
+                    titleFontSize: 28,
+                    descriptionFontSize: 15,
+                    cardPadding: 32,
+                    useFormCard: true,
+                  ),
+                ),
+              ),
+              desktopBody: _buildDecoratedBody(
+                child: Center(
+                  child: _buildContent(
+                    maxWidth: 480,
+                    horizontalPadding: 40,
+                    iconSize: 155,
+                    titleFontSize: 32,
+                    descriptionFontSize: 16,
+                    cardPadding: 40,
+                    useFormCard: true,
+                  ),
+                ),
               ),
             ),
-          ),
-          desktopBody: _buildDecoratedBody(
-            child: Center(
-              child: _buildContent(
-                maxWidth: 480,
-                horizontalPadding: 40,
-                iconSize: 155,
-                titleFontSize: 32,
-                descriptionFontSize: 16,
-                cardPadding: 40,
-                useFormCard: true,
+            const AppDistributionQrButton(),
+            if (_showSigningInOverlay)
+              Positioned.fill(
+                child: buildContentLoadingOverlay('Signing in...'),
               ),
-            ),
-          ),
+          ],
         ),
       ),
     );

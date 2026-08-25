@@ -4,17 +4,17 @@ import 'package:http/http.dart' as http;
 import 'package:capstone_project/models/message.dart';
 
 class AnswerRetrievalService {
-  //  The Cloud Run URL for an onRequest function already IS the endpoint.
-  // Do NOT append '/generateAnswer' — that would 404.
-  // This URL is the full address exported as `generateAnswer` in index.ts.
+  // Use the stable Firebase Functions URL instead of the generated Cloud Run
+  // service URL, which can change after redeploys.
   final String cloudFunctionUrl =
-      'https://generateanswer-kt3rxdstza-uc.a.run.app';
+      'https://us-central1-cmu-oasp-assist.cloudfunctions.net/generateAnswer';
 
   /// Generate an answer using streaming for real-time response.
   Stream<String> generateAnswerStream(
     String question, {
     List<Message>? conversationHistory,
     String? conversationId,
+    bool isFAQSelection = false,
   }) async* {
     try {
       print(
@@ -25,8 +25,9 @@ class AnswerRetrievalService {
       final requestBody = {
         'query': question,
         'stream': true,
-        'topK': 8,
+        'topK': 5,
         'minSimilarityScore': 0.30,
+        'isFAQSelection': isFAQSelection,
         'conversationHistory':
             conversationHistory
                 ?.map((m) => {'sender': m.sender, 'content': m.content})
@@ -34,9 +35,9 @@ class AnswerRetrievalService {
             [],
       };
 
-      //  POST directly to cloudFunctionUrl — the function IS the endpoint.
       final request = http.Request('POST', Uri.parse(cloudFunctionUrl));
       request.headers['Content-Type'] = 'application/json';
+      request.headers['Accept'] = 'text/event-stream';
       request.body = json.encode(requestBody);
 
       final streamedResponse = await request.send();
@@ -44,43 +45,59 @@ class AnswerRetrievalService {
       if (streamedResponse.statusCode != 200) {
         final errorBody = await streamedResponse.stream.bytesToString();
         print(' HTTP Error ${streamedResponse.statusCode}: $errorBody');
-        yield 'I apologize, but I encountered an error processing your '
-            'request. Please try again.';
+        yield _extractAnswerFromJson(errorBody) ??
+            'I apologize, but I encountered an error processing your '
+                'request. Please try again.';
         return;
       }
 
       String fullAnswer = '';
       int chunkCount = 0;
       final startTime = DateTime.now();
+      final contentType = streamedResponse.headers['content-type'] ?? '';
 
-      await for (final line in streamedResponse.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
-        if (line.trim().isEmpty ||
-            line.startsWith('event:') ||
-            line == 'data: [DONE]') {
-          continue;
+      if (contentType.toLowerCase().contains('application/json')) {
+        final responseBody = await streamedResponse.stream.bytesToString();
+        final answer = _extractAnswerFromJson(responseBody);
+        if (answer != null && answer.isNotEmpty) {
+          yield answer;
+          return;
         }
 
-        String jsonStr = line.trim();
-        if (jsonStr.startsWith('data: ')) {
-          jsonStr = jsonStr.substring(6);
-        }
+        print(' Unexpected JSON response: $responseBody');
+        yield 'I apologize, but I was unable to generate a response. '
+            'Please try again.';
+        return;
+      }
 
-        if (jsonStr.isEmpty || jsonStr == '[DONE]') continue;
+      await for (final jsonStr in _decodeServerSentEvents(
+        streamedResponse.stream,
+      )) {
+        if (jsonStr == '[DONE]') break;
 
         try {
           final data = json.decode(jsonStr) as Map<String, dynamic>;
 
-          if (data['type'] == 'content-delta') {
-            final text =
-                data['delta']?['message']?['content']?['text'] as String?;
-
-            if (text != null && text.isNotEmpty) {
-              chunkCount++;
-              fullAnswer += text;
-              yield fullAnswer;
+          if (data['type'] == 'error') {
+            print(' Streaming error from server: ${data['error']}');
+            final errorAnswer = _extractAnswerFromDynamic(data);
+            if (fullAnswer.isEmpty &&
+                errorAnswer != null &&
+                errorAnswer.isNotEmpty) {
+              yield errorAnswer;
+            } else if (fullAnswer.isEmpty) {
+              yield 'I encountered an error processing your request. '
+                  'Please try again.';
             }
+            break;
+          }
+
+          final text = _extractStreamText(data);
+
+          if (text != null && text.isNotEmpty) {
+            chunkCount++;
+            fullAnswer += text;
+            yield fullAnswer;
           } else if (data['type'] == 'message-end') {
             final totalTime =
                 DateTime.now().difference(startTime).inMilliseconds;
@@ -88,13 +105,6 @@ class AnswerRetrievalService {
 
             if (fullAnswer.isNotEmpty) {
               yield fullAnswer;
-            }
-            break;
-          } else if (data['type'] == 'error') {
-            print(' Streaming error from server: ${data['error']}');
-            if (fullAnswer.isEmpty) {
-              yield 'I encountered an error processing your request. '
-                  'Please try again.';
             }
             break;
           }
@@ -120,6 +130,143 @@ class AnswerRetrievalService {
     }
   }
 
+  Stream<String> _decodeServerSentEvents(Stream<List<int>> byteStream) async* {
+    final buffer = StringBuffer();
+
+    await for (final chunk in byteStream.transform(utf8.decoder)) {
+      buffer.write(chunk);
+      var pending = buffer.toString();
+      var eventEnd = _firstEventBoundary(pending);
+
+      while (eventEnd != null) {
+        final rawEvent = pending.substring(0, eventEnd);
+        pending = pending.substring(_boundaryEndIndex(pending, eventEnd));
+
+        final dataLines = <String>[];
+        for (final rawLine in const LineSplitter().convert(rawEvent)) {
+          final line = rawLine.trimRight();
+          if (line.isEmpty || line.startsWith(':') || line.startsWith('event:')) {
+            continue;
+          }
+          if (line.startsWith('data:')) {
+            dataLines.add(line.substring(5).trimLeft());
+          }
+        }
+
+        final data = dataLines.join('\n').trim();
+        if (data.isNotEmpty) {
+          yield data;
+        }
+
+        eventEnd = _firstEventBoundary(pending);
+      }
+
+      buffer
+        ..clear()
+        ..write(pending);
+    }
+
+    final remaining = buffer.toString().trim();
+    if (remaining.isNotEmpty) {
+      for (final rawLine in const LineSplitter().convert(remaining)) {
+        final line = rawLine.trim();
+        if (line.startsWith('data:')) {
+          final data = line.substring(5).trimLeft();
+          if (data.isNotEmpty) yield data;
+        }
+      }
+    }
+  }
+
+  int? _firstEventBoundary(String text) {
+    final lf = text.indexOf('\n\n');
+    final crlf = text.indexOf('\r\n\r\n');
+
+    if (lf == -1) return crlf == -1 ? null : crlf;
+    if (crlf == -1) return lf;
+    return min(lf, crlf);
+  }
+
+  int _boundaryEndIndex(String text, int boundaryStart) {
+    if (text.startsWith('\r\n\r\n', boundaryStart)) {
+      return boundaryStart + 4;
+    }
+    return boundaryStart + 2;
+  }
+
+  String? _extractStreamText(Map<String, dynamic> data) {
+    final delta = data['delta'];
+    if (delta is Map) {
+      final message = delta['message'];
+      if (message is Map) {
+        final content = message['content'];
+        if (content is Map) {
+          final deltaText = content['text'];
+          if (deltaText is String) return deltaText;
+        }
+      }
+    }
+
+    final directText = data['text'];
+    if (directText is String) return directText;
+
+    final answer = data['answer'];
+    if (answer is String) return answer;
+
+    final candidates = data['candidates'];
+    if (candidates is List && candidates.isNotEmpty) {
+      final firstCandidate = candidates.first;
+      if (firstCandidate is Map) {
+        final content = firstCandidate['content'];
+        if (content is Map) {
+          final parts = content['parts'];
+          if (parts is List && parts.isNotEmpty) {
+            final firstPart = parts.first;
+            if (firstPart is Map) {
+              final text = firstPart['text'];
+              if (text is String) return text;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  String? _extractAnswerFromJson(String body) {
+    try {
+      final decoded = json.decode(body);
+      return _extractAnswerFromDynamic(decoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _extractAnswerFromDynamic(dynamic decoded) {
+    if (decoded is! Map<String, dynamic>) return null;
+
+    final answer = decoded['answer'];
+    if (answer is String && answer.trim().isNotEmpty) {
+      return answer.trim();
+    }
+
+    final message = decoded['message'];
+    if (message is String && message.trim().isNotEmpty) {
+      return message.trim();
+    }
+
+    final error = decoded['error'];
+    if (error is Map<String, dynamic>) {
+      final errorMessage = error['message'];
+      if (errorMessage is String && errorMessage.trim().isNotEmpty) {
+        return errorMessage.trim();
+      }
+    }
+
+    return null;
+  }
+
   /// Non-streaming fallback method (kept for compatibility).
   Future<String> generateAnswer(
     String query, {
@@ -127,6 +274,7 @@ class AnswerRetrievalService {
     String? conversationId,
     int topK = 5,
     double minSimilarityScore = 0.3,
+    bool isFAQSelection = false,
   }) async {
     try {
       print(' Generating answer for: "$query"');
@@ -143,9 +291,9 @@ class AnswerRetrievalService {
         'conversationId': conversationId,
         'topK': topK,
         'minSimilarityScore': minSimilarityScore,
+        'isFAQSelection': isFAQSelection,
       };
 
-      //  POST directly to cloudFunctionUrl (same as streaming path).
       final response = await http
           .post(
             Uri.parse(cloudFunctionUrl),

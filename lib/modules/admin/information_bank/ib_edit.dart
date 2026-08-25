@@ -7,7 +7,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:capstone_project/modules/admin/information_bank/ib_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -72,7 +71,6 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
 
   final FileService _fileService = FileService();
   final ImagePicker _imagePicker = ImagePicker();
-  final TextRecognizer _textRecognizer = TextRecognizer();
 
   bool _isProcessingFile = false;
   String? _uploadedFileName;
@@ -106,7 +104,6 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
   void dispose() {
     titleController.dispose();
     contentController.dispose();
-    _textRecognizer.close();
     super.dispose();
   }
 
@@ -158,80 +155,6 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 100,
-      );
-
-      if (image != null) {
-        await _processImage(image);
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarUtil.showError(context, 'Error picking image: $e');
-      }
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 100,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-
-      if (photo != null) {
-        await _processImage(photo);
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackbarUtil.showError(context, 'Error taking photo: $e');
-      }
-    }
-  }
-
-  Future<void> _processImage(XFile image) async {
-    setState(() => _isProcessingFile = true);
-
-    try {
-      final inputImage = InputImage.fromFilePath(image.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(
-        inputImage,
-      );
-
-      String extractedText = recognizedText.text;
-
-      if (extractedText.trim().isEmpty) {
-        if (mounted) {
-          SnackbarUtil.showWarning(context, 'No text found in image');
-        }
-        setState(() => _isProcessingFile = false);
-        return;
-      }
-
-      setState(() {
-        contentController.text = extractedText;
-        _uploadedFileName =
-            'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        _isProcessingFile = false;
-      });
-
-      if (mounted) {
-        SnackbarUtil.showSuccess(
-          context,
-          'Text extracted successfully! Found ${extractedText.split(' ').length} words',
-        );
-      }
-    } catch (e) {
-      setState(() => _isProcessingFile = false);
-      if (mounted) {
-        SnackbarUtil.showError(context, 'Error extracting text from image: $e');
-      }
-    }
-  }
 
   void _showUploadOptionsBottomSheet() {
     showModalBottomSheet(
@@ -301,27 +224,6 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
                     _pickFile();
                   },
                 ),
-                _buildUploadOption(
-                  icon: Icons.photo_library_outlined,
-                  title: 'Choose from Gallery',
-                  subtitle: 'Extract text from image',
-                  color: const Color(0xFF1976D2),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _pickImageFromGallery();
-                  },
-                ),
-                _buildUploadOption(
-                  icon: Icons.camera_alt_outlined,
-                  title: 'Take Photo',
-                  subtitle: 'Capture and extract text',
-                  color: const Color(0xFFED6C02),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _takePhoto();
-                  },
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -1007,14 +909,14 @@ class _EditIBModalContentState extends State<_EditIBModalContent> {
 Color _getCategoryColor(String category) {
   switch (category) {
     case 'Admission':
-      return const Color(0xFF3B82F6);
+      return const Color(0xFF10B981);
     case 'Scholarship':
       return const Color(0xFFF59E0B);
     case 'Placement':
-      return const Color(0xFFEF4444);
+      return const Color(0xFF3B82F6);
     case 'General':
     default:
-      return const Color(0xFF2E7D32);
+      return const Color(0xFF6B7280);
   }
 }
 
@@ -1123,20 +1025,20 @@ Future<void> _handleSaveChanges(
         if (feedbackContext.mounted) {
           SnackbarUtil.showError(
             feedbackContext,
-            'Failed to update document: $e',
+            'Document update failed: $e',
           );
         }
       }
     }());
 
-    SnackbarUtil.showInfo(context, 'Document update is running in background');
+    SnackbarUtil.showInfo(context, 'Document updated successfully');
     if (context.mounted) {
       Navigator.of(context).pop();
     }
   } catch (e) {
     print('Error updating document: $e');
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Failed to update document: $e');
+      SnackbarUtil.showError(context, 'Document update failed: $e');
     }
   }
 }

@@ -13,7 +13,7 @@ export const checkFacebookTokenExpiration = onSchedule(
   {
     schedule: "0 9 * * *", // Daily at 9 AM Manila time
     timeZone: "Asia/Manila",
-    region: "us-central1",
+    region: "asia-southeast1",
   },
   async (event) => {
     console.log("========================================");

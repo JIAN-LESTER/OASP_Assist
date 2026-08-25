@@ -1,6 +1,7 @@
 import 'package:capstone_project/buttons/add_user_button.dart';
 import 'package:capstone_project/buttons/bulk.dart';
 import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_management.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/pagination.dart';
 import 'package:capstone_project/widgets/role_dropdown_button.dart';
 import 'package:capstone_project/widgets/search_field.dart';
@@ -141,11 +142,11 @@ class _UserManagementPageState extends State<UserManagementPage>
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return ResponsiveLayout(
-      mobileBody: MobileUserManagement(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 4),
+      child: ResponsiveLayout(
+        mobileBody: MobileUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -164,8 +165,8 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      tabletBody: TabletUserManagement(
+        ),
+        tabletBody: TabletUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -183,8 +184,8 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      desktopBody: DesktopUserManagement(
+        ),
+        desktopBody: DesktopUserManagement(
         selectedRole: selectedRole,
         onRoleChanged: _onRoleChanged,
         searchController: _searchController,
@@ -202,6 +203,7 @@ class _UserManagementPageState extends State<UserManagementPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
+        ),
       ),
     );
   }
@@ -386,16 +388,12 @@ class MobileUserManagement extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('users')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
+        stream: usersStream,
         builder: (context, snapshot) {
           // Show loading only on first load
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
 
           if (snapshot.hasError) {
@@ -466,7 +464,12 @@ class MobileUserManagement extends StatelessWidget {
                         Expanded(
                           child:
                               allDocs.isEmpty
-                                  ? const Center(child: Text('No users found.'))
+                                  ? buildManagementEmptyState(
+                                    hasFilters: false,
+                                    isMobileOrTablet:
+                                        MediaQuery.of(context).size.width < 900,
+                                    item: 'Users',
+                                  )
                                   : _buildUserList(
                                     allUsers: allDocs,
                                     selectedRole: selectedRole,
@@ -480,6 +483,7 @@ class MobileUserManagement extends StatelessWidget {
                                     selectedIds: selectedIds,
                                     isSelectionMode: isSelectionMode,
                                     onToggleSelection: onToggleSelection,
+                                    context: context
                                   ),
                         ),
                       ],
@@ -520,16 +524,12 @@ Widget mainContent(
   return Scaffold(
     backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('users')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: usersStream,
       builder: (context, snapshot) {
         // Show loading only on first load
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {
@@ -597,7 +597,12 @@ Widget mainContent(
                       Expanded(
                         child:
                             allDocs.isEmpty
-                                ? const Center(child: Text('No users found.'))
+                                ? buildManagementEmptyState(
+                                  hasFilters: false,
+                                  isMobileOrTablet:
+                                      MediaQuery.of(context).size.width < 900,
+                                  item: 'Users',
+                                )
                                 : _buildUserList(
                                   allUsers: allDocs,
                                   selectedRole: selectedRole,
@@ -610,6 +615,7 @@ Widget mainContent(
                                   selectedIds: selectedIds,
                                   isSelectionMode: isSelectionMode,
                                   onToggleSelection: onToggleSelection,
+                                  context: context
                                 ),
                       ),
                     ],
@@ -700,6 +706,7 @@ Widget _buildUserList({
   required Set<String> selectedIds,
   required bool isSelectionMode,
   required Function(String) onToggleSelection,
+  required BuildContext context,
 }) {
   final filtered =
       allUsers.where((doc) {
@@ -738,8 +745,11 @@ Widget _buildUserList({
       Expanded(
         child:
             currentPageUsers.isEmpty
-                ? const Center(
-                  child: Text('No users match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters:
+                      searchQuery.isNotEmpty || selectedRole != 'All Roles',
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Users',
                 )
                 : ListView.builder(
                   shrinkWrap: false,

@@ -712,16 +712,16 @@ class _ManageProgramsContentState extends State<ManageProgramsContent> {
 
           _showTopRightAlert('Program deleted successfully', AlertType.success);
         } catch (e) {
-          _showTopRightAlert('Failed to delete program: $e', AlertType.error);
+          _showTopRightAlert('Program deletion failed: $e', AlertType.error);
         }
       }());
 
       _showTopRightAlert(
-        'Program deletion is running in background',
+        'Program deleted successfully',
         AlertType.info,
       );
     } catch (e) {
-      _showTopRightAlert('Failed to delete program: $e', AlertType.error);
+      _showTopRightAlert('Program deletion failed: $e', AlertType.error);
     }
   }
 }
@@ -947,14 +947,14 @@ class _AddEditProgramContentState extends State<AddEditProgramContent> {
       widget.onSaved();
 
       _showTopRightAlert(
-        'Program ${isEditing ? 'update' : 'creation'} is running in background',
+        'Program ${isEditing ? 'updated' : 'created'} successfully',
         AlertType.info,
       );
 
       Navigator.of(context).pop();
     } catch (e) {
       _showTopRightAlert(
-        'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+        'Program ${isEditing ? 'update' : 'creation'} failed: $e',
         AlertType.error,
       );
     } finally {

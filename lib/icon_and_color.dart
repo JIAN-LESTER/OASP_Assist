@@ -13,13 +13,13 @@ class CategoryStyle {
 CategoryStyle getCategoryStyle(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return CategoryStyle('Admission', Colors.blue, Colors.white);
+      return CategoryStyle('Admission', Colors.green, Colors.white);
     case 'scholarship':
-      return CategoryStyle('Scholarship', Colors.purple, Colors.white);
+      return CategoryStyle('Scholarship', Colors.amber, Colors.white);
     case 'placement':
-      return CategoryStyle('Placement', Colors.teal[600]!, Colors.white);
+      return CategoryStyle('Placement', Colors.blue, Colors.white);
     case 'general':
-      return CategoryStyle('General', Colors.green, Colors.white);
+      return CategoryStyle('General', Colors.grey, Colors.white);
     default:
       return CategoryStyle('Unknown', Colors.grey, Colors.white);
   }
@@ -104,15 +104,15 @@ IconData getCategoryIcon(String? category) {
 Color getCategoryColor(String? category) {
   switch (category?.toLowerCase()) {
     case 'admission':
-      return Colors.blue;
+      return Colors.green;
     case 'scholarship':
-      return Colors.purple;
+      return Colors.amber;
     case 'placement':
-      return Colors.teal[600]!;
+      return Colors.blue;
     case 'general':
-      return Colors.green;
+      return Colors.grey;
     default:
-      return Colors.green;
+      return Colors.grey;
   }
 }
 
