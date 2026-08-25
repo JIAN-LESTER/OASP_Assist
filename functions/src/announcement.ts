@@ -1790,6 +1790,12 @@ async function createInfoBankFromCategory(
                   {text: chunk.text},
                 ],
               },
+              taskType: "RETRIEVAL_DOCUMENT",
+              outputDimensionality: 768,
+              embedContentConfig: {
+                taskType: "RETRIEVAL_DOCUMENT",
+                outputDimensionality: 768,
+              },
             },
             {
               headers: {
@@ -2676,6 +2682,12 @@ async function syncCategoryToInfoBank(
               {text: chunk.text},
             ],
           },
+          taskType: "RETRIEVAL_DOCUMENT",
+          outputDimensionality: 768,
+          embedContentConfig: {
+            taskType: "RETRIEVAL_DOCUMENT",
+            outputDimensionality: 768,
+          },
         },
         {
           headers: {
@@ -3287,6 +3299,12 @@ export const fixAnnouncementInfoBankMetadata = onCall(
                   parts: [
                     {text: chunk.text},
                   ],
+                },
+                taskType: "RETRIEVAL_DOCUMENT",
+                outputDimensionality: 768,
+                embedContentConfig: {
+                  taskType: "RETRIEVAL_DOCUMENT",
+                  outputDimensionality: 768,
                 },
               },
               {

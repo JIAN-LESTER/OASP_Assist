@@ -42,10 +42,11 @@ function buildGeminiEmbeddingRequest(
   return {
     model: GEMINI_EMBEDDING_MODEL_RESOURCE,
     content: {parts: [{text}]},
+    taskType: normalizeEmbeddingTaskType(taskType),
+    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
     embedContentConfig: {
       taskType: normalizeEmbeddingTaskType(taskType),
       outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-      autoTruncate: true,
     },
   };
 }
@@ -153,7 +154,7 @@ export const generateGeminiResponse = onCall(
 
     try {
       const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.value()}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_API_KEY.value()}`,
         {
           contents: [{parts: [{text: prompt}]}],
           generationConfig: {

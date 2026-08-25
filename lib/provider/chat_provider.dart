@@ -2933,10 +2933,11 @@ $question
               {"text": question},
             ],
           },
+          "taskType": taskType,
+          "outputDimensionality": 768,
           "embedContentConfig": {
             "taskType": taskType,
             "outputDimensionality": 768,
-            "autoTruncate": true,
           },
         }),
       );

@@ -78,10 +78,11 @@ class CohereService {
               {'text': text},
             ],
           },
+          'taskType': taskType,
+          'outputDimensionality': 768,
           'embedContentConfig': {
             'taskType': taskType,
             'outputDimensionality': 768,
-            'autoTruncate': true,
           },
         }),
       );

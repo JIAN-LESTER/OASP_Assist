@@ -14,7 +14,7 @@ void main() async {
 
   // Generate text
   final response = await ai.generate(
-    model: googleAI.gemini('gemini-2.5-flash'),
+    model: googleAI.gemini('gemini-3.5-flash'),
     prompt: 'Tell me a joke about a developer.',
   );
 
@@ -35,7 +35,7 @@ final embeddings = await ai.embedMany(
 
 ## Image Generation
 
-The plugin also supports image generation models such as `gemini-2.5-flash-image`.
+The plugin also supports image generation models such as `gemini-3.5-flash-image`.
 
 ### Example (Nano Banana)
 
@@ -47,7 +47,7 @@ ai.defineFlow(
   outputSchema: Media.$schema,
   fn: (input, context) async {
     final response = await ai.generate(
-      model: googleAI.gemini('gemini-2.5-flash-image'),
+      model: googleAI.gemini('gemini-3.5-flash-image'),
       prompt: input,
     );
     if (response.media == null) {
@@ -72,7 +72,7 @@ ai.defineFlow(
   outputSchema: Media.$schema,
   fn: (prompt, _) async {
     final response = await ai.generate(
-      model: googleAI.gemini('gemini-2.5-flash-preview-tts'),
+      model: googleAI.gemini('gemini-3.5-flash-preview-tts'),
       prompt: prompt,
       config: GeminiTtsOptions(
         responseModalities: ['AUDIO'],

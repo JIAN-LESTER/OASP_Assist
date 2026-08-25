@@ -146,7 +146,7 @@ class GeminiService {
   Future<String> _generateResponseDesktop(String prompt) async {
     try {
       final chatUrl =
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey';
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey';
 
       final response = await http.post(
         Uri.parse(chatUrl),

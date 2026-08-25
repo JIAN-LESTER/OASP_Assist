@@ -68,7 +68,8 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
   });
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
 const MAX_CONTEXT_CHARS = 600;
 const MAX_HISTORY_CHARS = 140;
 const FAQ_SIMILARITY_THRESHOLD = 0.88;
@@ -117,10 +118,11 @@ function buildGeminiEmbeddingRequest(
     content: {
       parts: [{text}],
     },
+    taskType: normalizeEmbeddingTaskType(taskType),
+    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
     embedContentConfig: {
       taskType: normalizeEmbeddingTaskType(taskType),
       outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-      autoTruncate: true,
     },
   };
 }
@@ -854,50 +856,67 @@ async function generateGeminiResponse(
   prompt: string,
   apiKey: string
 ): Promise<string> {
-  try {
-    const response = await axios.post<JsonResponse>(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          topP: 0.95,
-          topK: 40,
+  let lastError: unknown;
+
+  for (const model of [GEMINI_MODEL, GEMINI_FALLBACK_MODEL]) {
+    try {
+      const response = await axios.post<JsonResponse>(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          contents: [{parts: [{text: prompt}]}],
+          generationConfig: {
+            temperature: 0.3,
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 1024,
+          },
         },
-      },
-      {
-        headers: {"Content-Type": "application/json"},
-        timeout: 30000,
+        {
+          headers: {"Content-Type": "application/json"},
+          timeout: 30000,
+        }
+      );
+
+      const data: any = response.data;
+      const text = extractGeminiText(data);
+
+      if (!text) {
+        throw new Error(
+          data?.promptFeedback?.blockReason ?
+            `Gemini blocked the prompt: ${data.promptFeedback.blockReason}` :
+            "Empty response from Gemini"
+        );
       }
-    );
 
+      const usageMetadata = data?.usageMetadata;
+      if (usageMetadata) {
+        await logGeminiUsage({
+          userId: null,
+          conversationId: null,
+          model,
+          inputTokens: usageMetadata.promptTokenCount ?? 0,
+          outputTokens: usageMetadata.candidatesTokenCount ?? 0,
+        }).catch(() => undefined);
+      }
 
-    if (response.status !== 200) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+      return text;
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Gemini ${model} response failed:`, getAxiosErrorMessage(error));
     }
-
-    const data: any = response.data;
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    const usageMetadata = data?.usageMetadata;
-    if (usageMetadata) {
-      await logGeminiUsage({
-        userId: null,
-        conversationId: null,
-        model: GEMINI_MODEL,
-        inputTokens: usageMetadata.promptTokenCount ?? 0,
-        outputTokens: usageMetadata.candidatesTokenCount ?? 0,
-      }).catch(() => undefined);
-    }
-
-    if (!text) {
-      throw new Error("Empty response from Gemini");
-    }
-
-    return text;
-  } catch (error) {
-    throw error;
   }
+
+  throw lastError instanceof Error ? lastError : new Error("Gemini response failed");
+}
+
+function extractGeminiText(data: any): string {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return "";
+
+  return parts
+    .map((part: any) => typeof part?.text === "string" ? part.text : "")
+    .filter((text: string) => text.length > 0)
+    .join("");
 }
 
 
@@ -917,6 +936,7 @@ async function* generateGeminiResponseStream(
             temperature: 0.3,
             topP: 0.95,
             topK: 40,
+            maxOutputTokens: 1024,
           },
         }),
       }
@@ -957,7 +977,7 @@ async function* generateGeminiResponseStream(
 
         try {
           const data = JSON.parse(jsonStr);
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          const text = extractGeminiText(data);
 
           if (text) {
             yield text;
@@ -969,6 +989,22 @@ async function* generateGeminiResponseStream(
           }
         } catch {
           continue;
+        }
+      }
+    }
+
+    // A final SSE event may not end with a newline.
+    const finalLine = buffer.trim();
+    if (finalLine && !finalLine.startsWith("event:") && finalLine !== "data: [DONE]") {
+      const jsonStr = finalLine.startsWith("data: ") ?
+        finalLine.substring(6) : finalLine;
+      if (jsonStr && jsonStr !== "[DONE]") {
+        try {
+          const data = JSON.parse(jsonStr);
+          const text = extractGeminiText(data);
+          if (text) yield text;
+        } catch {
+          // Ignore an incomplete final event.
         }
       }
     }

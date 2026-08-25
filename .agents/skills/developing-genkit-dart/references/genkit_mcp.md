@@ -27,14 +27,14 @@ void main() async {
 
   // Tools can be discovered and executed dynamically using a wildcard...
   final response = await ai.generate(
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     prompt: 'Summarize the contents of README.md',
     toolNames: ['my-host:tool/fs/*'],
   );
   
   // ...or by specifying the exact tool name
   final exactResponse = await ai.generate(
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     prompt: 'Read README.md',
     toolNames: ['my-host:tool/fs/read_file'],
   );
@@ -67,7 +67,7 @@ void main() async {
   final tools = await client.getActiveTools(ai);
   
   final response = await ai.generate(
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     prompt: 'Read the contents of README.md',
     tools: tools,
   );
