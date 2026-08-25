@@ -3347,7 +3347,7 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Welcome to OASP Assist!',
+                          'Chat with OASP Assist!',
                           style: TextStyle(
                             fontSize: isMobile ? 18 : 20,
                             fontWeight: FontWeight.w700,
