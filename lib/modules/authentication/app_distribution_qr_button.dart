@@ -19,7 +19,7 @@ class AppDistributionQrButton extends StatelessWidget {
   });
 
   static const String appDistributionUrl =
-      'https://appdistribution.firebase.google.com/testerapps/1:13855273820:android:ea1cd67d149ffc5cd94799/releases/3c6mfot5n0qc8?utm_source=firebase-console';
+      'https://appdistribution.firebase.dev/i/2bdf9f3a00790508';
   static const Color primaryColor = Color.fromARGB(255, 8, 121, 11);
   static const String primaryFontFamily = 'Poppins';
 
@@ -97,7 +97,7 @@ class AppDistributionQrButton extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Scan this QR code on your Android phone to download the application.',
+                    'Scan this QR code on your Android phone to open the Firebase download invitation.',
                     style: TextStyle(
                       fontFamily: primaryFontFamily,
                       fontSize: 14,
