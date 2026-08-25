@@ -6,6 +6,7 @@ import 'package:capstone_project/modules/admin/dashboard_and_reports/statcard_ma
 import 'package:capstone_project/modules/admin/information_bank/ib_format.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 import 'package:capstone_project/widgets/category_dropdown_button.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:capstone_project/widgets/pagination.dart';
 import 'package:capstone_project/widgets/search_field.dart';
 
@@ -20,6 +21,12 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+final Stream<QuerySnapshot> _informationBankStream =
+    FirebaseFirestore.instance
+        .collection('information_bank')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
 
 class InformationBankPage extends StatefulWidget {
   const InformationBankPage({super.key});
@@ -118,17 +125,28 @@ class _InformationBankPageState extends State<InformationBankPage>
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 3),
+      child: ResponsiveLayout(
+        mobileBody: MobileInformationBank(
+        selectedCategory: selectedCategory,
+        onCategoryChanged: _onCategoryChanged,
+        searchController: _searchController,
+        currentPage: currentPage,
+        itemsPerPage: itemsPerPage,
+        onPageChanged: _goToPage,
+        onItemsPerPageChanged: _changeItemsPerPage,
+        ib: ibData,
+        selectedIds: selectedIds,
+        isSelectionMode: isSelectionMode,
+        onToggleSelection: toggleSelection,
+        onToggleSelectAll: toggleSelectAll,
+        onClearSelection: clearSelection,
+        onBulkDelete: _handleBulkDelete,
+        isAllSelected: isAllSelected,
         ),
-      );
-    }
-
-    return ResponsiveLayout(
-      mobileBody: MobileInformationBank(
+        tabletBody: TabletInformationBank(
         selectedCategory: selectedCategory,
         onCategoryChanged: _onCategoryChanged,
         searchController: _searchController,
@@ -144,8 +162,8 @@ class _InformationBankPageState extends State<InformationBankPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      tabletBody: TabletInformationBank(
+        ),
+        desktopBody: DesktopInformationBank(
         selectedCategory: selectedCategory,
         onCategoryChanged: _onCategoryChanged,
         searchController: _searchController,
@@ -161,23 +179,7 @@ class _InformationBankPageState extends State<InformationBankPage>
         onClearSelection: clearSelection,
         onBulkDelete: _handleBulkDelete,
         isAllSelected: isAllSelected,
-      ),
-      desktopBody: DesktopInformationBank(
-        selectedCategory: selectedCategory,
-        onCategoryChanged: _onCategoryChanged,
-        searchController: _searchController,
-        currentPage: currentPage,
-        itemsPerPage: itemsPerPage,
-        onPageChanged: _goToPage,
-        onItemsPerPageChanged: _changeItemsPerPage,
-        ib: ibData,
-        selectedIds: selectedIds,
-        isSelectionMode: isSelectionMode,
-        onToggleSelection: toggleSelection,
-        onToggleSelectAll: toggleSelectAll,
-        onClearSelection: clearSelection,
-        onBulkDelete: _handleBulkDelete,
-        isAllSelected: isAllSelected,
+        ),
       ),
     );
   }
@@ -344,16 +346,12 @@ class MobileInformationBank extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance
-                .collection('information_bank')
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
+        stream: _informationBankStream,
         builder: (context, snapshot) {
           // Show loading only on first load
           if (!snapshot.hasData &&
               snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const SizedBox.shrink();
           }
 
           if (snapshot.hasError) {
@@ -422,8 +420,11 @@ class MobileInformationBank extends StatelessWidget {
                         Expanded(
                           child:
                               allDocs.isEmpty
-                                  ? const Center(
-                                    child: Text('No documents found.'),
+                                  ? buildManagementEmptyState(
+                                    hasFilters: false,
+                                    isMobileOrTablet:
+                                        MediaQuery.of(context).size.width < 900,
+                                    item: 'Documents',
                                   )
                                   : _buildIBList(
                                     context: context,
@@ -474,16 +475,12 @@ Widget mainContent(
   return Scaffold(
     backgroundColor: const Color(0xFFF0F4F8),
     body: StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('information_bank')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+      stream: _informationBankStream,
       builder: (context, snapshot) {
         // Show loading only on first load
         if (!snapshot.hasData &&
             snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {
@@ -550,8 +547,11 @@ Widget mainContent(
                       Expanded(
                         child:
                             allDocs.isEmpty
-                                ? const Center(
-                                  child: Text('No documents found.'),
+                                ? buildManagementEmptyState(
+                                  hasFilters: false,
+                                  isMobileOrTablet:
+                                      MediaQuery.of(context).size.width < 900,
+                                  item: 'Documents',
                                 )
                                 : _buildIBList(
                                   context: context,
@@ -916,8 +916,12 @@ Widget _buildIBList({
       Expanded(
         child:
             currentPageIB.isEmpty
-                ? const Center(
-                  child: Text('No documents match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters:
+                      searchQuery.isNotEmpty ||
+                      selectedCategory != 'All Categories',
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Documents',
                 )
                 : ListView.builder(
                   shrinkWrap: false,

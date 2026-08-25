@@ -14,8 +14,7 @@ Widget buildPersistentDrawerItem({
   bool isSubItem = false,
 }) {
   final bool isSelected = selectedIndex == index && !isLogout;
-  final bool isServiceSelected =
-      (selectedIndex >= 8 && selectedIndex <= 10) && isServiceGroup;
+  final bool isServiceSelected = false;
 
   Widget itemContent = Container(
     margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -40,10 +39,9 @@ Widget buildPersistentDrawerItem({
 
           // For group items (negative indices), close OTHER groups only
           if (index < 0) {
-            if (index != -3)
+            if (index != -1)
               PersistentDrawerState.setUserManagementExpanded(false);
-            if (index != -1) PersistentDrawerState.setServicesExpanded(false);
-            if (index != -2) PersistentDrawerState.setLogsExpanded(false);
+            if (index != -3) PersistentDrawerState.setLogsExpanded(false);
 
             bool currentState = PersistentDrawerState.getExpansionState(index);
             PersistentDrawerState.setExpansionState(index, !currentState);

@@ -6,21 +6,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:capstone_project/utils/snackbar_util.dart';
 
-import 'package:capstone_project/models/admissions.dart';
-import 'package:capstone_project/models/placement.dart';
-import 'package:capstone_project/models/scholarships.dart';
-import 'package:capstone_project/services/cohere_service.dart';
+
 import 'package:capstone_project/services/file_service2.dart';
 import 'package:uuid/uuid.dart';
 import 'package:capstone_project/models/info_bank.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
 
-void showUploadDocumentModal(BuildContext context) {
+void showUploadDocumentModal(BuildContext context, {String? initialCategory}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -28,7 +24,7 @@ void showUploadDocumentModal(BuildContext context) {
     barrierColor: Colors.black.withOpacity(0.5),
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return const UploadDocumentModal();
+      return UploadDocumentModal(initialCategory: initialCategory);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
@@ -48,7 +44,9 @@ void showUploadDocumentModal(BuildContext context) {
 }
 
 class UploadDocumentModal extends StatelessWidget {
-  const UploadDocumentModal({super.key});
+  final String? initialCategory;
+
+  const UploadDocumentModal({super.key, this.initialCategory});
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +115,7 @@ class UploadDocumentModal extends StatelessWidget {
               isMobile: isMobile,
               isTablet: isTablet,
               isDesktop: isDesktop,
+              initialCategory: initialCategory,
             ),
           ),
         ),
@@ -129,12 +128,14 @@ class UploadDocumentContent extends StatefulWidget {
   final bool isMobile;
   final bool isTablet;
   final bool isDesktop;
+  final String? initialCategory;
 
   const UploadDocumentContent({
     Key? key,
     required this.isMobile,
     required this.isTablet,
     required this.isDesktop,
+    this.initialCategory,
   }) : super(key: key);
 
   @override
@@ -144,10 +145,8 @@ class UploadDocumentContent extends StatefulWidget {
 class _UploadDocumentContentState extends State<UploadDocumentContent> {
   final FileService _fileService = FileService();
   final TextEditingController _titleController = TextEditingController();
-  final CohereService _cohereService = CohereService();
   final TextEditingController _categoryController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  final TextRecognizer _textRecognizer = TextRecognizer();
 
   String? _selectedFileName;
   String? _extractedText;
@@ -171,10 +170,18 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final initialCategory = widget.initialCategory;
+    if (initialCategory != null && initialCategory.trim().isNotEmpty) {
+      _categoryController.text = initialCategory;
+    }
+  }
+
+  @override
   void dispose() {
     _titleController.dispose();
     _categoryController.dispose();
-    _textRecognizer.close();
     super.dispose();
   }
 
@@ -263,87 +270,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 100,
-      );
-
-      if (image != null) {
-        await _processImage(image);
-      }
-    } catch (e) {
-      SnackbarUtil.showError(context, 'Error picking image: $e');
-    }
-  }
-
-  Future<void> _takePhoto() async {
-    try {
-      final XFile? photo = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 100,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-
-      if (photo != null) {
-        await _processImage(photo);
-      }
-    } catch (e) {
-      SnackbarUtil.showError(context, 'Error taking photo: $e');
-    }
-  }
-
-  Future<void> _processImage(XFile image) async {
-    setState(() {
-      _isProcessingImage = true;
-      _fileReady = false;
-      _extractedText = null;
-      _fileError = null; // Clear file error
-    });
-
-    try {
-      final inputImage = InputImage.fromFilePath(image.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(
-        inputImage,
-      );
-
-      String extractedText = recognizedText.text;
-
-      if (extractedText.trim().isEmpty) {
-        SnackbarUtil.showWarning(context, 'No text found in image');
-        setState(() {
-          _isProcessingImage = false;
-          _fileReady = false;
-        });
-        return;
-      }
-
-      final fileName = 'Image_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      setState(() {
-        _selectedFileName = fileName;
-        _extractedText = extractedText;
-        _fileReady = true;
-        _isProcessingImage = false;
-        _titleController.text =
-            'Document from Image ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}';
-      });
-
-      SnackbarUtil.showSuccess(
-        context,
-        'Text extracted successfully! Found ${extractedText.split(' ').length} words',
-      );
-    } catch (e) {
-      setState(() {
-        _isProcessingImage = false;
-        _fileReady = false;
-        _extractedText = null;
-      });
-      SnackbarUtil.showError(context, 'Error extracting text from image: $e');
-    }
-  }
-
   void _showUploadOptionsBottomSheet() {
     if (widget.isMobile) {
       showModalBottomSheet(
@@ -413,27 +339,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
                       _pickFile();
                     },
                   ),
-                  _buildUploadOption(
-                    icon: Icons.photo_library_outlined,
-                    title: 'Choose from Gallery',
-                    subtitle: 'Extract text from image',
-                    color: Color(0xFF1976D2),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pickImageFromGallery();
-                    },
-                  ),
-                  _buildUploadOption(
-                    icon: Icons.camera_alt_outlined,
-                    title: 'Take Photo',
-                    subtitle: 'Capture and extract text',
-                    color: Color(0xFFED6C02),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _takePhoto();
-                    },
-                  ),
-                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -592,195 +497,6 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
             isFromUpload: true,
           );
 
-          switch (category) {
-            case 'Admission':
-              print(" Analyzing admission document...");
-              final admissionCohere = await _cohereService.analyzeAdmission(
-                extractedText,
-              );
-
-              print(" Admission analysis result: $admissionCohere");
-
-              List<String>? contactsList;
-              try {
-                if (admissionCohere['contacts'] is List<Map<String, dynamic>>) {
-                  List<Map<String, dynamic>> contactsData =
-                      admissionCohere['contacts'] as List<Map<String, dynamic>>;
-                  if (contactsData.isNotEmpty) {
-                    contactsList =
-                        contactsData.map((contact) {
-                          String type = contact['type']?.toString() ?? '';
-                          String value = contact['value']?.toString() ?? '';
-                          return '$type: $value';
-                        }).toList();
-                  }
-                }
-              } catch (e) {
-                print(" Error processing contacts: $e");
-                contactsList = null;
-              }
-
-              List<String> stepsList = <String>[];
-              try {
-                if (admissionCohere['steps'] is List<String>) {
-                  stepsList = admissionCohere['steps'] as List<String>;
-                } else if (admissionCohere['steps'] is List) {
-                  stepsList =
-                      (admissionCohere['steps'] as List)
-                          .map((e) => e.toString())
-                          .toList();
-                }
-              } catch (e) {
-                print(" Error processing steps: $e");
-                stepsList = <String>[];
-              }
-
-              final admissions = Admissions(
-                id: documentId,
-                steps: stepsList,
-                requirements: admissionCohere['requirements'],
-                title: title,
-                content: extractedText,
-                contact: contactsList,
-                academicYear: admissionCohere['academicYear'],
-                links: admissionCohere['links'],
-                source: selectedFileName,
-                createdAt: DateTime.now(),
-              );
-
-              await _fileService.saveToAdmission(
-                admissions,
-                sourceDocumentId: documentId,
-              );
-              break;
-
-            case 'Scholarship':
-              print(" Analyzing scholarship document...");
-              final scholarshipCohere = await _cohereService.analyzeScholarship(
-                extractedText,
-              );
-
-          if (scholarshipCohere['scholarships'] is List &&
-              scholarshipCohere['scholarships'].isNotEmpty) {
-            List<dynamic> scholarshipDataList =
-                scholarshipCohere['scholarships'];
-            List<Scholarship> scholarships = [];
-
-            for (int i = 0; i < scholarshipDataList.length; i++) {
-              final scholarshipData = scholarshipDataList[i];
-              final scholarshipId = i == 0 ? documentId : '${documentId}_$i';
-
-              final scholarship = Scholarship(
-                scholarshipID: scholarshipId,
-                sourceId: scholarshipId,
-                name: scholarshipData['name'] ?? 'Unnamed Scholarship',
-                description:
-                    scholarshipData['description'] ??
-                    'No description available',
-                scholarshipProvider:
-                    scholarshipData['scholarshipProvider'] ??
-                    'Unknown Provider',
-                eligibilityRequirements:
-                    scholarshipData['eligibilityRequirements'] ?? <String>[],
-                privileges: scholarshipData['privileges'] ?? <String>[],
-                deadline: scholarshipCohere['deadline'],
-                applicationLink: scholarshipData['application_link'] ?? '',
-                createdAt: DateTime.now(),
-              );
-
-              scholarships.add(scholarship);
-            }
-
-            await _fileService.saveMultipleScholarships(
-              scholarships,
-              sourceDocumentId: documentId,
-            );
-
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showSuccess(
-                feedbackContext,
-                'Found and saved ${scholarships.length} scholarship(s)!',
-              );
-            }
-          } else {
-            print(" No scholarships found in the document");
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showWarning(
-                feedbackContext,
-                'No scholarships found in the document',
-              );
-            }
-          }
-          break;
-
-            case 'Placement':
-              print(" Analyzing placement document...");
-              final placementCohere = await _cohereService.analyzePlacement(
-                extractedText,
-              );
-
-          if (placementCohere['placements'] is List &&
-              placementCohere['placements'].isNotEmpty) {
-            List<dynamic> placementDataList = placementCohere['placements'];
-            List<Placement> placements = [];
-
-            for (int i = 0; i < placementDataList.length; i++) {
-              final placementData = placementDataList[i];
-              final placementId = i == 0 ? documentId : '${documentId}_$i';
-
-              final placement = Placement(
-                placementID: placementId,
-                isRecruiting: true,
-                partnerCompany:
-                    placementData['partnerCompany'] ?? 'Unnamed Placement',
-                contacts:
-                    placementData['contacts'] is List
-                        ? List<String>.from(
-                          placementData['contacts'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                positions:
-                    placementData['positions'] is List
-                        ? List<String>.from(
-                          placementData['positions'].map((e) => e.toString()),
-                        )
-                        : <String>[],
-                createdAt:
-                    DateTime.tryParse(placementData['createdAt'] ?? '') ??
-                    DateTime.now(),
-              );
-
-              placements.add(placement);
-            }
-
-            await _fileService.saveMultiplePlacements(
-              placements,
-              sourceDocumentId: documentId,
-            );
-
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showSuccess(
-                feedbackContext,
-                'Found and saved ${placements.length} placement(s)!',
-              );
-            }
-          } else {
-            print(" No placements found in the document");
-            if (feedbackContext.mounted) {
-              SnackbarUtil.showWarning(
-                feedbackContext,
-                'No placements found in the document',
-              );
-            }
-          }
-          break;
-
-            default:
-          print(
-            " Category '$category' does not require special processing",
-          );
-          break;
-      }
 
           await _logUploadAction(title);
 
@@ -793,16 +509,16 @@ class _UploadDocumentContentState extends State<UploadDocumentContent> {
         } catch (e) {
           print(" Upload error: $e");
           if (feedbackContext.mounted) {
-            SnackbarUtil.showError(feedbackContext, 'Upload failed: $e');
+            SnackbarUtil.showError(feedbackContext, 'Document upload failed: $e');
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'Document upload is running in background');
+      SnackbarUtil.showInfo(context, 'Document uploaded successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
       print(" Upload error: $e");
-      SnackbarUtil.showError(context, 'Upload failed: $e');
+      SnackbarUtil.showError(context, 'Document upload failed: $e');
     }
   }
 

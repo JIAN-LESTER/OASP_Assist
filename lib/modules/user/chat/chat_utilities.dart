@@ -731,7 +731,7 @@ class _MessageLimitDialogState extends State<MessageLimitDialog>
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Text(
-                      'You\'ve used all 5 messages today',
+                      'You\'ve used all 3 messages today',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 15,

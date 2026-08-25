@@ -61,10 +61,18 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   bool isRefreshing = false;
   String selectedCategory = 'All Categories';
   final TextEditingController _searchController = TextEditingController();
+  late final Stream<QuerySnapshot> _recentAnnouncementsStream;
 
   @override
   void initState() {
     super.initState();
+    _recentAnnouncementsStream =
+        FirebaseFirestore.instance
+            .collection('announcements')
+            .where('deleted', isEqualTo: false)
+            .orderBy('created_time', descending: true)
+            .limit(5)
+            .snapshots();
     _loadAnnouncements();
   }
 
@@ -375,8 +383,9 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                 // header
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Search field
                       Expanded(child: _buildSearchField()),
@@ -393,6 +402,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
                                   setState(() => selectedCategory = value),
                         ),
                       ),
+                      const SizedBox(width: 16),
                       _buildRefreshButton(isDesktop: true),
                     ],
                   ),
@@ -546,26 +556,7 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
   // MAIN CONTENT
   Widget _buildMainContent({required bool isDesktop}) {
     if (isLoading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.green[600]!),
-              strokeWidth: 3,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Loading announcements...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
+      return _AnnouncementListSkeleton(isDesktop: isDesktop);
     }
 
     final displayedAnnouncements = filteredAnnouncements;
@@ -626,7 +617,9 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
       color: Colors.green[600],
       child: ListView.builder(
         padding:
-            isDesktop ? const EdgeInsets.fromLTRB(0, 0, 0, 32) : EdgeInsets.zero,
+            isDesktop
+                ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+                : const EdgeInsets.symmetric(horizontal: 20),
         itemCount: displayedAnnouncements.length,
         itemBuilder: (context, index) {
           return Padding(
@@ -677,18 +670,10 @@ class _StaffAnnouncementState extends State<StaffAnnouncementPage> {
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('announcements')
-                        .where('deleted', isEqualTo: false)
-                        .orderBy('created_time', descending: true)
-                        .limit(5)
-                        .snapshots(),
+                stream: _recentAnnouncementsStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    );
+                    return const _AnnouncementSidebarSkeleton();
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1789,6 +1774,113 @@ class FullScreenImageGallery extends StatefulWidget {
 
   @override
   State<FullScreenImageGallery> createState() => _FullScreenImageGalleryState();
+}
+
+class _AnnouncementListSkeleton extends StatelessWidget {
+  final bool isDesktop;
+
+  const _AnnouncementListSkeleton({required this.isDesktop});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding:
+          isDesktop
+              ? const EdgeInsets.fromLTRB(32, 0, 32, 32)
+              : const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 5,
+      separatorBuilder: (_, __) => SizedBox(height: isDesktop ? 24 : 16),
+      itemBuilder: (_, __) => const _AnnouncementSkeletonCard(),
+    );
+  }
+}
+
+class _AnnouncementSidebarSkeleton extends StatelessWidget {
+  const _AnnouncementSidebarSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      itemCount: 5,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder:
+          (_, __) => const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+              SizedBox(height: 8),
+              _AnnouncementSkeletonBox(width: 130, height: 12),
+            ],
+          ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonCard extends StatelessWidget {
+  const _AnnouncementSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _AnnouncementSkeletonBox(width: 42, height: 42, radius: 12),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _AnnouncementSkeletonBox(width: 160, height: 16),
+                    SizedBox(height: 8),
+                    _AnnouncementSkeletonBox(width: 110, height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 18),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: double.infinity, height: 14),
+          SizedBox(height: 10),
+          _AnnouncementSkeletonBox(width: 220, height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _AnnouncementSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
 }
 
 class TopRightAlert extends StatefulWidget {

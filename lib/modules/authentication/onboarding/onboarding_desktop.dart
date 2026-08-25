@@ -686,8 +686,8 @@ class _OnboardingDesktopState extends State<OnboardingDesktop>
             _buildStepItem(
               Icons.explore_rounded,
               'Step 3',
-              'Explore Services',
-              'Browse resources and access OASP Assist features.',
+              'View Announcements',
+              'Browse updates and access OASP Assist features.',
               true,
             ),
           ],

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:capstone_project/modules/admin/faqs/faq_info.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
+import 'package:capstone_project/utils/faq_text_normalizer.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
 
 void showEditFAQModal(
@@ -555,14 +556,14 @@ Widget _buildActionButtons(
 Color _getCategoryColor(String category) {
   switch (category) {
     case 'Admission':
-      return const Color(0xFF3B82F6);
+      return const Color(0xFF10B981);
     case 'Scholarship':
       return const Color(0xFFF59E0B);
     case 'Placement':
-      return const Color(0xFFEF4444);
+      return const Color(0xFF3B82F6);
     case 'General':
     default:
-      return const Color(0xFF2E7D32);
+      return const Color(0xFF6B7280);
   }
 }
 
@@ -583,6 +584,7 @@ Future<void> _handleSaveChanges(
       try {
         await FirebaseFirestore.instance.collection('faqs').doc(userDoc.id).update({
           'question': question,
+          'questionNormalized': normalizeFaqQuestion(question),
           'answer': answer,
           'category': category,
           'updatedAt': Timestamp.now(),
@@ -630,19 +632,19 @@ Future<void> _handleSaveChanges(
         if (feedbackContext.mounted) {
           SnackbarUtil.showError(
             feedbackContext,
-            'Failed to update: ${e.toString()}',
+            'FAQ update failed: ${e.toString()}',
           );
         }
       }
     }());
 
-    SnackbarUtil.showInfo(context, 'FAQ update is running in background');
+    SnackbarUtil.showInfo(context, 'FAQ updated successfully');
     if (context.mounted) {
       Navigator.of(context).pop();
     }
   } catch (e) {
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Failed to update: ${e.toString()}');
+      SnackbarUtil.showError(context, 'FAQ update failed: ${e.toString()}');
     }
   }
 }

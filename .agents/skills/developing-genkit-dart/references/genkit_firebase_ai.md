@@ -14,7 +14,7 @@ void main() async {
 
   // Generate text
   final response = await ai.generate(
-    model: firebaseAI.gemini('gemini-2.5-flash'),
+    model: firebaseAI.gemini('gemini-3.5-flash'),
     prompt: 'Tell me a joke about a developer.',
   );
 

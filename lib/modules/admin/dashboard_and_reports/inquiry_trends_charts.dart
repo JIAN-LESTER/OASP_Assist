@@ -28,13 +28,13 @@ Color _getFAQBarColor(int index, int total) {
 Color _getColorForCategory(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return const Color(0xff3b82f6); // Blue
-    case 'scholarship':
       return const Color(0xff10b981); // Green
+    case 'scholarship':
+      return const Color(0xfff59e0b); // Yellow
     case 'placement':
-      return const Color(0xfff59e0b); // Amber
+      return const Color(0xff3b82f6); // Blue
     case 'general':
-      return const Color(0xff8b5cf6); // Purple
+      return const Color(0xff6b7280); // Gray
     default:
       return const Color(0xff6b7280); // Gray
   }
@@ -1114,13 +1114,13 @@ List<LineChartBarData> _generateLineChartBars(
 Color getColorForCategory(String category) {
   switch (category.toLowerCase()) {
     case 'admission':
-      return const Color(0xff3b82f6);
-    case 'scholarship':
       return const Color(0xff10b981);
-    case 'placement':
+    case 'scholarship':
       return const Color(0xfff59e0b);
+    case 'placement':
+      return const Color(0xff3b82f6);
     case 'general':
-      return const Color(0xff8b5cf6);
+      return const Color(0xff6b7280);
     default:
       return const Color(0xff6b7280);
   }
@@ -1165,10 +1165,10 @@ double getBottomTitleInterval(
     if (daysDiff == 0) {
       // Hourly: show every 3-4 hours
       return dataLength <= 24 ? 3.0 : 4.0;
-    } else if (daysDiff <= 7) {
-      // Daily: show all days if 7 or fewer
-      return 1.0;
     } else if (daysDiff <= 31) {
+      // Daily: show all days if 31 or fewer
+      return 1.0;
+    } else if (daysDiff <= 90) {
       // Weekly: show all weeks
       return 1.0;
     } else {
@@ -1216,10 +1216,10 @@ String formatBottomTitle(
         return "${hour - 12}PM";
       }
       return date;
-    } else if (daysDiff <= 7) {
+    } else if (daysDiff <= 31) {
       // Daily format: already formatted as "Mon", "Tue", etc.
       return date;
-    } else if (daysDiff <= 31) {
+    } else if (daysDiff <= 90) {
       // Weekly format: "W1", "W2", etc.
 
       return date;
@@ -1258,8 +1258,8 @@ String formatBottomTitle(
 //     final daysDiff = endDate.difference(startDate).inDays;
 
 //     if (daysDiff == 0) return 'by hour';
-//     if (daysDiff <= 7) return 'by day';
-//     if (daysDiff <= 31) return 'by week';
+//     if (daysDiff <= 31) return 'by day';
+//     if (daysDiff <= 90) return 'by week';
 //     return 'by month';
 //   }
 

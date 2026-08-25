@@ -20,7 +20,7 @@ class GeminiService {
       _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
       if (_apiKey.isEmpty) {
-        throw Exception('Gemini API key not found in .env file');
+        throw Exception('Gemini API access is not configured for this client.');
       }
 
       _embedUrl =
@@ -76,7 +76,11 @@ class GeminiService {
               {'text': text},
             ],
           },
-          'outputDimensionality': 768,
+          'embedContentConfig': {
+            'taskType': taskType,
+            'outputDimensionality': 768,
+            'autoTruncate': true,
+          },
         }),
       );
 
@@ -142,7 +146,7 @@ class GeminiService {
   Future<String> _generateResponseDesktop(String prompt) async {
     try {
       final chatUrl =
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$_apiKey';
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey';
 
       final response = await http.post(
         Uri.parse(chatUrl),
@@ -155,7 +159,6 @@ class GeminiService {
               ],
             },
           ],
-          'outputDimensionality': 768,
           'generationConfig': {'temperature': 0.3, 'maxOutputTokens': 1024},
         }),
       );

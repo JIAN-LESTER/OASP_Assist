@@ -739,16 +739,16 @@ class _AddUserContentState extends State<AddUserContent> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to create user account: ${e.toString()}',
+              'User creation failed: ${e.toString()}',
             );
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'User creation is running in background');
+      SnackbarUtil.showInfo(context, 'User created successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
-      SnackbarUtil.showError(context, 'Failed to start user creation: $e');
+      SnackbarUtil.showError(context, 'User creation failed: $e');
       if (mounted) {
         setState(() {
           _isSubmitting = false;

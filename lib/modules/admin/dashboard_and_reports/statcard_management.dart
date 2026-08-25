@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:capstone_project/services/firebase_usage_logger.dart';
 
 Widget buildCompactStatCard(
   String title,
@@ -11,6 +12,64 @@ Widget buildCompactStatCard(
     builder: (context, constraints) {
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 600;
+
+      if (isMobile) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFBFDFB),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFC7DCCD)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF4F1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: const Color(0xFF6B7470), size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0,
+                        height: 1.1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                        letterSpacing: 0,
+                        height: 1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
 
       return Container(
         padding: EdgeInsets.symmetric(
@@ -97,6 +156,444 @@ Widget buildCompactStatCard(
       );
     },
   );
+}
+
+Widget buildManagementTableSkeleton({
+  int statCardCount = 4,
+  bool showTabs = false,
+}) {
+  return _ManagementSkeletonShimmer(
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF0F4F8),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = MediaQuery.of(context).size.width < 600;
+          final cardCount = statCardCount.clamp(1, 4).toInt();
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(isMobile ? 16 : 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showTabs) ...[
+                  Row(
+                    children: [
+                      _managementSkeletonBox(width: 120, height: 38),
+                      const SizedBox(width: 12),
+                      _managementSkeletonBox(width: 150, height: 38),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                _managementSkeletonPageHeader(isMobile),
+                const SizedBox(height: 16),
+                _managementSkeletonStats(cardCount, isMobile),
+                const SizedBox(height: 8),
+                _managementSkeletonActions(isMobile),
+                const SizedBox(height: 16),
+                _managementSkeletonTable(isMobile),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+Widget buildSmoothManagementTransition({
+  required bool isLoading,
+  required Widget loading,
+  required Widget child,
+}) {
+  return AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    child: KeyedSubtree(
+      key: ValueKey(isLoading ? 'management-loading' : 'management-content'),
+      child: isLoading ? loading : child,
+    ),
+  );
+}
+
+Widget _managementSkeletonPageHeader(bool isMobile) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _managementSkeletonBox(width: 220, height: 24),
+        const SizedBox(height: 10),
+        _managementSkeletonBox(width: 180, height: 14),
+        const SizedBox(height: 16),
+        _managementSkeletonBox(width: 150, height: 48, radius: 8),
+      ],
+    );
+  }
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _managementSkeletonBox(width: 230, height: 24),
+          const SizedBox(height: 10),
+          _managementSkeletonBox(width: 190, height: 14),
+        ],
+      ),
+      _managementSkeletonBox(width: 168, height: 48, radius: 8),
+    ],
+  );
+}
+
+Widget _managementSkeletonStats(int count, bool isMobile) {
+  final cards = List.generate(
+    count,
+    (_) => Expanded(
+      child: Container(
+        height: 60,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _managementSkeletonBox(width: 36, height: 36, radius: 10),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _managementSkeletonBox(height: 12),
+            ),
+            const SizedBox(width: 12),
+            _managementSkeletonBox(width: 34, height: 16),
+            const SizedBox(width: 10),
+            Container(
+              width: 3,
+              height: 30,
+              decoration: BoxDecoration(
+                color: const Color(0xFF93C5FD),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  if (isMobile) {
+    return Column(
+      children: [
+        for (var i = 0; i < cards.length; i += 2) ...[
+          Row(
+            children: [
+              cards[i],
+              if (i + 1 < cards.length) ...[
+                const SizedBox(width: 12),
+                cards[i + 1],
+              ],
+            ],
+          ),
+          if (i + 2 < cards.length) const SizedBox(height: 12),
+        ],
+      ],
+    );
+  }
+
+  return Row(
+    children: [
+      for (var i = 0; i < cards.length; i++) ...[
+        cards[i],
+        if (i != cards.length - 1) const SizedBox(width: 16),
+      ],
+    ],
+  );
+}
+
+Widget _managementSkeletonActions(bool isMobile) {
+  if (isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _managementSkeletonBox(width: double.infinity, height: 44, radius: 6),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(child: _managementSkeletonBox(height: 44, radius: 6)),
+            const SizedBox(width: 10),
+            _managementSkeletonBox(width: 116, height: 44, radius: 6),
+          ],
+        ),
+      ],
+    );
+  }
+
+  return Row(
+    children: [
+      Expanded(child: _managementSkeletonBox(height: 44, radius: 6)),
+      const SizedBox(width: 16),
+      _managementSkeletonBox(width: 150, height: 44, radius: 6),
+    ],
+  );
+}
+
+Widget _managementSkeletonTable(bool isMobile) {
+  return Container(
+    padding: EdgeInsets.fromLTRB(
+      isMobile ? 14 : 24,
+      isMobile ? 14 : 24,
+      isMobile ? 14 : 24,
+      0,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 14,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2E7D32),
+            borderRadius: BorderRadius.circular(5),
+          ),
+          child: Row(
+            children: [
+              _managementSkeletonBox(
+                width: 18,
+                height: 18,
+                radius: 4,
+                color: Colors.white.withOpacity(0.55),
+              ),
+              const SizedBox(width: 18),
+              Expanded(flex: 2, child: _managementSkeletonHeaderBox()),
+              if (!isMobile) ...[
+                Expanded(child: _managementSkeletonHeaderBox()),
+                Expanded(child: _managementSkeletonHeaderBox()),
+                Expanded(flex: 2, child: _managementSkeletonHeaderBox()),
+              ],
+              Expanded(child: _managementSkeletonHeaderBox()),
+              const SizedBox(width: 48),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Column(
+          children: [
+            for (var i = 0; i < 8; i++) ...[
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: i.isOdd ? const Color(0xFFF6FFFC) : Colors.white,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(
+                  children: [
+                    _managementSkeletonBox(width: 18, height: 18, radius: 4),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _managementSkeletonBox(width: 150, height: 13),
+                          const SizedBox(height: 6),
+                          _managementSkeletonBox(width: 120, height: 11),
+                        ],
+                      ),
+                    ),
+                    if (!isMobile) ...[
+                      Expanded(child: _managementSkeletonBox(width: 92, height: 26, radius: 4)),
+                      Expanded(child: _managementSkeletonBox(width: 46, height: 12)),
+                      Expanded(flex: 2, child: _managementSkeletonBox(width: 260, height: 12)),
+                    ],
+                    Expanded(child: _managementSkeletonBox(width: 52, height: 24, radius: 4)),
+                    _managementSkeletonBox(width: 24, height: 12),
+                  ],
+                ),
+              ),
+              if (i != 7) const SizedBox(height: 6),
+            ],
+          ],
+        ),
+        _managementSkeletonPagination(isMobile),
+      ],
+    ),
+  );
+}
+
+Widget _managementSkeletonHeaderBox() {
+  return Align(
+    alignment: Alignment.centerLeft,
+    child: _managementSkeletonBox(
+      width: 72,
+      height: 13,
+      color: Colors.white.withOpacity(0.75),
+    ),
+  );
+}
+
+Widget _managementSkeletonPagination(bool isMobile) {
+  if (isMobile) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          _managementSkeletonBox(width: 108, height: 14),
+          const Spacer(),
+          _managementSkeletonBox(width: 118, height: 34, radius: 8),
+        ],
+      ),
+    );
+  }
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+    child: Row(
+      children: [
+        _managementSkeletonBox(width: 136, height: 14),
+        const SizedBox(width: 22),
+        _managementSkeletonBox(width: 190, height: 14),
+        const Spacer(),
+        for (var i = 0; i < 5; i++) ...[
+          _managementSkeletonBox(width: 34, height: 34, radius: 8),
+          if (i != 4) const SizedBox(width: 8),
+        ],
+      ],
+    ),
+  );
+}
+
+Widget _managementSkeletonBox({
+  double? width,
+  required double height,
+  double radius = 8,
+  Color color = const Color(0xFFE2E8F0),
+}) {
+  return _ManagementSkeletonShimmerBox(
+    width: width,
+    height: height,
+    radius: radius,
+    baseColor: color,
+  );
+}
+
+class _ManagementSkeletonShimmer extends StatefulWidget {
+  final Widget child;
+
+  const _ManagementSkeletonShimmer({required this.child});
+
+  @override
+  State<_ManagementSkeletonShimmer> createState() =>
+      _ManagementSkeletonShimmerState();
+}
+
+class _ManagementSkeletonShimmerState extends State<_ManagementSkeletonShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSkeletonShimmerScope(
+      animation: _controller,
+      child: widget.child,
+    );
+  }
+}
+
+class _ManagementSkeletonShimmerScope extends InheritedNotifier<Animation<double>> {
+  final Animation<double> animation;
+
+  const _ManagementSkeletonShimmerScope({
+    required this.animation,
+    required super.child,
+  }) : super(notifier: animation);
+
+  static Animation<double>? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<_ManagementSkeletonShimmerScope>()
+        ?.animation;
+  }
+}
+
+class _ManagementSkeletonShimmerBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+  final Color baseColor;
+
+  const _ManagementSkeletonShimmerBox({
+    this.width,
+    required this.height,
+    required this.radius,
+    required this.baseColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = _ManagementSkeletonShimmerScope.maybeOf(context);
+    if (animation == null) return _buildBox(baseColor);
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final pulse = Curves.easeInOut.transform(
+          animation.value < 0.5
+              ? animation.value * 2
+              : (1 - animation.value) * 2,
+        );
+        final color = Color.lerp(baseColor, Colors.white, 0.22 * pulse)!;
+
+        return RepaintBoundary(child: _buildBox(color));
+      },
+    );
+  }
+
+  Widget _buildBox(Color color) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
 }
 
 class StatData {
@@ -244,6 +741,20 @@ class StatDataManagement {
     _cacheTimestamps[cacheKey] = DateTime.now();
   }
 
+  Future<void> _logDisplayedReads(
+    String source,
+    Map<String, List<QueryDocumentSnapshot>> groups,
+  ) async {
+    for (final entry in groups.entries) {
+      if (entry.value.isEmpty) continue;
+      await FirebaseUsageLogger.logRead(
+        collection: entry.key,
+        count: entry.value.length,
+        source: source,
+      );
+    }
+  }
+
   // ==================== INFORMATION BANK ====================
   Future<InformationBankData> getInformationBankData() async {
     const cacheKey = 'information_bank';
@@ -257,6 +768,12 @@ class StatDataManagement {
         _getInformationBank(),
         _getLatestInformationBank(),
       ]);
+      await _logDisplayedReads('information_bank_statcard', {
+        'information_bank': [
+          ...results[0],
+          ...results[1],
+        ],
+      });
 
       final data = _processInformationBankData(
         ib: results[0],
@@ -320,6 +837,13 @@ class StatDataManagement {
         _getLatestFAQ(),
         _getMostAskedFAQ(),
       ]);
+      await _logDisplayedReads('faq_statcard', {
+        'faqs': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+        ],
+      });
 
       final data = _processFAQsData(
         faqs: results[0],
@@ -399,6 +923,14 @@ class StatDataManagement {
         _getNewUsers(startOfMonth),
         _getUsersLoggedInToday(startOfDay),
       ]);
+      await _logDisplayedReads('user_statcard', {
+        'users': [
+          ...results[0],
+          ...results[1],
+          ...results[2],
+          ...results[3],
+        ],
+      });
 
       final data = _processUserData(
         users: results[0],
@@ -447,6 +979,10 @@ class StatDataManagement {
     try {
       final users = await _getUsersOptimized();
       final programs = await _getPrograms();
+      await _logDisplayedReads('program_statcard', {
+        'users': users,
+        'programs': programs,
+      });
       final data = _processProgramData(users: users, programs: programs);
 
       _programCache[cacheKey] = data;
@@ -487,6 +1023,9 @@ class StatDataManagement {
 
     try {
       final admissions = await _getAdmissions();
+      await _logDisplayedReads('admission_statcard', {
+        'admissions': admissions,
+      });
       final data = _processAdmissionData(admissions: admissions);
 
       _admissionCache[cacheKey] = data;
@@ -526,6 +1065,9 @@ class StatDataManagement {
 
     try {
       final scholarships = await _getScholarships();
+      await _logDisplayedReads('scholarship_statcard', {
+        'scholarships': scholarships,
+      });
       final data = _processScholarshipData(scholarships: scholarships);
 
       _scholarshipCache[cacheKey] = data;
@@ -586,6 +1128,9 @@ class StatDataManagement {
 
     try {
       final placements = await _getJobPlacements();
+      await _logDisplayedReads('placement_statcard', {
+        'placements': placements,
+      });
       final data = _processPlacementData(placements: placements);
 
       _placementCache[cacheKey] = data;

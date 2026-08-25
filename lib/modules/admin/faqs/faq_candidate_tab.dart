@@ -1,10 +1,11 @@
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/models/faq_candidate.dart';
+import 'package:capstone_project/widgets/empty_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'promote_faq.dart';
 
-/// Drop this widget into whatever tab/section you add to FaqManagementPage.
 class FaqCandidatesTab extends StatefulWidget {
   const FaqCandidatesTab({super.key});
 
@@ -13,22 +14,24 @@ class FaqCandidatesTab extends StatefulWidget {
 }
 
 class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
-  String _statusFilter = 'pending'; // 'pending' | 'promoted' | 'dismissed'
+  String _statusFilter = 'pending';
   String? _lastLoggedQueryKey;
+  final Map<String, Stream<QuerySnapshot>> _candidateStreams = {};
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildFilterRow(),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
+        if (!isMobile) ...[_buildTableHeader(), const SizedBox(height: 6)],
         Expanded(child: _buildCandidateList()),
       ],
     );
   }
-
-  // ── Filter chips ──────────────────────────────────────────────────────────
 
   Widget _buildFilterRow() {
     const filters = [
@@ -68,16 +71,73 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
     );
   }
 
-  // ── Stream list ───────────────────────────────────────────────────────────
+  Widget _buildTableHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2E7D32),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Row(
+        children: [
+          SizedBox(
+            width: 58,
+            child: Text(
+              'Count',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            flex: 4,
+            child: Text(
+              'Question',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              'Answer',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(width: 40),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'Category',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          SizedBox(width: 108),
+        ],
+      ),
+    );
+  }
 
   Widget _buildCandidateList() {
     return StreamBuilder<QuerySnapshot>(
       stream: _candidateStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-          );
+          return const SizedBox.shrink();
         }
 
         if (snapshot.hasError) {
@@ -91,14 +151,18 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
           return _buildEmptyState();
         }
 
-        return ListView.separated(
+        return ListView.builder(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, index) {
             final candidate = FAQCandidate.fromFirestore(docs[index]);
-            return _CandidateCard(
-              candidate: candidate,
-              onTap: () => showPromoteFAQModal(context, candidate),
+            return Padding(
+              key: ValueKey(candidate.id),
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _CandidateRow(
+                candidate: candidate,
+                index: index,
+                onTap: () => showPromoteFAQModal(context, candidate),
+              ),
             );
           },
         );
@@ -123,11 +187,15 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
       );
     }
 
-    return FirebaseFirestore.instance
-        .collection('faq_candidates')
-        .where('status', isEqualTo: _statusFilter)
-        .orderBy('occurrenceCount', descending: true)
-        .snapshots();
+    return _candidateStreams.putIfAbsent(
+      _statusFilter,
+      () =>
+          FirebaseFirestore.instance
+              .collection('faq_candidates')
+              .where('status', isEqualTo: _statusFilter)
+              .orderBy('occurrenceCount', descending: true)
+              .snapshots(),
+    );
   }
 
   void _logCandidateQueryError(Object? error) {
@@ -149,78 +217,37 @@ class _FaqCandidatesTabState extends State<FaqCandidatesTab> {
   }
 
   Widget _buildEmptyState() {
-    final messages = {
-      'pending': (
-        Icons.hourglass_empty_outlined,
-        'No pending candidates',
-        'Candidates appear here when a question reaches 10+ occurrences.',
-      ),
-      'promoted': (
-        Icons.check_circle_outline,
-        'No promoted candidates yet',
-        'Questions you promote will appear here.',
-      ),
-      'dismissed': (
-        Icons.block_outlined,
-        'No dismissed candidates',
-        'Dismissed candidates will appear here.',
-      ),
+    final item = switch (_statusFilter) {
+      'promoted' => 'Promoted Candidates',
+      'dismissed' => 'Dismissed Candidates',
+      _ => 'FAQ Candidates',
     };
 
-    final info = messages[_statusFilter]!;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(info.$1, size: 48, color: Colors.grey.shade300),
-          const SizedBox(height: 12),
-          Text(
-            info.$2,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            info.$3,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-          ),
-        ],
-      ),
+    return buildManagementEmptyState(
+      hasFilters: false,
+      isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+      item: item,
     );
   }
 }
 
-// ============================================================================
-// Individual candidate card
-// ============================================================================
-
-class _CandidateCard extends StatelessWidget {
+class _CandidateRow extends StatelessWidget {
   final FAQCandidate candidate;
+  final int index;
   final VoidCallback onTap;
 
-  const _CandidateCard({required this.candidate, required this.onTap});
+  const _CandidateRow({
+    required this.candidate,
+    required this.index,
+    required this.onTap,
+  });
 
-  String _formatDate(Timestamp ts) {
-    final d = ts.toDate();
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[d.month - 1]} ${d.day}';
+  String get _statusLabel {
+    return switch (candidate.status) {
+      'promoted' => 'Promoted',
+      'dismissed' => 'Dismissed',
+      _ => 'Review',
+    };
   }
 
   Color get _statusColor {
@@ -231,161 +258,181 @@ class _CandidateCard extends StatelessWidget {
     };
   }
 
-  String get _statusLabel {
-    return switch (candidate.status) {
-      'promoted' => 'Promoted',
-      'dismissed' => 'Dismissed',
-      _ => '${candidate.occurrenceCount} occurrences',
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     final isPending = candidate.status == 'pending';
 
     return InkWell(
       onTap: isPending ? onTap : null,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          vertical: isMobile ? 12 : 8,
+          horizontal: isMobile ? 12 : 10,
+        ),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isPending ? const Color(0xFFBBDEBB) : Colors.grey.shade200,
-            width: isPending ? 1 : 0.5,
+          color: index.isEven ? Colors.white : const Color(0xFFF8FFFE),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: isMobile ? _buildMobileContent() : _buildDesktopContent(),
+      ),
+    );
+  }
+
+  Widget _buildDesktopContent() {
+    return Row(
+      children: [
+        SizedBox(
+          width: 58,
+          child: _OccurrencePill(
+            count: candidate.occurrenceCount,
+            color: _statusColor,
           ),
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Count column
-            Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${candidate.occurrenceCount}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: _statusColor,
-                      ),
-                    ),
-                  ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 4,
+          child: Text(
+            candidate.question,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Text(
+            candidate.answer,
+            style: const TextStyle(fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 40),
+        Expanded(
+          flex: 2,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _CategoryBadge(category: candidate.category),
+          ),
+        ),
+        SizedBox(
+          width: 108,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: _buildTrailingAction(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileContent() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _OccurrencePill(count: candidate.occurrenceCount, color: _statusColor),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                candidate.question,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'asked',
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
-                ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                candidate.answer,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          candidate.question,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
-                            height: 1.35,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _CategoryBadge(category: candidate.category),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    candidate.answer,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: Colors.grey.shade600,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  // Footer row
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 12,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_formatDate(candidate.firstSeen)} – ${_formatDate(candidate.lastSeen)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (candidate.status != 'pending')
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _statusColor.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            _statusLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _statusColor,
-                            ),
-                          ),
-                        )
-                      else
-                        Row(
-                          children: [
-                            Text(
-                              'Review',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF2E7D32),
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            const Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 13,
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+                  _CategoryBadge(category: candidate.category),
+                  const Spacer(),
+                  _buildTrailingAction(),
                 ],
               ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTrailingAction() {
+    if (candidate.status == 'pending') {
+      return const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Review',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2E7D32),
             ),
-          ],
+          ),
+          SizedBox(width: 2),
+          Icon(
+            Icons.arrow_forward_rounded,
+            size: 13,
+            color: Color(0xFF2E7D32),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: _statusColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        _statusLabel,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: _statusColor,
+        ),
+      ),
+    );
+  }
+}
+
+class _OccurrencePill extends StatelessWidget {
+  final int count;
+  final Color color;
+
+  const _OccurrencePill({required this.count, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        '$count',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
       ),
     );
@@ -396,28 +443,21 @@ class _CategoryBadge extends StatelessWidget {
   final String category;
   const _CategoryBadge({required this.category});
 
-  static const _colors = {
-    'Admission': (Color(0xFFEFF6FF), Color(0xFF1D4ED8)),
-    'Scholarship': (Color(0xFFFFFBEB), Color(0xFFB45309)),
-    'Placement': (Color(0xFFF5F3FF), Color(0xFF6D28D9)),
-    'General': (Color(0xFFF3F4F6), Color(0xFF374151)),
-  };
-
   @override
   Widget build(BuildContext context) {
-    final colors = _colors[category] ?? _colors['General']!;
+    final categoryStyle = getCategoryStyle(category);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: colors.$1,
+        color: categoryStyle.backgroundColor,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        category,
+        categoryStyle.displayName,
         style: TextStyle(
-          fontSize: 10.5,
-          fontWeight: FontWeight.w600,
-          color: colors.$2,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: categoryStyle.textColor,
         ),
       ),
     );

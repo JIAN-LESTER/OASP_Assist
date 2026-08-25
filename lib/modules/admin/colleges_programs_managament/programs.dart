@@ -13,6 +13,9 @@ import 'package:capstone_project/responsive/responsive_layout.dart';
 import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:flutter/material.dart';
 
+final Stream<QuerySnapshot> _programsManagementStream =
+    FirebaseFirestore.instance.collection('programs').orderBy('name').snapshots();
+
 class ProgramManagementPage extends StatefulWidget {
   const ProgramManagementPage({super.key});
 
@@ -71,33 +74,34 @@ class _ProgramManagementPageState extends State<ProgramManagementPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    return ResponsiveLayout(
-      mobileBody: MobileProgramManagement(
+    return buildSmoothManagementTransition(
+      isLoading: isLoading,
+      loading: buildManagementTableSkeleton(statCardCount: 2),
+      child: ResponsiveLayout(
+        mobileBody: MobileProgramManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      tabletBody: TabletProgramManagement(
+        ),
+        tabletBody: TabletProgramManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
-      ),
-      desktopBody: DesktopProgramManagement(
+        ),
+        desktopBody: DesktopProgramManagement(
         searchController: _searchController,
         currentPage: currentPage,
         itemsPerPage: itemsPerPage,
         onPageChanged: _goToPage,
         onItemsPerPageChanged: _changeItemsPerPage,
         program: program,
+        ),
       ),
     );
   }
@@ -221,17 +225,11 @@ class MobileProgramManagement extends StatelessWidget {
                     const SizedBox(height: 10),
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream:
-                            FirebaseFirestore.instance
-                                .collection('programs')
-                                .orderBy('name')
-                                .snapshots(),
+                        stream: _programsManagementStream,
                         builder: (context, snapshot) {
                           if (snapshot.connectionState ==
                               ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
+                            return const SizedBox.shrink();
                           }
                           if (snapshot.hasError) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -255,6 +253,7 @@ class MobileProgramManagement extends StatelessWidget {
                             itemsPerPage: itemsPerPage,
                             onPageChanged: onPageChanged,
                             onItemsPerPageChanged: onItemsPerPageChanged,
+                            context: context
                           );
                         },
                       ),
@@ -310,17 +309,11 @@ Widget mainContent(
                   const SizedBox(height: 10),
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
-                      stream:
-                          FirebaseFirestore.instance
-                              .collection('programs')
-                              .orderBy('name')
-                              .snapshots(),
+                      stream: _programsManagementStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const SizedBox.shrink();
                         }
                         if (snapshot.hasError) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -343,6 +336,7 @@ Widget mainContent(
                           itemsPerPage: itemsPerPage,
                           onPageChanged: onPageChanged,
                           onItemsPerPageChanged: onItemsPerPageChanged,
+                          context: context,
                         );
                       },
                     ),
@@ -404,6 +398,7 @@ Widget _buildProgramList({
   required int itemsPerPage,
   required ValueChanged<int> onPageChanged,
   required ValueChanged<int> onItemsPerPageChanged,
+  required BuildContext context,
 }) {
   final filtered =
       allPrograms.where((doc) {
@@ -427,8 +422,10 @@ Widget _buildProgramList({
       Expanded(
         child:
             currentPagePrograms.isEmpty
-                ? const Center(
-                  child: Text('No programs match your search criteria.'),
+                ? buildManagementEmptyState(
+                  hasFilters: searchQuery.isNotEmpty,
+                  isMobileOrTablet: MediaQuery.of(context).size.width < 900,
+                  item: 'Programs',
                 )
                 : ListView.separated(
                   itemCount: currentPagePrograms.length,
@@ -1159,7 +1156,7 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to delete program: $e',
+              'Program deletion failed: $e',
             );
           }
         }
@@ -1171,13 +1168,13 @@ class _DeleteProgramModalState extends State<DeleteProgramModal> {
         ).pop(true); // Return true to indicate success
         SnackbarUtil.showInfo(
           context,
-          'Program deletion is running in background',
+          'Program deleted successfully',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDeleting = false);
-        SnackbarUtil.showError(context, 'Failed to delete program: $e');
+        SnackbarUtil.showError(context, 'Program deletion failed: $e');
       }
     }
   }
@@ -1657,7 +1654,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+              'Program ${isEditing ? 'update' : 'creation'} failed: $e',
             );
           }
         }
@@ -1665,7 +1662,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
 
       SnackbarUtil.showInfo(
         context,
-        'Program ${isEditing ? 'update' : 'creation'} is running in background',
+        'Program ${isEditing ? 'updated' : 'created'} successfully',
       );
       Navigator.of(context).pop();
     } catch (e) {
@@ -1673,7 +1670,7 @@ class _AddEditProgramModalState extends State<AddEditProgramModal> {
         setState(() => _isSubmitting = false);
         SnackbarUtil.showError(
           context,
-          'Failed to ${isEditing ? 'update' : 'create'} program: $e',
+          'Program ${isEditing ? 'update' : 'creation'} failed: $e',
         );
       }
     }

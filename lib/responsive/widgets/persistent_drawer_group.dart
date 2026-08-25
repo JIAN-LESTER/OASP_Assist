@@ -3,20 +3,13 @@ import 'package:flutter/material.dart';
 
 // State management class for persistent drawer expansion
 class PersistentDrawerState extends ChangeNotifier {
-  static bool _isServicesExpanded = false;
   static bool _isLogsExpanded = false;
   static bool _isUserManagementExpanded = false;
 
   static final List<VoidCallback> _stateListeners = [];
 
-  static bool get isServicesExpanded => _isServicesExpanded;
   static bool get isLogsExpanded => _isLogsExpanded;
   static bool get isUserManagementExpanded => _isUserManagementExpanded;
-
-  static void setServicesExpanded(bool expanded) {
-    _isServicesExpanded = expanded;
-    _notifyAllListeners();
-  }
 
   static void setLogsExpanded(bool expanded) {
     _isLogsExpanded = expanded;
@@ -30,11 +23,9 @@ class PersistentDrawerState extends ChangeNotifier {
 
   static bool getExpansionState(int groupIndex) {
     switch (groupIndex) {
-      case -3:
-        return _isUserManagementExpanded;
       case -1:
-        return _isServicesExpanded;
-      case -2:
+        return _isUserManagementExpanded;
+      case -3:
         return _isLogsExpanded;
       default:
         return false;
@@ -43,13 +34,10 @@ class PersistentDrawerState extends ChangeNotifier {
 
   static void setExpansionState(int groupIndex, bool expanded) {
     switch (groupIndex) {
-      case -3:
+      case -1:
         _isUserManagementExpanded = expanded;
         break;
-      case -1:
-        _isServicesExpanded = expanded;
-        break;
-      case -2:
+      case -3:
         _isLogsExpanded = expanded;
         break;
     }
@@ -57,7 +45,6 @@ class PersistentDrawerState extends ChangeNotifier {
   }
 
   static void resetExpansionStates() {
-    _isServicesExpanded = false;
     _isLogsExpanded = false;
     _isUserManagementExpanded = false;
     _notifyAllListeners();
@@ -87,7 +74,7 @@ Widget buildPersistentDrawerGroup({
   required Function(int) onTap,
   required bool isExpanded,
   required List<Widget> children,
-  required bool isServicesExpanded,
+  required bool isGroupExpanded,
 }) {
   return _PersistentDrawerGroupWidget(
     icon: icon,
@@ -150,11 +137,9 @@ class _PersistentDrawerGroupWidgetState
     );
 
     // Close ALL OTHER groups first
-    if (widget.groupIndex != -3)
-      PersistentDrawerState.setUserManagementExpanded(false);
     if (widget.groupIndex != -1)
-      PersistentDrawerState.setServicesExpanded(false);
-    if (widget.groupIndex != -2) PersistentDrawerState.setLogsExpanded(false);
+      PersistentDrawerState.setUserManagementExpanded(false);
+    if (widget.groupIndex != -3) PersistentDrawerState.setLogsExpanded(false);
 
     // Toggle current group
     PersistentDrawerState.setExpansionState(widget.groupIndex, !currentState);

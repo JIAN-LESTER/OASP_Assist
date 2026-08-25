@@ -374,7 +374,10 @@ Future<void> _handleReusableDelete(
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
 
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      SnackbarUtil.showError(
+        context,
+        '${config.title.split(' ').last} deletion failed: $error',
+      );
     }
   }
 }
@@ -535,7 +538,7 @@ Widget _buildActionButtons(
                                 if (feedbackContext.mounted) {
                                   SnackbarUtil.showError(
                                     feedbackContext,
-                                    'Delete failed: ${error.toString()}',
+                                    '${config.title.split(' ').last} deletion failed: ${error.toString()}',
                                   );
                                 }
                               }
@@ -543,7 +546,7 @@ Widget _buildActionButtons(
 
                             SnackbarUtil.showInfo(
                               context,
-                              '${config.title.split(' ').last} deletion is running in background',
+                              '${config.title.split(' ').last} deleted successfully',
                             );
                             Navigator.of(context, rootNavigator: false).pop();
                             return;
@@ -557,7 +560,7 @@ Widget _buildActionButtons(
                             if (context.mounted) {
                               SnackbarUtil.showError(
                                 context,
-                                'Delete failed: ${error.toString()}',
+                                '${config.title.split(' ').last} deletion failed: ${error.toString()}',
                               );
                             }
                           }
@@ -677,7 +680,7 @@ Future<void> handleUserDelete(
     print(" Delete operation failed: $error");
 
     // Show more specific error message
-    String errorMessage = 'Delete failed: ';
+    String errorMessage = 'User deletion failed: ';
     if (error.toString().contains('permission-denied')) {
       errorMessage += 'You do not have permission to delete users';
     } else if (error.toString().contains('unauthenticated')) {
@@ -842,7 +845,7 @@ Future<void> handleInformationBankDelete(
 
     if (context.mounted) {
       Navigator.of(context).pop(); // Close loading
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      SnackbarUtil.showError(context, 'Document deletion failed: $error');
     }
   }
 }
@@ -928,7 +931,7 @@ Future<void> handleAdmissionDelete(
     print(" Delete operation failed: $error");
 
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      SnackbarUtil.showError(context, 'Admission deletion failed: $error');
     }
 
     throw error; // Re-throw so button can handle it
@@ -1045,7 +1048,7 @@ Future<void> handleScholarshipDelete(
     print(" Delete operation failed: $error");
 
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      SnackbarUtil.showError(context, 'Scholarship deletion failed: $error');
     }
 
     throw error; // Re-throw so button can handle it
@@ -1162,7 +1165,7 @@ Future<void> handlePlacementDelete(
     print(" Delete operation failed: $error");
 
     if (context.mounted) {
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+      SnackbarUtil.showError(context, 'Placement deletion failed: $error');
     }
 
     throw error; // Re-throw so button can handle it

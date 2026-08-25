@@ -1,9 +1,13 @@
+import 'package:capstone_project/icon_and_color.dart';
 import 'package:capstone_project/modules/user/user_main_page.dart';
+import 'package:capstone_project/provider/chat_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:provider/provider.dart';
+import '../../authentication/app_distribution_qr_button.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({Key? key}) : super(key: key);
@@ -20,18 +24,10 @@ class _HomeDashboardState extends State<HomeDashboard>
   // Cached data for faster subsequent loads
   Map<String, dynamic>? _cachedUserData;
   List<Map<String, dynamic>>? _cachedMessages;
-  QuerySnapshot? _cachedAdmissions;
-  QuerySnapshot? _cachedScholarships;
-  QuerySnapshot? _cachedPlacements;
-  QuerySnapshot? _cachedAnnouncements;
 
   // Loading states for progressive rendering
   bool _userDataLoaded = false;
   bool _messagesLoaded = false;
-  bool _admissionsLoaded = false;
-  bool _scholarshipsLoaded = false;
-  bool _placementsLoaded = false;
-  bool _announcementsLoaded = false;
 
   String? _currentConversationId;
 
@@ -49,14 +45,21 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     // Start batch loading immediately
     _batchLoadData();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      chatProvider.loadUserMessageCount();
+      chatProvider.listenToUserMessageCount();
+    });
   }
 
   Future<void> _batchLoadData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Load everything in parallel immediately
-    await Future.wait([_loadCriticalData(user), _loadServicesData()]);
+    await _loadCriticalData(user);
   }
 
   // Load critical data first (user info + chat)
@@ -140,59 +143,6 @@ class _HomeDashboardState extends State<HomeDashboard>
     }
   }
 
-  // Load all services data in parallel
-  Future<void> _loadServicesData() async {
-    try {
-      // Load all service data simultaneously
-      final results = await Future.wait([
-        FirebaseFirestore.instance
-            .collection('admissions')
-            .orderBy('createdAt', descending: true)
-            .limit(1)
-            .get(),
-        FirebaseFirestore.instance
-            .collection('scholarships')
-            .orderBy('createdAt', descending: true)
-            .limit(3)
-            .get(),
-        FirebaseFirestore.instance
-            .collection('placements')
-            .orderBy('createdAt', descending: true)
-            .limit(3)
-            .get(),
-        FirebaseFirestore.instance
-            .collection('announcements')
-            .where('deleted', isEqualTo: false)
-            .orderBy('created_time', descending: true)
-            .limit(3)
-            .get(),
-      ]);
-
-      if (mounted) {
-        setState(() {
-          _cachedAdmissions = results[0];
-          _admissionsLoaded = true;
-          _cachedScholarships = results[1];
-          _scholarshipsLoaded = true;
-          _cachedPlacements = results[2];
-          _placementsLoaded = true;
-          _cachedAnnouncements = results[3];
-          _announcementsLoaded = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading services data: $e');
-      if (mounted) {
-        setState(() {
-          _admissionsLoaded = true;
-          _scholarshipsLoaded = true;
-          _placementsLoaded = true;
-          _announcementsLoaded = true;
-        });
-      }
-    }
-  }
-
   @override
   void dispose() {
     _animationController.dispose();
@@ -224,20 +174,11 @@ class _HomeDashboardState extends State<HomeDashboard>
                 slivers: [
                   // Welcome Header
                   SliverToBoxAdapter(child: _buildWelcomeHeader()),
+                  SliverToBoxAdapter(child: _buildDownloadMobileAppSection()),
 
-                    // AI Chat Assistant
+                  // AI Chat Assistant
                   SliverToBoxAdapter(child: _buildChatPreviewSection()),
-
-                  // Service Grid
-                  SliverPadding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: _isMobile(context) ? 16 : 20,
-                      vertical: 8,
-                    ),
-                    sliver: _buildServicesGrid(),
-                  ),
-
-                
+                  SliverToBoxAdapter(child: _buildAnnouncementsPreviewSection()),
 
                   // Bottom spacing
                   SliverToBoxAdapter(
@@ -259,6 +200,78 @@ class _HomeDashboardState extends State<HomeDashboard>
 
     final name = _cachedUserData?['name'] ?? 'User';
     return _buildHeaderUI(name);
+  }
+
+  Widget _buildDownloadMobileAppSection() {
+    final isMobile = _isMobile(context);
+
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 20,
+        vertical: 8,
+      ),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2E7D32).withOpacity(0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF2E7D32).withOpacity(0.18),
+              ),
+            ),
+            child: Icon(
+              Icons.phone_android,
+              color: const Color(0xFF2E7D32),
+              size: isMobile ? 22 : 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Download Mobile App',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Install the mobile application.',
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const AppDistributionQrButton(
+            positioned: false,
+            requireLoginForEmail: false,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildHeaderLoadingSkeleton() {
@@ -435,9 +448,9 @@ class _HomeDashboardState extends State<HomeDashboard>
       child: Container(
         margin: EdgeInsets.symmetric(
           horizontal: isMobile ? 16 : 20,
-          vertical: 8,
+          vertical: 10,
         ),
-        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        padding: EdgeInsets.all(isMobile ? 18 : 24),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
@@ -523,14 +536,16 @@ class _HomeDashboardState extends State<HomeDashboard>
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            _buildMessageLimitSummary(isMobile),
+            const SizedBox(height: 18),
             const Divider(height: 1),
+            const SizedBox(height: 18),
+            _buildChatMessagesPreview(
+              hasConversation: hasConversation,
+              isMobile: isMobile,
+            ),
             const SizedBox(height: 16),
-            if (!hasConversation)
-              _buildNoMessagesYet(isMobile)
-            else
-              _buildRealChatMessages(_cachedMessages!, isMobile),
-            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
@@ -544,6 +559,187 @@ class _HomeDashboardState extends State<HomeDashboard>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMessageLimitSummary(bool isMobile) {
+    return Consumer<ChatProvider>(
+      builder: (context, chatProvider, _) {
+        final used = chatProvider.userDailyMessageCount;
+        final limit = ChatProvider.MAX_DAILY_MESSAGES;
+        final remaining = (limit - used).clamp(0, limit);
+        final isLimitReached = remaining == 0;
+        final progress =
+            limit == 0 ? 0.0 : (used / limit).clamp(0.0, 1.0).toDouble();
+
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 12 : 14),
+          decoration: BoxDecoration(
+            color:
+                isLimitReached
+                    ? const Color(0xFFFFF1F2)
+                    : const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color:
+                  isLimitReached
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFFBBF7D0),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.message_outlined,
+                    color:
+                        isLimitReached
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFF2E7D32),
+                    size: isMobile ? 18 : 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isLimitReached
+                          ? 'Daily message limit reached'
+                          : '$remaining messages remaining today',
+                      style: TextStyle(
+                        fontSize: isMobile ? 12 : 13,
+                        fontWeight: FontWeight.w700,
+                        color:
+                            isLimitReached
+                                ? const Color(0xFF991B1B)
+                                : const Color(0xFF166534),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$used/$limit',
+                    style: TextStyle(
+                      fontSize: isMobile ? 12 : 13,
+                      fontWeight: FontWeight.w800,
+                      color:
+                          isLimitReached
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFF2E7D32),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 7,
+                  value: progress,
+                  backgroundColor: Colors.white.withOpacity(0.85),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isLimitReached
+                        ? const Color(0xFFDC2626)
+                        : const Color(0xFF2E7D32),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                isLimitReached
+                    ? 'Your limit resets at 8:00 AM.'
+                    : 'Limit resets daily at 8:00 AM.',
+                style: TextStyle(
+                  fontSize: isMobile ? 11 : 12,
+                  color:
+                      isLimitReached
+                          ? const Color(0xFFB91C1C)
+                          : const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnnouncementsPreviewSection() {
+    final isMobile = _isMobile(context);
+
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: 8),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withOpacity(0.10),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(
+            icon: Icons.campaign_outlined,
+            title: 'Latest Announcements',
+            subtitle: 'Recent updates from OASP.',
+            color: const Color(0xFF2563EB),
+            isMobile: isMobile,
+          ),
+          const SizedBox(height: 14),
+          StreamBuilder<QuerySnapshot>(
+            stream:
+                FirebaseFirestore.instance
+                    .collection('announcements')
+                    .where('deleted', isEqualTo: false)
+                    .orderBy('created_time', descending: true)
+                    .limit(3)
+                    .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return _buildAnnouncementsSkeleton(isMobile);
+              }
+
+              final announcements = snapshot.data?.docs ?? [];
+              if (announcements.isEmpty) {
+                return _buildNoAnnouncementsYet(isMobile);
+              }
+
+              return Column(
+                children:
+                    announcements
+                        .map(
+                          (doc) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildAnnouncementPreviewItem(
+                              doc,
+                              isMobile,
+                            ),
+                          ),
+                        )
+                        .toList(),
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          _buildCardAction(
+            label: 'View Announcements',
+            color: const Color(0xFF2563EB),
+            onPressed: () => _navigateToTab(context, 2),
+          ),
+        ],
       ),
     );
   }
@@ -634,37 +830,273 @@ class _HomeDashboardState extends State<HomeDashboard>
     );
   }
 
-  Widget _buildNoMessagesYet(bool isMobile) {
+  Widget _buildAnnouncementsSkeleton(bool isMobile) {
+    return Column(
+      children: List.generate(
+        3,
+        (index) => Padding(
+          padding: EdgeInsets.only(bottom: index == 2 ? 0 : 8),
+          child: Row(
+            children: [
+              _buildSkeletonLine(width: isMobile ? 36 : 40, height: 40),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSkeletonLine(width: double.infinity, height: 14),
+                    const SizedBox(height: 6),
+                    _buildSkeletonLine(
+                      width: isMobile ? 130 : 180,
+                      height: 12,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoAnnouncementsYet(bool isMobile) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        vertical: isMobile ? 18 : 20,
+        horizontal: 16,
+      ),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         children: [
           Icon(
-            Icons.chat_bubble_outline,
-            size: isMobile ? 40 : 48,
-            color: Colors.grey.shade400,
+            Icons.campaign_outlined,
+            size: isMobile ? 34 : 40,
+            color: const Color(0xFF94A3B8),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'No announcements yet',
+            style: TextStyle(
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF475569),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementPreviewItem(DocumentSnapshot doc, bool isMobile) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    final category = data['category']?.toString() ?? 'General';
+    final message = data['message']?.toString() ?? 'No message';
+    final timeText =
+        data['created_time'] is Timestamp
+            ? formatTime(data['created_time'] as Timestamp)
+            : '';
+    final categoryColor = getCategoryColor(category);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _navigateToTab(context, 2),
+      child: Container(
+        padding: EdgeInsets.all(isMobile ? 12 : 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: isMobile ? 36 : 40,
+              height: isMobile ? 36 : 40,
+              decoration: BoxDecoration(
+                color: categoryColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                getCategoryIcon(category),
+                color: categoryColor,
+                size: isMobile ? 18 : 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: isMobile ? 13 : 14,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF111827),
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 12,
+                            color: categoryColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (timeText.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFCBD5E1),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          timeText,
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 12,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right,
+              color: Color(0xFF94A3B8),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatMessagesPreview({
+    required bool hasConversation,
+    required bool isMobile,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 14 : 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2E7D32),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  hasConversation ? 'Recent conversation' : 'Start a chat',
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF334155),
+                  ),
+                ),
+              ),
+              if (hasConversation)
+                Text(
+                  '${_cachedMessages!.length.clamp(0, 4)} shown',
+                  style: TextStyle(
+                    fontSize: isMobile ? 10 : 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (!hasConversation)
+            _buildNoMessagesYet(isMobile)
+          else
+            _buildRealChatMessages(_cachedMessages!, isMobile),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoMessagesYet(bool isMobile) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        vertical: isMobile ? 18 : 20,
+        horizontal: 16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: isMobile ? 44 : 50,
+            height: isMobile ? 44 : 50,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2E7D32).withOpacity(0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.chat_bubble_outline,
+              size: isMobile ? 24 : 28,
+              color: const Color(0xFF2E7D32),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
-            'No messages yet',
-            style: TextStyle(
-              fontSize: isMobile ? 15 : 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Start a conversation with OASP Assist!',
+            'Ask OASP Assist anything',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: isMobile ? 13 : 14,
-              color: Colors.grey.shade600,
+              fontSize: isMobile ? 14 : 15,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Your latest messages will appear here once you start a conversation.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isMobile ? 12 : 13,
+              height: 1.35,
+              color: const Color(0xFF64748B),
             ),
           ),
         ],
@@ -676,123 +1108,161 @@ class _HomeDashboardState extends State<HomeDashboard>
     List<Map<String, dynamic>> messages,
     bool isMobile,
   ) {
-    final displayMessages = messages.take(3).toList();
+    final displayMessages =
+        messages
+            .where((message) {
+              final content = message['content']?.toString() ?? '';
+              return content.trim().isNotEmpty;
+            })
+            .take(4)
+            .toList();
 
     return Column(
       children:
-          displayMessages.reversed.map((message) {
-            final isUser = message['sender'] == 'user';
+          displayMessages.reversed.toList().asMap().entries.map((entry) {
+            final index = entry.key;
+            final message = entry.value;
+            final isUser = _isUserMessage(message);
             final content = message['content']?.toString() ?? '';
 
-            if (content.trim().isEmpty) return const SizedBox.shrink();
-
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(
+                bottom: index == displayMessages.length - 1 ? 0 : 10,
+              ),
               child: _buildChatBubble(content, isUser, isMobile),
             );
           }).toList(),
     );
   }
 
-  Widget _buildChatBubble(String message, bool isUser, bool isMobile) {
-    final displayMessage =
-        message.length > 100 ? '${message.substring(0, 100)}...' : message;
-
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 16,
-          vertical: isMobile ? 10 : 12,
-        ),
-        decoration: BoxDecoration(
-          gradient:
-              isUser
-                  ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
-                  )
-                  : null,
-          color: isUser ? null : Colors.grey[100],
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isUser ? 16 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 16),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  isUser
-                      ? const Color(0xFF2E7D32).withOpacity(0.2)
-                      : Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: MarkdownBody(
-          data: displayMessage,
-          styleSheet: MarkdownStyleSheet(
-            p: TextStyle(
-              color: isUser ? Colors.white : Colors.black87,
-              fontSize: isMobile ? 13 : 14,
-              height: 1.4,
-            ),
-            strong: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isUser ? Colors.white : Colors.black87,
-            ),
-          ),
-        ),
-      ),
-    );
+  bool _isUserMessage(Map<String, dynamic> message) {
+    final sender = message['sender']?.toString().toLowerCase() ?? '';
+    return sender == 'user' || sender == 'student';
   }
 
-  Widget _buildServicesGrid() {
-    final isMobile = _isMobile(context);
+  Widget _buildChatBubble(String message, bool isUser, bool isMobile) {
+    final cleanedMessage = message.trim().replaceAll(RegExp(r'\s+'), ' ');
+    final maxLength = isMobile ? 120 : 170;
+    final displayMessage =
+        cleanedMessage.length > maxLength
+            ? '${cleanedMessage.substring(0, maxLength)}...'
+            : cleanedMessage;
 
-    return SliverList(
-      delegate: SliverChildListDelegate([
-        !isMobile
-            ? IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: _buildAdmissionCard()),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildScholarshipCard()),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildPlacementCard()),
-                ],
+    return Row(
+      mainAxisAlignment:
+          isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isUser) ...[
+          _buildMessageAvatar(isUser, isMobile),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Container(
+            constraints: BoxConstraints(maxWidth: isMobile ? 280 : 520),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : 14,
+              vertical: isMobile ? 10 : 12,
+            ),
+            decoration: BoxDecoration(
+              gradient:
+                  isUser
+                      ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF2E7D32), Color(0xFF388E3C)],
+                      )
+                      : null,
+              color: isUser ? null : Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(isUser ? 16 : 5),
+                bottomRight: Radius.circular(isUser ? 5 : 16),
               ),
-            )
-            : Column(
-              children: [
-                _buildAdmissionCard(),
-                const SizedBox(height: 12),
-                _buildScholarshipCard(),
-                const SizedBox(height: 12),
-                _buildPlacementCard(),
+              border:
+                  isUser
+                      ? null
+                      : Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      isUser
+                          ? const Color(0xFF2E7D32).withOpacity(0.18)
+                          : Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
-        const SizedBox(height: 16),
-        _buildAnnouncementCard(),
-      ]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUser ? 'You' : 'OASP Assist',
+                  style: TextStyle(
+                    fontSize: isMobile ? 10 : 11,
+                    fontWeight: FontWeight.w800,
+                    color:
+                        isUser
+                            ? Colors.white.withOpacity(0.78)
+                            : const Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                MarkdownBody(
+                  data: displayMessage,
+                  selectable: false,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: isUser ? Colors.white : const Color(0xFF1F2937),
+                      fontSize: isMobile ? 12 : 13,
+                      height: 1.35,
+                    ),
+                    strong: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isUser ? Colors.white : const Color(0xFF111827),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (isUser) ...[
+          const SizedBox(width: 8),
+          _buildMessageAvatar(isUser, isMobile),
+        ],
+      ],
     );
   }
 
-  String cleanStep(String step) {
-    return step
-        .replaceAll(
-          RegExp(r'^\s*[\(\[\d]+\s*[\.\)\]]\s*'),
-          '',
-        ) // removes "1.", "(1)", "[1]", etc.
-        .trim();
+  Widget _buildMessageAvatar(bool isUser, bool isMobile) {
+    return Container(
+      width: isMobile ? 28 : 32,
+      height: isMobile ? 28 : 32,
+      decoration: BoxDecoration(
+        color:
+            isUser
+                ? const Color(0xFF2E7D32).withOpacity(0.12)
+                : const Color(0xFFEFF6FF),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color:
+              isUser
+                  ? const Color(0xFF2E7D32).withOpacity(0.24)
+                  : const Color(0xFFBFDBFE),
+        ),
+      ),
+      child: Icon(
+        isUser ? Icons.person_outline : Icons.smart_toy_outlined,
+        size: isMobile ? 15 : 17,
+        color:
+            isUser
+                ? const Color(0xFF2E7D32)
+                : const Color(0xFF2563EB),
+      ),
+    );
   }
 
   Widget _buildHomeCard({
@@ -947,396 +1417,6 @@ class _HomeDashboardState extends State<HomeDashboard>
         style: TextButton.styleFrom(
           foregroundColor: color,
           textStyle: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAdmissionCard() {
-    final isMobile = _isMobile(context);
-
-    if (!_admissionsLoaded) {
-      return _buildCardSkeleton(isMobile, 'Admission Info', Icons.school);
-    }
-
-    List<String> steps = [];
-    if (_cachedAdmissions != null && _cachedAdmissions!.docs.isNotEmpty) {
-      final data = _cachedAdmissions!.docs.first.data() as Map<String, dynamic>;
-      steps =
-          (data['steps'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .take(6)
-              .toList() ??
-          [];
-    }
-
-    if (steps.isEmpty) {
-      steps = [
-        'Create Account',
-        'Fill Personal Information',
-        'Upload Documents',
-        'Submit Application',
-        'Pay Application Fee',
-      ];
-    }
-
-    return GestureDetector(
-      onTap: () => _navigateToTab(context, 3),
-      child: _buildHomeCard(
-        accentColor: const Color(0xFF2E7D32),
-        isMobile: isMobile,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCardHeader(
-              icon: Icons.school,
-              title: 'Admission Info',
-              subtitle: 'Track the steps for your application.',
-              color: const Color(0xFF2E7D32),
-              isMobile: isMobile,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Application Steps',
-              style: TextStyle(
-                fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...steps.take(4).map(
-                  (step) => _buildInfoTile(
-                    icon: Icons.check_rounded,
-                    title: cleanStep(step),
-                    color: const Color(0xFF2E7D32),
-                    isMobile: isMobile,
-                  ),
-                ),
-            const SizedBox(height: 12),
-            _buildCardAction(
-              label: 'See more',
-              color: const Color(0xFF2E7D32),
-              onPressed: () => _navigateToTab(context, 3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScholarshipCard() {
-    final isMobile = _isMobile(context);
-
-    if (!_scholarshipsLoaded) {
-      return _buildCardSkeleton(isMobile, 'Scholarships', Icons.card_giftcard);
-    }
-
-    List<Map<String, dynamic>> scholarships = [];
-    if (_cachedScholarships != null && _cachedScholarships!.docs.isNotEmpty) {
-      scholarships =
-          _cachedScholarships!.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return {
-              'name': data['name'] ?? 'Unnamed Scholarship',
-              'provider': data['scholarshipProvider'] ?? 'Unknown',
-            };
-          }).toList();
-    }
-
-    if (scholarships.isEmpty) {
-      scholarships = [
-        {'name': 'Merit-Based Scholarship', 'provider': 'University'},
-        {'name': 'Need-Based Financial Aid', 'provider': 'Foundation'},
-        {'name': 'Athletic Scholarship', 'provider': 'Sports Dept'},
-      ];
-    }
-
-    return GestureDetector(
-      onTap: () => _navigateToTab(context, 4),
-      child: _buildHomeCard(
-        accentColor: const Color(0xFF00897B),
-        isMobile: isMobile,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCardHeader(
-              icon: Icons.card_giftcard,
-              title: 'Scholarships',
-              subtitle: 'Browse available grants and providers.',
-              color: const Color(0xFF00897B),
-              isMobile: isMobile,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Available Scholarships',
-              style: TextStyle(
-                fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...scholarships.map(
-              (scholarship) => _buildInfoTile(
-                icon: Icons.star_rounded,
-                title: scholarship['name']!,
-                subtitle: scholarship['provider']!,
-                color: const Color(0xFF00897B),
-                isMobile: isMobile,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildCardAction(
-              label: 'See more',
-              color: const Color(0xFF00897B),
-              onPressed: () => _navigateToTab(context, 4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlacementCard() {
-    final isMobile = _isMobile(context);
-
-    if (!_placementsLoaded) {
-      return _buildCardSkeleton(isMobile, 'Placement Assistance', Icons.work);
-    }
-
-    return GestureDetector(
-      onTap: () => _navigateToTab(context, 5),
-      child: _buildHomeCard(
-        accentColor: const Color(0xFF1976D2),
-        isMobile: isMobile,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCardHeader(
-              icon: Icons.work,
-              title: 'Placement Assistance',
-              subtitle: 'Find hiring opportunities and positions.',
-              color: const Color(0xFF1976D2),
-              isMobile: isMobile,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Upcoming Companies',
-              style: TextStyle(
-                fontSize: isMobile ? 13 : 14,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ..._buildPlacementItems(isMobile),
-            const SizedBox(height: 12),
-            _buildCardAction(
-              label: 'See more',
-              color: const Color(0xFF1976D2),
-              onPressed: () => _navigateToTab(context, 5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildPlacementItems(bool isMobile) {
-    final companies = [
-      {'name': 'TechCorp Ltd.', 'positions': '5 positions'},
-      {'name': 'InnovateSoft Inc.', 'positions': '3 positions'},
-      {'name': 'DataSolutions Co.', 'positions': '7 positions'},
-    ];
-
-    return companies.map((company) {
-      return _buildInfoTile(
-        icon: Icons.business_rounded,
-        title: company['name']!,
-        subtitle: company['positions']!,
-        color: const Color(0xFF1976D2),
-        isMobile: isMobile,
-      );
-    }).toList();
-  }
-
-  Widget _buildAnnouncementCard() {
-    final isMobile = _isMobile(context);
-
-    if (!_announcementsLoaded) {
-      return _buildCardSkeleton(isMobile, 'Announcements', Icons.campaign);
-    }
-
-    List<Map<String, dynamic>> announcements = [];
-    if (_cachedAnnouncements != null && _cachedAnnouncements!.docs.isNotEmpty) {
-      announcements =
-          _cachedAnnouncements!.docs.map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-
-            String category = data['category']?.toString() ?? 'General';
-            String priority = 'low';
-            if (category.toLowerCase().contains('urgent') ||
-                category.toLowerCase().contains('important')) {
-              priority = 'high';
-            } else if (category.toLowerCase().contains('announcement')) {
-              priority = 'medium';
-            }
-
-            String date = 'Recent';
-            if (data['created_time'] != null) {
-              try {
-                DateTime createdTime;
-                if (data['created_time'] is Timestamp) {
-                  createdTime = (data['created_time'] as Timestamp).toDate();
-                } else if (data['created_time'] is String) {
-                  createdTime = DateTime.parse(data['created_time']);
-                } else {
-                  createdTime = DateTime.now();
-                }
-                date =
-                    '${createdTime.month}/${createdTime.day}/${createdTime.year}';
-              } catch (e) {
-                date = 'Recent';
-              }
-            }
-
-            String message = data['message']?.toString() ?? 'No description';
-            String title =
-                message.length > 50 ? message.substring(0, 50) : message;
-            String description =
-                message.length > 100
-                    ? message.substring(0, 100) + '...'
-                    : message;
-
-            return {
-              'title': title,
-              'description': description,
-              'date': date,
-              'priority': priority,
-            };
-          }).toList();
-    }
-
-    if (announcements.isEmpty) {
-      announcements = [
-        {
-          'title': 'Semester Registration Open',
-          'description':
-              'Register for next semester courses. Deadline: March 15',
-          'date': 'March 1, 2025',
-          'priority': 'high',
-        },
-        {
-          'title': 'Career Fair Next Week',
-          'description':
-              'Top companies hiring. Bring your resume and dress professionally.',
-          'date': 'March 5, 2025',
-          'priority': 'medium',
-        },
-        {
-          'title': 'Library Hours Extended',
-          'description': 'Library now open until 11 PM during exam week.',
-          'date': 'March 3, 2025',
-          'priority': 'low',
-        },
-      ];
-    }
-
-    return GestureDetector(
-      onTap: () => _navigateToTab(context, 2),
-      child: _buildHomeCard(
-        accentColor: const Color(0xFF7B1FA2),
-        isMobile: isMobile,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCardHeader(
-              icon: Icons.campaign,
-              title: 'Announcements',
-              subtitle: 'Latest updates and important notices.',
-              color: const Color(0xFF7B1FA2),
-              isMobile: isMobile,
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-            ...announcements.map((announcement) {
-              Color priorityColor =
-                  announcement['priority'] == 'high'
-                      ? Colors.red
-                      : announcement['priority'] == 'medium'
-                      ? Colors.orange
-                      : Colors.blue;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: EdgeInsets.all(isMobile ? 12 : 14),
-                decoration: BoxDecoration(
-                  color: priorityColor.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: priorityColor.withOpacity(0.18)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: priorityColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            announcement['title']!,
-                            style: TextStyle(
-                              fontSize: isMobile ? 14 : 15,
-                              color: const Color(0xFF111827),
-                              fontWeight: FontWeight.w800,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          announcement['date']!,
-                          style: TextStyle(
-                            fontSize: isMobile ? 11 : 12,
-                            color: Colors.black45,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20),
-                      child: Text(
-                        announcement['description']!,
-                        style: TextStyle(
-                          fontSize: isMobile ? 12 : 13,
-                          color: Colors.black54,
-                          height: 1.4,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            const SizedBox(height: 12),
-            _buildCardAction(
-              label: 'View All',
-              color: const Color(0xFF7B1FA2),
-              onPressed: () => _navigateToTab(context, 2),
-            ),
-          ],
         ),
       ),
     );

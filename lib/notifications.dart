@@ -22,6 +22,8 @@ class _NotificationModalState extends State<NotificationModal>
   bool _isLoadingDetail = false;
 
   late TabController _tabController;
+  late final Stream<QuerySnapshot>? _notificationsStream;
+  late final Stream<QuerySnapshot>? _clearAllStream;
   int _selectedTabIndex = 0;
 
   // Undo functionality
@@ -387,6 +389,23 @@ class _NotificationModalState extends State<NotificationModal>
   @override
   void initState() {
     super.initState();
+    _notificationsStream =
+        currentUserId == null
+            ? null
+            : _firestore
+                .collection('notifications')
+                .where('userId', isEqualTo: currentUserId)
+                .where('targetRole', isEqualTo: widget.role)
+                .orderBy('createdAt', descending: true)
+                .snapshots();
+    _clearAllStream =
+        currentUserId == null
+            ? null
+            : _firestore
+                .collection('notifications')
+                .where('userId', isEqualTo: currentUserId)
+                .where('targetRole', isEqualTo: widget.role)
+                .snapshots();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) return; // Ignore intermediate states
@@ -1769,12 +1788,6 @@ class _NotificationModalState extends State<NotificationModal>
   }
 
   Widget _buildNotificationListView() {
-    Query baseQuery = _firestore
-        .collection('notifications')
-        .where('userId', isEqualTo: currentUserId)
-        .where('targetRole', isEqualTo: widget.role)
-        .orderBy('createdAt', descending: true);
-
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
@@ -1803,12 +1816,7 @@ class _NotificationModalState extends State<NotificationModal>
                 const Spacer(),
                 // Clear All button
                 StreamBuilder<QuerySnapshot>(
-                  stream:
-                      _firestore
-                          .collection('notifications')
-                          .where('userId', isEqualTo: currentUserId)
-                          .where('targetRole', isEqualTo: widget.role)
-                          .snapshots(),
+                  stream: _clearAllStream,
                   builder: (context, snapshot) {
                     final hasNotifications =
                         snapshot.hasData && snapshot.data!.docs.isNotEmpty;
@@ -1862,7 +1870,7 @@ class _NotificationModalState extends State<NotificationModal>
               border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
             ),
             child: StreamBuilder<QuerySnapshot>(
-              stream: baseQuery.snapshots(),
+              stream: _notificationsStream,
               builder: (context, snapshot) {
                 int allCount = 0;
                 int todayCount = 0;
@@ -2042,7 +2050,7 @@ class _NotificationModalState extends State<NotificationModal>
           // Notification List
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: baseQuery.snapshots(),
+              stream: _notificationsStream,
               builder: (context, snapshot) {
                 // Cache the snapshot to prevent rebuilding
                 if (snapshot.hasData) {

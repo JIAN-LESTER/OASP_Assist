@@ -1279,10 +1279,10 @@ double _getBottomTitleInterval(int dataLength, String timeFrame, [DateTime? star
     if (daysDiff == 0) {
       // Hourly: show every 3-4 hours
       return dataLength <= 24 ? 3.0 : 4.0;
-    } else if (daysDiff <= 7) {
-      // Daily: show all days if 7 or fewer
-      return 1.0;
     } else if (daysDiff <= 31) {
+      // Daily: show all days if 31 or fewer
+      return 1.0;
+    } else if (daysDiff <= 90) {
       // Weekly: show all weeks
       return 1.0;
     } else {

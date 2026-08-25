@@ -31,6 +31,7 @@ class _StaffMainPageState extends State<StaffMainPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
   bool _handledInitialArgs = false;
+  bool _isNavigating = false;
 
   String? _escalationId;
   String? _conversationId;
@@ -181,11 +182,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
     if (_isLoadingServiceUnit) {
       print(' Service unit still loading...');
       return [
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
-        const Center(child: CircularProgressIndicator()),
+        StaffDashboardPage(),
+        const StaffReportsPage(),
+        const _HumanEscalationPageSkeleton(),
+        const StaffAnnouncementPage(),
+        const StaffMessageLogsPage(),
       ];
     }
 
@@ -219,8 +220,23 @@ class _StaffMainPageState extends State<StaffMainPage> {
     ];
   }
 
-  void _onNavigationItemTap(int index) {
+  Future<void> _onNavigationItemTap(int index) async {
     print(' Navigation item tapped: $index');
+    if (!mounted ||
+        _isNavigating ||
+        index == _selectedIndex ||
+        index < 0 ||
+        index >= _pageTitles.length) {
+      return;
+    }
+
+    setState(() {
+      _isNavigating = true;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+
     setState(() {
       _selectedIndex = index;
 
@@ -230,6 +246,13 @@ class _StaffMainPageState extends State<StaffMainPage> {
         _conversationId = null;
         _shouldAutoOpen = false;
       }
+    });
+
+    await Future.delayed(const Duration(milliseconds: 450));
+    if (!mounted) return;
+
+    setState(() {
+      _isNavigating = false;
     });
   }
 
@@ -264,7 +287,11 @@ class _StaffMainPageState extends State<StaffMainPage> {
         selectedIndex: _selectedIndex,
         onItemTap: _onNavigationItemTap,
       ),
-      body: _getPages()[_selectedIndex],
+      body: Stack(
+        children: [
+          _getPages()[_selectedIndex],
+        ],
+      ),
     );
   }
 
@@ -287,8 +314,134 @@ class _StaffMainPageState extends State<StaffMainPage> {
             onItemTap: _onNavigationItemTap,
             isExpanded: _isSidebarExpanded,
           ),
-          Expanded(child: _getPages()[_selectedIndex]),
+          Expanded(
+            child: Stack(
+              children: [
+                _getPages()[_selectedIndex],
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _HumanEscalationPageSkeleton extends StatelessWidget {
+  const _HumanEscalationPageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
+    final isDesktop = screenWidth >= 900;
+    final horizontalPadding = isDesktop ? 32.0 : (isTablet ? 24.0 : 16.0);
+    final verticalPadding = isDesktop ? 24.0 : (isTablet ? 20.0 : 16.0);
+
+    return Container(
+      color: const Color(0xFFF0F4F8),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              verticalPadding,
+              horizontalPadding,
+              isTablet ? 12 : 8,
+            ),
+            color: Colors.white,
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const _MainSkeletonBox(width: 150, height: 24),
+                    const Spacer(),
+                    _MainSkeletonBox(
+                      width: isTablet ? 44 : 38,
+                      height: isTablet ? 44 : 38,
+                      radius: 10,
+                    ),
+                  ],
+                ),
+                SizedBox(height: isTablet ? 24 : 16),
+                const _MainSkeletonBox(width: double.infinity, height: 48),
+                SizedBox(height: isTablet ? 12 : 8),
+                Row(
+                  children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      const Expanded(
+                        child: _MainSkeletonBox(height: 64, radius: 12),
+                      ),
+                      if (i != 2) SizedBox(width: isTablet ? 10 : 6),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: EdgeInsets.all(horizontalPadding),
+              itemCount: 6,
+              separatorBuilder: (_, __) => SizedBox(height: isTablet ? 12 : 10),
+              itemBuilder:
+                  (_, __) => Container(
+                    padding: EdgeInsets.all(isTablet ? 14 : 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(isTablet ? 14 : 12),
+                    ),
+                    child: Row(
+                      children: [
+                        _MainSkeletonBox(
+                          width: isTablet ? 44 : 38,
+                          height: isTablet ? 44 : 38,
+                          radius: 12,
+                        ),
+                        SizedBox(width: isTablet ? 14 : 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _MainSkeletonBox(
+                                width: double.infinity,
+                                height: 14,
+                              ),
+                              SizedBox(height: 8),
+                              _MainSkeletonBox(width: 180, height: 12),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MainSkeletonBox extends StatelessWidget {
+  final double? width;
+  final double height;
+  final double radius;
+
+  const _MainSkeletonBox({
+    this.width,
+    required this.height,
+    this.radius = 8,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }

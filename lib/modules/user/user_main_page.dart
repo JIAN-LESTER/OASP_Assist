@@ -5,9 +5,6 @@ import 'package:capstone_project/modules/user/announcement/user_announcement.dar
 import 'package:capstone_project/modules/user/chat/chat_page.dart';
 
 import 'package:capstone_project/modules/user/home/home.dart';
-import 'package:capstone_project/modules/user/service_information/admission_info.dart';
-import 'package:capstone_project/modules/user/service_information/placement_info.dart';
-import 'package:capstone_project/modules/user/service_information/scholarship_list.dart';
 import 'package:capstone_project/modules/authentication/onboarding/onBoardingGuide.dart';
 import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -78,7 +75,11 @@ class _UserMainPageState extends State<UserMainPage>
   final GlobalKey _profileKey = GlobalKey();
   final GlobalKey _bottomNavKey = GlobalKey();
   final GlobalKey _faqButtonKey = GlobalKey();
+  final GlobalKey _faqCardsKey = GlobalKey();
+  final GlobalKey _textInputKey = GlobalKey();
   final GlobalKey _audioButtonKey = GlobalKey();
+  final GlobalKey<OnboardingGuideState> _onboardingGuideKey =
+      GlobalKey<OnboardingGuideState>();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -103,16 +104,57 @@ class _UserMainPageState extends State<UserMainPage>
     });
   }
 
+  void _showGuideAgain() {
+    _showGuideAgainAfterChatIsMounted();
+  }
+
+  Future<void> _showGuideAgainAfterChatIsMounted() async {
+    if (!mounted) return;
+
+    if (_selectedIndex != 1) {
+      setState(() {
+        _selectedIndex = 1;
+        _currentIndex = 1;
+      });
+      _tabController.animateTo(1);
+      await Future.delayed(const Duration(milliseconds: 350));
+    } else {
+      await Future.delayed(Duration.zero);
+    }
+
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showGuideWhenReady();
+    });
+  }
+
+  void _showGuideWhenReady({int attempt = 0}) {
+    final guideState = _onboardingGuideKey.currentState;
+    if (guideState != null) {
+      guideState.showGuide();
+      return;
+    }
+
+    if (attempt >= 10 || !mounted) return;
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      _showGuideWhenReady(attempt: attempt + 1);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
 
     // Initialize controllers
     final validatedInitialTab = widget.initialTabIndex ?? 0;
-    _currentIndex = validatedInitialTab.clamp(0, 5); // Pages are 0-5
+    _currentIndex = validatedInitialTab.clamp(0, 2); // Pages are 0-2
     _selectedIndex = _currentIndex;
     _tabController = TabController(
-      length: 6, //  Make sure this matches your pages list length
+      length: 3, //  Make sure this matches your pages list length
       vsync: this,
       initialIndex: _currentIndex,
     );
@@ -173,11 +215,8 @@ class _UserMainPageState extends State<UserMainPage>
 
         //  REMOVED DELAY - Show immediately
         if (mounted) {
-          final onboardingGuide = OnboardingGuide.of(context);
-          if (onboardingGuide != null) {
-            print(' Triggering OnboardingGuide after user onboarding');
-            onboardingGuide.showGuide();
-          }
+          print(' Triggering OnboardingGuide after user onboarding');
+          _showGuideAgain();
         }
       }
     } catch (e) {
@@ -282,7 +321,7 @@ class _UserMainPageState extends State<UserMainPage>
 
             //  Validate tab index
             if (initialTab != null) {
-              _selectedIndex = initialTab.clamp(0, 5);
+              _selectedIndex = initialTab.clamp(0, 2);
             }
           });
 
@@ -305,7 +344,7 @@ class _UserMainPageState extends State<UserMainPage>
           });
         } else if (initialTab != null) {
           //  Validate and clamp tab index
-          final validatedTab = initialTab.clamp(0, 5);
+          final validatedTab = initialTab.clamp(0, 2);
 
           setState(() {
             _selectedIndex = validatedTab;
@@ -490,19 +529,18 @@ class _UserMainPageState extends State<UserMainPage>
     'Home',
     'Chat with OASP Assist',
     'Announcements',
-    'Admission Information',
-    'Scholarship List',
-    'Placement Information',
   ];
 
   String _navigationLoadingTextForIndex(int index) {
     return 'Loading...';
   }
 
-  void _onNavigationItemTap(int index) async {
+  void _onNavigationItemTap(int index, {bool showOverlay = true}) async {
     print(' Navigation tap to index: $index');
 
-    if (!mounted || _isNavigating) return;
+    if (!mounted || (showOverlay && _isNavigating) || index == _selectedIndex) {
+      return;
+    }
 
     if (index < 0 || index >= _tabController.length) {
       print(' Invalid tab index: $index');
@@ -510,6 +548,15 @@ class _UserMainPageState extends State<UserMainPage>
     }
 
     try {
+      if (showOverlay) {
+        setState(() {
+          _isNavigating = true;
+        });
+
+        await Future.delayed(const Duration(milliseconds: 120));
+        if (!mounted) return;
+      }
+
       if (index == 1) {
         final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -544,11 +591,15 @@ class _UserMainPageState extends State<UserMainPage>
 
         _tabController.animateTo(index, duration: Duration.zero); //  Instant
       }
+
+      if (showOverlay) {
+        await Future.delayed(const Duration(milliseconds: 450));
+      }
     } catch (e) {
       print(' Navigation error: $e');
       if (mounted) _showErrorSnackBar("Navigation failed: $e");
     } finally {
-      if (mounted) {
+      if (showOverlay && mounted) {
         setState(() {
           _isNavigating = false;
         });
@@ -802,12 +853,11 @@ class _UserMainPageState extends State<UserMainPage>
         showFAQs: _showFAQs,
         onFAQToggle: _toggleFAQs,
         faqButtonKey: _faqButtonKey,
+        faqCardsKey: _faqCardsKey,
+        textInputKey: _textInputKey,
         audioButtonKey: _audioButtonKey,
       ),
       const UserAnnouncementPage(),
-      const AdmissionInfo(),
-      const ScholarshipList(),
-      const PlacementInfo(),
     ];
 
     return FutureBuilder<void>(
@@ -815,7 +865,7 @@ class _UserMainPageState extends State<UserMainPage>
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: SizedBox.shrink(),
           );
         }
 
@@ -830,11 +880,14 @@ class _UserMainPageState extends State<UserMainPage>
         }
 
         return OnboardingGuide(
+          key: _onboardingGuideKey,
           sidebarKey: _sidebarKey,
           notificationKey: _notificationKey,
           profileKey: _profileKey,
           bottomNavKey: _bottomNavKey,
           faqButtonKey: _faqButtonKey,
+          faqCardsKey: _faqCardsKey,
+          textInputKey: _textInputKey,
           audioButtonKey: _audioButtonKey,
           onFinished: () {
             //  Callback when guide finishes
@@ -885,9 +938,11 @@ class _UserMainPageState extends State<UserMainPage>
       body: Stack(
         children: [
           pages[_selectedIndex],
-          if (_isNavigating || _isLoading)
-            buildContentLoadingOverlay(
-              _navigationLoadingTextForIndex(_selectedIndex),
+          if (_isNavigating)
+            Positioned.fill(
+              child: buildContentLoadingOverlay(
+                _navigationLoadingTextForIndex(_selectedIndex),
+              ),
             ),
         ],
       ),
@@ -928,6 +983,7 @@ class _UserMainPageState extends State<UserMainPage>
             isExpanded: _isSidebarExpanded,
             onConversationSelected: _onConversationSelected,
             onNewChat: _onNewChatPressed,
+            onShowGuide: _showGuideAgain,
           ),
           //   Wrap only the page content in Stack
           Expanded(
@@ -935,9 +991,11 @@ class _UserMainPageState extends State<UserMainPage>
               children: [
                 pages[_selectedIndex],
                 //  Only white out the content area
-                if (_isNavigating || _isLoading)
-                  buildContentLoadingOverlay(
-                    _navigationLoadingTextForIndex(_selectedIndex),
+                if (_isNavigating)
+                  Positioned.fill(
+                    child: buildContentLoadingOverlay(
+                      _navigationLoadingTextForIndex(_selectedIndex),
+                    ),
                   ),
               ],
             ),
@@ -1026,6 +1084,28 @@ class _UserMainPageState extends State<UserMainPage>
                 ],
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showGuideAgain();
+                  },
+                  icon: const Icon(Icons.school_outlined, size: 18),
+                  label: const Text('Show Guide Again'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: UniversalUIComponents.primaryGreen,
+                    side: BorderSide(
+                      color: UniversalUIComponents.primaryGreen.withOpacity(
+                        0.35,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Expanded(child: _buildDrawerConversationsList()),
           ],
         ),
@@ -1062,11 +1142,7 @@ class _UserMainPageState extends State<UserMainPage>
 
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: UniversalUIComponents.primaryGreen,
-            ),
-          );
+          return const SizedBox.shrink();
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -1721,16 +1797,6 @@ class _UserMainPageState extends State<UserMainPage>
                       isSmall: isSmall,
                     ),
                   ),
-                  Expanded(
-                    child: _buildNavItem(
-                      icon: Icons.apps,
-                      label: 'Services',
-                      index: 3,
-                      isSelected: _selectedIndex >= 3,
-                      isVerySmall: isVerySmall,
-                      isSmall: isSmall,
-                    ),
-                  ),
                 ],
               ),
             );
@@ -1771,11 +1837,7 @@ class _UserMainPageState extends State<UserMainPage>
     return InkWell(
       onTap: () {
         HapticFeedback.mediumImpact();
-        if (index == 3) {
-          _showServicesMenu();
-        } else {
-          _onNavigationItemTap(index);
-        }
+        _onNavigationItemTap(index, showOverlay: false);
       },
       child: Container(
         padding: EdgeInsets.symmetric(
@@ -1827,141 +1889,6 @@ class _UserMainPageState extends State<UserMainPage>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  void _showServicesMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(24),
-                topRight: Radius.circular(24),
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Services',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B5E20),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildServiceTile(
-                  icon: Icons.school,
-                  title: 'Admission Information',
-                  subtitle: 'View admission requirements',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(3);
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildServiceTile(
-                  icon: Icons.card_giftcard,
-                  title: 'Scholarship List',
-                  subtitle: 'Browse available scholarships',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(4);
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildServiceTile(
-                  icon: Icons.work,
-                  title: 'Placement Information',
-                  subtitle: 'Career placement details',
-                  onTap: () {
-                    Navigator.pop(context);
-                    //  Navigate to actual page index
-                    _onNavigationItemTap(5);
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-    );
-  }
-
-  Widget _buildServiceTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: UniversalUIComponents.primaryGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: UniversalUIComponents.primaryGreen,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
-            ],
-          ),
         ),
       ),
     );

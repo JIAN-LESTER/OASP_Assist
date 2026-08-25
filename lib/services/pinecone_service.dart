@@ -23,7 +23,7 @@ class PineconeCloudService {
       _apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
 
       if (_baseUrl.isEmpty || _apiKey.isEmpty) {
-        throw Exception('Pinecone credentials not found in .env file');
+        throw Exception('Pinecone credentials are not configured for this client.');
       }
 
       if (kDebugMode) {
@@ -334,6 +334,12 @@ class PineconeCloudService {
         print(
           " Document inserted into Pinecone with ID: $id (upserted: $upsertedCount)",
         );
+        await _logPineconeUsage(
+          operation: 'upsert',
+          count: upsertedCount is int ? upsertedCount : 1,
+          namespace: namespace,
+          source: 'document_upload',
+        );
       } else {
         print(" Pinecone insert failed: ${response.statusCode}");
         print("Response body: ${response.body}");
@@ -454,6 +460,12 @@ class PineconeCloudService {
         final responseData = jsonDecode(response.body);
         final upsertedCount = responseData['upsertedCount'] ?? 0;
         print(" Batch inserted into Pinecone: $upsertedCount documents");
+        await _logPineconeUsage(
+          operation: 'upsert',
+          count: upsertedCount is int ? upsertedCount : batch.length,
+          namespace: namespace,
+          source: 'document_batch_upload',
+        );
       } else {
         print(" Pinecone batch insert failed: ${response.statusCode}");
         print("Response body: ${response.body}");
@@ -734,6 +746,25 @@ class PineconeCloudService {
       }
     });
     return clean;
+  }
+
+  Future<void> _logPineconeUsage({
+    required String operation,
+    required int count,
+    String? namespace,
+    String source = 'document_upload',
+  }) async {
+    try {
+      final callable = functions.httpsCallable('logPineconeUsage');
+      await callable.call({
+        'operation': operation,
+        'count': count,
+        'source': source,
+        if (namespace != null) 'namespace': namespace,
+      });
+    } catch (e) {
+      print(' Pinecone usage logging failed: $e');
+    }
   }
 
   bool get isSupported => true; // Both platforms are now supported

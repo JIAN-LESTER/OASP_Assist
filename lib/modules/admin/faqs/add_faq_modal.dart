@@ -9,6 +9,7 @@ import 'package:capstone_project/modal_pages/modal_widget/section_header.dart';
 import 'package:capstone_project/modal_pages/modal_widget/textfield.dart';
 
 import 'package:capstone_project/responsive/responsive_layout.dart';
+import 'package:capstone_project/utils/faq_text_normalizer.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -143,12 +144,15 @@ class _AddFaqContentState extends State<AddFaqContent> {
   String? _questionError;
   String? _answerError;
 
-  Future<List<double>> _generateEmbedding(String question) async {
+  Future<List<double>> _generateEmbedding(String text) async {
     final callable = FirebaseFunctions.instance.httpsCallable(
-      'generateCohereEmbedding',
+      'generateEmbedding',
     );
 
-    final result = await callable.call({'text': question});
+    final result = await callable.call({
+      'text': text,
+      'taskType': 'RETRIEVAL_DOCUMENT',
+    });
 
     return (result.data['embedding'] as List)
         .map((e) => (e as num).toDouble())
@@ -204,13 +208,14 @@ class _AddFaqContentState extends State<AddFaqContent> {
         try {
           List<double>? embedding;
           try {
-            embedding = await _generateEmbedding(question);
+            embedding = await _generateEmbedding('Q: $question\nA: $answer');
           } catch (e) {
             print(' Failed to generate embedding: $e');
           }
 
           final Map<String, dynamic> faqData = {
             'question': question,
+            'questionNormalized': normalizeFaqQuestion(question),
             'answer': answer,
             'category': category,
             'isPredefined': true,
@@ -220,7 +225,10 @@ class _AddFaqContentState extends State<AddFaqContent> {
 
           if (embedding != null) {
             faqData['embedding'] = embedding;
-            faqData['embeddingModel'] = 'embed-multilingual-v3.0';
+            faqData['geminiEmbedding'] = embedding;
+            faqData['contextEmbedding'] = embedding;
+            faqData['faqContextEmbedding'] = embedding;
+            faqData['embeddingModel'] = 'gemini-embedding-001';
             faqData['embeddingDimensions'] = embedding.length;
           }
 
@@ -244,16 +252,16 @@ class _AddFaqContentState extends State<AddFaqContent> {
           if (feedbackContext.mounted) {
             SnackbarUtil.showError(
               feedbackContext,
-              'Failed to create FAQ: $e',
+              'FAQ creation failed: $e',
             );
           }
         }
       }());
 
-      SnackbarUtil.showInfo(context, 'FAQ creation is running in background');
+      SnackbarUtil.showInfo(context, 'FAQ created successfully');
       Navigator.of(context).pop(true);
     } catch (e) {
-      SnackbarUtil.showError(context, 'Failed to create FAQ: $e');
+      SnackbarUtil.showError(context, 'FAQ creation failed: $e');
     }
   }
 
@@ -387,6 +395,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               }
                             },
                             maxLines: 2,
+                            textAlignVertical: TextAlignVertical.top,
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,
@@ -397,13 +406,30 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               labelText: 'FAQ Question',
                               hintText:
                                   'Enter the frequently asked question...',
-                              prefixIcon: Icon(
-                                Icons.help_outline,
-                                color:
-                                    _questionError != null
-                                        ? Colors.red
-                                        : const Color(0xFF6B7280),
-                                size: 20,
+                              alignLabelWithHint: true,
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 48,
+                              ),
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 10,
+                                  top: 16,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  widthFactor: 1,
+                                  heightFactor: 1,
+                                  child: Icon(
+                                    Icons.help_outline,
+                                    color:
+                                        _questionError != null
+                                            ? Colors.red
+                                            : const Color(0xFF6B7280),
+                                    size: 20,
+                                  ),
+                                ),
                               ),
                               errorText: _questionError,
                               labelStyle: TextStyle(
@@ -457,9 +483,11 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               ),
                               filled: true,
                               fillColor: const Color(0xFFFAFBFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                0,
+                                16,
+                                16,
+                                16,
                               ),
                             ),
                           ),
@@ -497,6 +525,7 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               }
                             },
                             maxLines: 5,
+                            textAlignVertical: TextAlignVertical.top,
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 14,
@@ -507,13 +536,30 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               labelText: 'FAQ Answer',
                               hintText:
                                   'Enter the detailed answer to this question...',
-                              prefixIcon: Icon(
-                                Icons.article_outlined,
-                                color:
-                                    _answerError != null
-                                        ? Colors.red
-                                        : const Color(0xFF6B7280),
-                                size: 20,
+                              alignLabelWithHint: true,
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 48,
+                              ),
+                              prefixIcon: Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 10,
+                                  top: 16,
+                                ),
+                                child: Align(
+                                  alignment: Alignment.topCenter,
+                                  widthFactor: 1,
+                                  heightFactor: 1,
+                                  child: Icon(
+                                    Icons.article_outlined,
+                                    color:
+                                        _answerError != null
+                                            ? Colors.red
+                                            : const Color(0xFF6B7280),
+                                    size: 20,
+                                  ),
+                                ),
                               ),
                               errorText: _answerError,
                               errorMaxLines: 2,
@@ -568,9 +614,11 @@ class _AddFaqContentState extends State<AddFaqContent> {
                               ),
                               filled: true,
                               fillColor: const Color(0xFFFAFBFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
+                              contentPadding: const EdgeInsets.fromLTRB(
+                                0,
+                                16,
+                                16,
+                                16,
                               ),
                             ),
                           ),

@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:capstone_project/reusable_widgets/loading_overlay.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -76,10 +77,12 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.all(widget.isMobile ? 16 : 32),
-      child: Container(
+    return Stack(
+      children: [
+        Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.all(widget.isMobile ? 16 : 32),
+          child: Container(
         constraints: const BoxConstraints(maxWidth: 420),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -316,7 +319,13 @@ class LogoutDialogContentState extends State<LogoutDialogContent> {
             ),
           ],
         ),
-      ),
+          ),
+        ),
+        if (_isLoading)
+          Positioned.fill(
+            child: buildContentLoadingOverlay('Logging out...'),
+          ),
+      ],
     );
   }
 

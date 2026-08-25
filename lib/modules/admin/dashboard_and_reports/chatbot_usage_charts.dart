@@ -431,6 +431,32 @@ Widget _buildEmptyState({
   );
 }
 
+Widget _buildEmptyChartCard({
+  required IconData icon,
+  required String message,
+  required String subtitle,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: _buildEmptyState(
+      icon: icon,
+      message: message,
+      subtitle: subtitle,
+    ),
+  );
+}
+
 Widget buildConversationsOverTimeCard(
   List<ChartData> conversationTrend,
   String timeFrame, {
@@ -1809,7 +1835,7 @@ Widget buildEscalationLimitReachCard(double escalationLimitReachRate) {
 // Chart for Chat Limit Reach Trend
 Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
   if (trendData.isEmpty) {
-    return _buildEmptyState(
+    return _buildEmptyChartCard(
       message: 'Chat Limit Reach Trend',
       subtitle: 'Users hitting message limit over time',
       icon: Icons.chat_bubble_outline,
@@ -2027,7 +2053,7 @@ Widget buildChatLimitReachTrendCard(List<ChartData> trendData) {
 // Chart for Escalation Limit Reach Trend
 Widget buildEscalationLimitReachTrendCard(List<ChartData> trendData) {
   if (trendData.isEmpty) {
-    return _buildEmptyState(
+    return _buildEmptyChartCard(
       message: 'Escalation Limit Reach Trend',
       subtitle: 'Users hitting escalation limit over time',
       icon: Icons.priority_high,
@@ -2342,10 +2368,10 @@ double getBottomTitleInterval(
     if (daysDiff == 0) {
       // Hourly: show every 3-4 hours
       return dataLength <= 24 ? 3.0 : 4.0;
-    } else if (daysDiff <= 7) {
-      // Daily: show all days if 7 or fewer
-      return 1.0;
     } else if (daysDiff <= 31) {
+      // Daily: show all days if 31 or fewer
+      return 1.0;
+    } else if (daysDiff <= 90) {
       // Weekly: show all weeks
       return 1.0;
     } else {
@@ -2393,10 +2419,10 @@ String formatBottomTitle(
         return "${hour - 12}PM";
       }
       return date;
-    } else if (daysDiff <= 7) {
+    } else if (daysDiff <= 31) {
       // Daily format: already formatted as "Mon", "Tue", etc.
       return date;
-    } else if (daysDiff <= 31) {
+    } else if (daysDiff <= 90) {
       // Weekly format: "W1", "W2", etc.
       return date;
     } else {
@@ -2438,8 +2464,8 @@ String _getTimeFrameDescription(
     final daysDiff = endDate.difference(startDate).inDays;
 
     if (daysDiff == 0) return 'by hour';
-    if (daysDiff <= 7) return 'by day';
-    if (daysDiff <= 31) return 'by week';
+    if (daysDiff <= 31) return 'by day';
+    if (daysDiff <= 90) return 'by week';
     return 'by month';
   }
 

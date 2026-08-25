@@ -5,9 +5,9 @@
 -   **Index Exports**: Use `index.ts` files to export flows and tools, making it easier to import them into your main configuration.
 
 ## Model Selection (Google AI)
--   **Gemini Models**: If using Google AI, ALWAYS use the latest generation (`gemini-3-*` or `gemini-2.5-*`).
+-   **Gemini Models**: If using Google AI, ALWAYS use the latest generation (`gemini-3-*` or `gemini-3.5-*`).
     -   **NEVER** use `gemini-2.0-*` or `gemini-1.5-*` series, as they are decommissioned and won't work.
-    -   **Recommended**: `gemini-2.5-flash` or `gemini-3-flash-preview` for general use, `gemini-3.1-pro-preview` for complex tasks.
+    -   **Recommended**: `gemini-3.5-flash` or `gemini-3-flash-preview` for general use, `gemini-3.1-pro-preview` for complex tasks.
 
 ## Model Selection (Other Providers)
 -   **Consult Documentation**: For other providers (OpenAI, Anthropic, etc.), refer to the provider's official documentation for the latest recommended model versions.

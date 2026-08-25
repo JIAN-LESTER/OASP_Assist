@@ -34,6 +34,8 @@ class ChatPage extends StatefulWidget {
   final bool showFAQs;
   final VoidCallback? onFAQToggle;
   final GlobalKey? faqButtonKey;
+  final GlobalKey? faqCardsKey;
+  final GlobalKey? textInputKey;
   final GlobalKey? audioButtonKey;
 
   const ChatPage({
@@ -43,6 +45,8 @@ class ChatPage extends StatefulWidget {
     this.showFAQs = false,
     this.onFAQToggle,
     this.faqButtonKey,
+    this.faqCardsKey,
+    this.textInputKey,
     this.audioButtonKey,
   }) : super(key: key);
 
@@ -52,7 +56,9 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController(
+    keepScrollOffset: false,
+  );
   final Map<String, String?> _localRatings = {};
   final Map<String, bool> _ratingLoading =
       {}; // Track loading state per message
@@ -129,6 +135,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
             _showFAQs = false;
             _isLoadingConversation = false;
           });
+          _scrollToBottomInstant();
         }
         return;
       }
@@ -365,6 +372,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
         setState(() {
           _showFAQs = widget.showFAQs;
         });
+
+        if (!_showFAQs && chatProvider.messages.isNotEmpty) {
+          _scrollToBottomInstant();
+        }
       }
       print(' ChatPage FAQ visibility changed: $_showFAQs');
     }
@@ -378,9 +389,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
     //  INSTANT: Scroll when switching from FAQs to chat
     if (!_showFAQs && chatProvider.messages.isNotEmpty) {
-      if (mounted && _scrollController.hasClients) {
-        _scrollToBottomInstant();
-      }
+      _scrollToBottomInstant();
     }
 
     if (widget.onFAQToggle != null) {
@@ -405,15 +414,13 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
 
     //  INSTANT: Scroll to bottom when closing FAQs
-    if (mounted &&
-        _scrollController.hasClients &&
-        chatProvider.messages.isNotEmpty) {
+    if (mounted && chatProvider.messages.isNotEmpty) {
       _scrollToBottomInstant();
     }
 
     //  INSTANT: Send message immediately
     if (mounted && !chatProvider.isLoading) {
-      _sendMessage(chatProvider);
+      _sendMessage(chatProvider, isFAQSelection: true);
     }
   }
 
@@ -1239,23 +1246,32 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   //           .toInt();
 
   void _scrollToBottomInstant() {
-    if (!_scrollController.hasClients) return;
-
-    // Use multiple frame callbacks to ensure scroll happens
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && mounted) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-
-        // Double-check after another frame
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients && mounted) {
-            _scrollController.jumpTo(
-              _scrollController.position.maxScrollExtent,
-            );
-          }
-        });
+    void jumpWhenReady() {
+      if (_isDisposing ||
+          !mounted ||
+          _showFAQs ||
+          !_scrollController.hasClients) {
+        return;
       }
+
+      final position = _scrollController.position;
+      if (!position.hasContentDimensions) return;
+
+      _scrollController.jumpTo(position.minScrollExtent);
+    }
+
+    // The message list is often mounted by the same setState that requests the
+    // scroll, so retry across layout frames instead of requiring clients now.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      jumpWhenReady();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        jumpWhenReady();
+      });
     });
+
+    Future.delayed(Duration(milliseconds: 100), jumpWhenReady);
+    Future.delayed(Duration(milliseconds: 300), jumpWhenReady);
   }
 
   Future<Map<String, dynamic>?> _getEscalationStatus(String messageId) async {
@@ -2904,7 +2920,10 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
     }
   }
 
-  void _sendMessage(ChatProvider chatProvider) async {
+  void _sendMessage(
+    ChatProvider chatProvider, {
+    bool isFAQSelection = false,
+  }) async {
     final text = _controller.text.trim();
     if (text.isEmpty || chatProvider.isLoading) return;
 
@@ -2953,7 +2972,11 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
 
     try {
       // Send message - the scroll callback will be triggered automatically
-      await chatProvider.askQuestionWithStreaming(context, text);
+      await chatProvider.askQuestionWithStreaming(
+        context,
+        text,
+        isFAQSelection: isFAQSelection,
+      );
     } catch (e) {
       debugPrint('Error sending message: $e');
       if (mounted) {
@@ -2985,6 +3008,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   @override
   void dispose() {
     print(' ChatPage disposing...');
+    _isDisposing = true;
     _controller.dispose();
     _scrollController.dispose();
     _conversationsSubscription?.cancel();
@@ -3015,6 +3039,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                           key: _faqSectionKey,
                           onFAQSelected: _onFAQSelected,
                           messageController: _controller,
+                          faqCardsKey: widget.faqCardsKey,
                         )
                         : (messages.isEmpty
                             ? _buildEmptyChatState()
@@ -3032,6 +3057,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
                         ? (_faqSectionKey.currentState?.isListening ?? false)
                         : _isListening,
                 faqButtonKey: widget.faqButtonKey,
+                textInputKey: widget.textInputKey,
                 audioButtonKey: widget.audioButtonKey,
               ),
             ],
@@ -3179,7 +3205,7 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
       if (!_scrollController.hasClients) return;
 
       final double currentPosition = _scrollController.position.pixels;
-      final double targetPosition = _scrollController.position.maxScrollExtent;
+      final double targetPosition = _scrollController.position.minScrollExtent;
 
       // If already at bottom (within 50px), don't scroll
       if ((targetPosition - currentPosition).abs() < 50) {
@@ -3204,15 +3230,16 @@ class _ChatPageState extends State<ChatPage> with TickerProviderStateMixin {
   Widget _buildMessagesList(List<Message> messages, ChatProvider chatProvider) {
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       physics: BouncingScrollPhysics(),
       itemCount:
           messages
               .length, //  REMOVED: + (chatProvider.showTypingIndicator ? 1 : 0)
       padding: EdgeInsets.only(top: 16, bottom: 24, left: 8, right: 8),
       itemBuilder: (context, index) {
-        final Message message = messages[index];
+        final Message message = messages[messages.length - 1 - index];
         final bool isUser = message.sender == 'user';
-        final bool isLastMessage = index == messages.length - 1;
+        final bool isLastMessage = index == 0;
 
         //   Better streaming detection
         final streamingContent = chatProvider.getStreamingContent(message.id);
@@ -3320,7 +3347,7 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Welcome to OASP Assist!',
+                          'Chat with OASP Assist!',
                           style: TextStyle(
                             fontSize: isMobile ? 18 : 20,
                             fontWeight: FontWeight.w700,
@@ -3356,9 +3383,9 @@ class FirstTimeWelcomeDialog extends StatelessWidget {
                     // Feature items
                     _buildFeatureItem(
                       icon: Icons.chat_bubble_outline,
-                      title: '5 Messages Per Day',
+                      title: '3 Messages Per Day',
                       description:
-                          'Ask up to 5 questions daily to get instant answers',
+                          'Ask up to 3 questions daily to get instant answers',
                       isMobile: isMobile,
                     ),
                     SizedBox(height: isMobile ? 14 : 16),

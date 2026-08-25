@@ -17,6 +17,8 @@ class SquareTile extends StatefulWidget {
 
 class _SquareTileState extends State<SquareTile> {
   bool _isLoading = false;
+  static const String _webClientId =
+      '13855273820-72hpqqhplltklr09mb40lqk84pn7ktke.apps.googleusercontent.com';
 
   Future<void> signInWithGoogleAccountSelection() async {
     if (_isLoading) return;
@@ -27,11 +29,14 @@ class _SquareTileState extends State<SquareTile> {
 
     try {
       print(' Starting Google Sign-In...');
+      print(' Google Sign-In platform: web=$kIsWeb');
 
       // Platform-specific implementation
       if (kIsWeb || (!kIsWeb && (Platform.isWindows || Platform.isLinux))) {
+        print(' Google Sign-In flow: Firebase popup');
         await _signInWithGoogleWeb();
       } else {
+        print(' Google Sign-In flow: native mobile');
         await _signInWithGoogleNative();
       }
     } catch (e, st) {
@@ -40,15 +45,20 @@ class _SquareTileState extends State<SquareTile> {
       final isCancellation =
           errorString.contains('cancel') ||
           errorString.contains('sign_in_cancelled') ||
-          errorString.contains('sign_in_failed') ||
-          errorString.contains('network_error') ||
           errorString == 'null' ||
           e is PlatformException &&
-              (e.code == 'sign_in_canceled' ||
-                  e.code == 'sign_in_failed' ||
-                  e.code == 'network_error');
+              e.code == 'sign_in_canceled';
 
       if (!isCancellation) {
+        if (e is FirebaseAuthException) {
+          print(
+            ' FirebaseAuthException: code=${e.code}, message=${e.message}, email=${e.email}',
+          );
+        } else if (e is PlatformException) {
+          print(
+            ' PlatformException: code=${e.code}, message=${e.message}, details=${e.details}',
+          );
+        }
         print(' Error during Google sign-in: $e\n$st');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -73,9 +83,11 @@ class _SquareTileState extends State<SquareTile> {
   // Web/Desktop sign-in using Firebase Auth directly
   Future<void> _signInWithGoogleWeb() async {
     final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+    print(' Google web auth provider created');
 
     // Force account selection
     googleProvider.setCustomParameters({'prompt': 'select_account'});
+    print(' Google web popup starting');
 
     try {
       final UserCredential userCredential = await FirebaseAuth.instance
@@ -104,6 +116,7 @@ class _SquareTileState extends State<SquareTile> {
       if (e.code == 'account-exists-with-different-credential') {
         await _handleAccountExistsError(e);
       } else {
+        print(' Google web FirebaseAuthException: ${e.code} - ${e.message}');
         rethrow;
       }
     }
@@ -112,20 +125,28 @@ class _SquareTileState extends State<SquareTile> {
   // Native mobile sign-in using google_sign_in package
   Future<void> _signInWithGoogleNative() async {
     final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+    print(' Google native initialize with serverClientId=$_webClientId');
+    await googleSignIn.initialize(serverClientId: _webClientId);
+    print(' Google native initialized');
 
     // OPTIMIZED: Only disconnect if needed, no unnecessary signOut
     // This prevents delays when user cancels immediately
+    print(' Google native account selection starting');
     final GoogleSignInAccount googleUser = await googleSignIn.authenticate();
+    print(' Google native selected account: ${googleUser.email}');
     //  Auth tokens
     final GoogleSignInAuthentication googleAuth =
         await googleUser.authentication;
+    print(' Google native idToken present: ${googleAuth.idToken != null}');
 
     //  Firebase Auth
     final credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
     );
+    print(' Firebase credential created from Google token');
 
     try {
+      print(' Firebase signInWithCredential starting');
       final UserCredential userCredential = await FirebaseAuth.instance
           .signInWithCredential(credential);
 
@@ -145,6 +166,7 @@ class _SquareTileState extends State<SquareTile> {
       if (e.code == 'account-exists-with-different-credential') {
         await _handleAccountExistsError(e, pendingCredential: credential);
       } else {
+        print(' Native FirebaseAuthException: ${e.code} - ${e.message}');
         rethrow;
       }
     }
