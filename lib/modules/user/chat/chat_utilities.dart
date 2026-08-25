@@ -1020,7 +1020,7 @@ class _MessageLimitWarningDialogState extends State<MessageLimitWarningDialog>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '/ 5',
+                              '/ 3',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w600,
