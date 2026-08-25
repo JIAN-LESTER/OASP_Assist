@@ -20,7 +20,7 @@ class GeminiService {
       _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
       if (_apiKey.isEmpty) {
-        throw Exception('Gemini API key not found in .env file');
+        throw Exception('Gemini API access is not configured for this client.');
       }
 
       _embedUrl =

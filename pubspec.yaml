@@ -93,7 +93,6 @@ flutter:
     - lib/images/guest.png
     - lib/images/oasp.png
     - lib/images/oasp_launcher.png
-    - .env
 
 flutter_launcher_icons:
   android: true

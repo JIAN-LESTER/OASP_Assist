@@ -23,7 +23,7 @@ class PineconeCloudService {
       _apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
 
       if (_baseUrl.isEmpty || _apiKey.isEmpty) {
-        throw Exception('Pinecone credentials not found in .env file');
+        throw Exception('Pinecone credentials are not configured for this client.');
       }
 
       if (kDebugMode) {
