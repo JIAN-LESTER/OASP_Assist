@@ -10,6 +10,7 @@ import {
   COHERE_EMBEDDING_DIMENSIONS,
   createCohereEmbedding,
 } from "./cohereEmbedding";
+import {GOOGLE_CLOUD_VISION_ENABLED} from "./integrationControls";
 
 // Define secrets
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
@@ -2191,6 +2192,139 @@ export const batchSyncCategoriesToInfoBank = onCall(
   }
 );
 
+async function deletePineconeChunks(chunkIds: string[]): Promise<void> {
+  if (chunkIds.length === 0) return;
+
+  const pineconeKey = PINECONE_API_KEY.value();
+  const pineconeHost = PINECONE_HOST.value();
+
+  if (!pineconeKey || !pineconeHost) {
+    throw new Error("Pinecone credentials are not configured");
+  }
+
+  await axios.post(
+    `${pineconeHost}/vectors/delete`,
+    {ids: chunkIds},
+    {
+      headers: {
+        "Api-Key": pineconeKey,
+        "Content-Type": "application/json",
+      },
+      timeout: 30000,
+    }
+  );
+}
+
+/**
+ * Remove searchable Information Bank data once an announcement deadline has
+ * been reached. The announcement itself remains available as historical data.
+ */
+export const cleanupExpiredAnnouncementInfoBank = onSchedule(
+  {
+    schedule: "0 * * * *",
+    timeZone: "Asia/Manila",
+    region: "asia-southeast1",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [PINECONE_API_KEY, PINECONE_HOST],
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+    console.info(
+      `Checking for expired announcement Information Bank entries at ${
+        now.toDate().toISOString()
+      }`
+    );
+
+    const expiredAnnouncements = await db
+      .collection("announcements")
+      .where("deadline", "<=", now)
+      .get();
+
+    let removedEntries = 0;
+    let failedAnnouncements = 0;
+
+    for (const announcementDoc of expiredAnnouncements.docs) {
+      const announcementData = announcementDoc.data();
+      if (announcementData.informationBankExpiredAt) {
+        continue;
+      }
+
+      const announcementId = announcementDoc.id;
+      const category = String(announcementData.category || "general")
+        .trim()
+        .toLowerCase();
+      const candidateIds = new Set([
+        `announcement_${announcementId}`,
+        `${category}_${announcementId}`,
+      ]);
+
+      try {
+        const linkedEntries = await db
+          .collection("information_bank")
+          .where("announcementId", "==", announcementId)
+          .get();
+        const entriesById = new Map<
+          string,
+          admin.firestore.DocumentSnapshot
+        >();
+        for (const linkedEntry of linkedEntries.docs) {
+          entriesById.set(linkedEntry.id, linkedEntry);
+        }
+
+        const candidateSnapshots = await Promise.all(
+          Array.from(candidateIds).map((id) =>
+            db.collection("information_bank").doc(id).get()
+          )
+        );
+        for (const candidate of candidateSnapshots) {
+          if (candidate.exists) entriesById.set(candidate.id, candidate);
+        }
+
+        for (const infoBankDoc of entriesById.values()) {
+          const infoBankData = infoBankDoc.data() || {};
+          const chunkIds = Array.isArray(infoBankData.chunkIds) ?
+            infoBankData.chunkIds.filter(
+              (id: unknown): id is string => typeof id === "string" && !!id
+            ) :
+            [];
+          const parentPineconeId = infoBankData.pinecone_id;
+
+          if (chunkIds.length === 0 &&
+              typeof parentPineconeId === "string" &&
+              parentPineconeId) {
+            chunkIds.push(parentPineconeId);
+          }
+
+          await deletePineconeChunks([...new Set(chunkIds)]);
+          await infoBankDoc.ref.delete();
+          removedEntries++;
+          console.info(
+            `Removed expired Information Bank entry ${infoBankDoc.id}`
+          );
+        }
+
+        await announcementDoc.ref.update({
+          informationBankExpiredAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          informationBankActive: false,
+        });
+      } catch (error) {
+        failedAnnouncements++;
+        console.error(
+          `Failed to clean expired announcement ${announcementId}`,
+          error
+        );
+      }
+    }
+
+    console.info(
+      `Expired announcement cleanup completed: ${removedEntries} ` +
+      `Information Bank entries removed, ${failedAnnouncements} failed`
+    );
+  }
+);
+
 export const cleanupDeletedAnnouncement = functions
   .region("asia-southeast1")
   .firestore
@@ -2266,35 +2400,37 @@ async function processPost(
 
 
     if (messageUnchanged && imagesAlreadyStored && permalinkUnchanged) {
-      // Still check if category doc or info bank is missing
+      // Still check if the category document or Information Bank entry is missing.
       const category = docData?.category?.toLowerCase() || "";
-      if (["admission", "scholarship", "placement"].includes(category)) {
-        const categoryDoc = await db
-          .collection(`${category}s`)
-          .doc(postId)
-          .get();
-        const infoBankId = `${category}_${postId}`;
-        const infoBankDoc = await db
-          .collection("information_bank")
-          .doc(infoBankId)
-          .get();
+      const hasStructuredCategory =
+        ["admission", "scholarship", "placement"].includes(category);
+      const categoryDoc = hasStructuredCategory ?
+        await db.collection(`${category}s`).doc(postId).get() :
+        null;
+      const infoBankId = hasStructuredCategory ?
+        `${category}_${postId}` :
+        `announcement_${postId}`;
+      const infoBankDoc = await db
+        .collection("information_bank")
+        .doc(infoBankId)
+        .get();
 
-        if (!categoryDoc.exists || !infoBankDoc.exists) {
-          const messageForAnalysis = docData?.ocr_text ?
-            `${originalMessage}\n\n[Text from images]:\n${docData.ocr_text}` :
-            originalMessage;
+      if ((categoryDoc && !categoryDoc.exists) || !infoBankDoc.exists) {
+        const storedOcrText = GOOGLE_CLOUD_VISION_ENABLED ?
+          docData?.ocr_text || "" : "";
+        const messageForAnalysis = storedOcrText ?
+          `${originalMessage}\n\n[Text from images]:\n${storedOcrText}` :
+          originalMessage;
 
-          await createCategoryAndInfoBank(
-            postId,
-            category.charAt(0).toUpperCase() + category.slice(1),
-            messageForAnalysis,
-            docData?.deadline || null,
-            cohereKey,
-            docData?.ocr_text || "",
-            allImageUrls.length
-          );
-        } else {
-        }
+        await createCategoryAndInfoBank(
+          postId,
+          category.charAt(0).toUpperCase() + category.slice(1),
+          messageForAnalysis,
+          docData?.deadline || null,
+          cohereKey,
+          storedOcrText,
+          allImageUrls.length
+        );
       }
       return;
     }
@@ -2311,7 +2447,8 @@ async function processPost(
     }
 
 
-    const combinedOcrText = docData?.ocr_text || "";
+    const combinedOcrText = GOOGLE_CLOUD_VISION_ENABLED ?
+      docData?.ocr_text || "" : "";
 
 
     const updatePayload: Record<string, any> = {
@@ -2337,35 +2474,34 @@ async function processPost(
 
 
     const category = docData?.category?.toLowerCase() || "";
-    if (["admission", "scholarship", "placement"].includes(category)) {
-      const categoryDoc = await db
-        .collection(`${category}s`)
-        .doc(postId)
-        .get();
-      const infoBankId = `${category}_${postId}`;
-      const infoBankDoc = await db
-        .collection("information_bank")
-        .doc(infoBankId)
-        .get();
+    const hasStructuredCategory =
+      ["admission", "scholarship", "placement"].includes(category);
+    const categoryDoc = hasStructuredCategory ?
+      await db.collection(`${category}s`).doc(postId).get() :
+      null;
+    const infoBankId = hasStructuredCategory ?
+      `${category}_${postId}` :
+      `announcement_${postId}`;
+    const infoBankDoc = await db
+      .collection("information_bank")
+      .doc(infoBankId)
+      .get();
 
-      const needsCategoryDoc = !categoryDoc.exists;
-      const needsInfoBank = !infoBankDoc.exists;
+    const needsCategoryDoc = categoryDoc !== null && !categoryDoc.exists;
+    const needsInfoBank = !infoBankDoc.exists;
 
+    if (needsCategoryDoc || needsInfoBank) {
+      const messageForAnalysis = originalMessage;
 
-      if (needsCategoryDoc || needsInfoBank) {
-        const messageForAnalysis = originalMessage;
-
-        await createCategoryAndInfoBank(
-          postId,
-          category.charAt(0).toUpperCase() + category.slice(1),
-          messageForAnalysis,
-          docData?.deadline || null,
-          cohereKey,
-          combinedOcrText,
-          allImageUrls.length
-        );
-      } else {
-      }
+      await createCategoryAndInfoBank(
+        postId,
+        category.charAt(0).toUpperCase() + category.slice(1),
+        messageForAnalysis,
+        docData?.deadline || null,
+        cohereKey,
+        combinedOcrText,
+        allImageUrls.length
+      );
     }
 
     return;
@@ -2441,6 +2577,13 @@ async function createCategoryAndInfoBank(
   const settings = await getAutoCreateSettings();
   const categoryLower = category.toLowerCase() as "admission" | "scholarship" | "placement";
 
+  if (deadlineTimestamp && deadlineTimestamp.toMillis() <= Date.now()) {
+    console.info(
+      `Skipping Information Bank sync for expired announcement ${postId}`
+    );
+    return;
+  }
+
   if (!settings.enabled) {
     return;
   }
@@ -2480,7 +2623,19 @@ async function createCategoryAndInfoBank(
         ocrText,
         imageCount
       );
+    } else {
+      await createInfoBankFromAnnouncement(
+        postId,
+        category,
+        messageForAnalysis,
+        deadlineTimestamp
+      );
     }
+
+    await db.collection("announcements").doc(postId).update({
+      informationBankActive: true,
+      informationBankExpiredAt: admin.firestore.FieldValue.delete(),
+    });
   } catch (categoryError: any) {
     try {
       await db.collection("category_creation_errors").add({
@@ -2494,6 +2649,123 @@ async function createCategoryAndInfoBank(
     }
 
     throw categoryError;
+  }
+}
+
+/**
+ * Add announcements without a dedicated category document to the Information
+ * Bank so every synced announcement is searchable by the assistant.
+ */
+async function createInfoBankFromAnnouncement(
+  announcementId: string,
+  category: string,
+  content: string,
+  deadline: admin.firestore.Timestamp | null
+): Promise<void> {
+  const normalizedContent = content.trim();
+  if (!normalizedContent) {
+    throw new Error(`Announcement ${announcementId} has no searchable content`);
+  }
+
+  const infoBankId = `announcement_${announcementId}`;
+  const infoBankRef = db.collection("information_bank").doc(infoBankId);
+  const existingDoc = await infoBankRef.get();
+
+  if (existingDoc.exists) {
+    console.info(
+      `Information Bank entry ${infoBankId} already exists; skipping duplicate`
+    );
+    return;
+  }
+
+  const normalizedCategory = category.trim().toLowerCase() || "general";
+  const firstLine = normalizedContent
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  const fallbackTitle = `${
+    normalizedCategory.charAt(0).toUpperCase() + normalizedCategory.slice(1)
+  } Announcement`;
+  const title = firstLine ?
+    firstLine.substring(0, 120) :
+    fallbackTitle;
+  const chunks = splitIntoChunks(normalizedContent, title, "announcement");
+  const chunkIds: string[] = [];
+
+  try {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const chunkTitle = chunks.length > 1 ?
+        `${title} (Part ${i + 1}/${chunks.length})` :
+        title;
+      const embedding = await createCohereEmbedding(
+        `Document title: ${title}\nSection text: ${chunk.text}`,
+        COHERE_API_KEY.value(),
+        "search_document"
+      );
+
+      await storePineconeVector(chunk.id, embedding, {
+        docId: infoBankId,
+        originalDocId: announcementId,
+        documentId: infoBankId,
+        announcementId,
+        text: chunk.text,
+        content: chunk.text,
+        title: chunkTitle,
+        originalTitle: title,
+        fileName: title,
+        chunkIndex: i,
+        chunk_index: i,
+        totalChunks: chunks.length,
+        chunkCount: chunks.length,
+        isFirstChunk: i === 0,
+        isLastChunk: i === chunks.length - 1,
+        source: "announcement",
+        category: normalizedCategory,
+        categoryID: normalizedCategory,
+        categoryType: normalizedCategory,
+        createdAt: new Date().toISOString(),
+        autoGeneratedFromAnnouncement: true,
+        ...(deadline && {deadline: deadline.toDate().toISOString()}),
+      });
+
+      chunkIds.push(chunk.id);
+    }
+
+    await infoBankRef.set({
+      ibID: infoBankId,
+      id: infoBankId,
+      originalId: announcementId,
+      announcementId,
+      ib_title: title,
+      title,
+      content: normalizedContent,
+      source: "announcement",
+      category: normalizedCategory,
+      categoryID: normalizedCategory,
+      categoryType: normalizedCategory,
+      deadline,
+      pinecone_id: chunkIds[0] || null,
+      totalChunks: chunks.length,
+      chunkIds,
+      chunked: chunks.length > 1,
+      chunkSize: 1000,
+      chunkOverlap: 200,
+      autoGeneratedFromAnnouncement: true,
+      uploadedViaFlutter: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    console.info(
+      `Added announcement ${announcementId} to Information Bank as ${infoBankId}`
+    );
+  } catch (error: any) {
+    console.error(
+      `Failed to add announcement ${announcementId} to Information Bank`,
+      error
+    );
+    throw error;
   }
 }
 async function softDeleteCategoryDocument(

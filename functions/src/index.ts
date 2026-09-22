@@ -1,3 +1,4 @@
+import "./integrationControls";
 import * as admin from "firebase-admin";
 
 
@@ -50,6 +51,7 @@ export {
   manualSyncFacebookPostsHttp,
   reprocessExistingAnnouncements,
   cleanupDeletedAnnouncement,
+  cleanupExpiredAnnouncementInfoBank,
 
   batchSyncCategoriesToInfoBank,
 
