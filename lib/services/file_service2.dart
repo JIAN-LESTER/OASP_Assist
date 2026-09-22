@@ -141,7 +141,9 @@ class FileService {
 
       for (int i = 0; i < chunks.length; i++) {
         final chunk = chunks[i];
-        final embedding = await _geminiService.embedText(chunk.text);
+        final embedding = await _geminiService.embedText(
+          'Document title: ${ib.title}\nSection text: ${chunk.text}',
+        );
 
         final chunkTitle =
             chunks.length > 1
@@ -272,7 +274,9 @@ class FileService {
         for (int i = 0; i < chunks.length; i++) {
           final chunk = chunks[i];
 
-          final embedding = await _geminiService.embedText(chunk.text);
+          final embedding = await _geminiService.embedText(
+            'Document title: ${ib.title}\nSection text: ${chunk.text}',
+          );
 
           final chunkTitle =
               chunks.length > 1
@@ -411,7 +415,9 @@ class FileService {
         final chunk = chunks[i];
 
         // Generate embedding for new content
-        final embedding = await _geminiService.embedText(chunk.text);
+        final embedding = await _geminiService.embedText(
+          'Document title: $newTitle\nSection text: ${chunk.text}',
+        );
 
         final chunkTitle =
             chunks.length > 1

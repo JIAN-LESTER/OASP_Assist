@@ -78,7 +78,7 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
 const COHERE_MODEL = "command-r-08-2024";
-const MAX_CONTEXT_CHARS = 600;
+const MAX_CONTEXT_CHARS = 2400;
 const MAX_HISTORY_CHARS = 140;
 const FAQ_SIMILARITY_THRESHOLD = 0.88;
 const FAQ_STRONG_SIMILARITY = 0.92;
@@ -347,7 +347,7 @@ async function findDirectFAQMatch(query: string): Promise<FAQMatch | null> {
 }
 
 async function retrieveRelevantDocuments(
-  _query: string,
+  query: string,
   queryEmbedding: number[],
   pineconeIndex: any,
   topK = 5,
@@ -364,7 +364,7 @@ async function retrieveRelevantDocuments(
   try {
     const similarChunks = await pineconeIndex.query({
       vector: queryEmbedding,
-      topK: topK * 4,
+      topK: topK * 8,
       includeMetadata: true,
     });
 
@@ -390,39 +390,126 @@ async function retrieveRelevantDocuments(
       }
     }
 
+    const queryTerms = getSearchTerms(query);
     const results: any[] = [];
 
     for (const docId of Object.keys(documentChunks)) {
-      const chunks = documentChunks[docId];
+      let chunks = documentChunks[docId];
       chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-      const topChunks = chunks.slice(0, 2);
-      const combinedContent = topChunks
+      const bestChunk = chunks[0];
+      const bestChunkIndex = getChunkIndex(bestChunk);
+
+      // Run a document-scoped query so the chunks immediately before and after
+      // the best semantic match are available even when they were not global
+      // top matches.
+      if (bestChunkIndex !== null) {
+        try {
+          const documentMatches = await pineconeIndex.query({
+            vector: queryEmbedding,
+            topK: 100,
+            includeMetadata: true,
+            filter: {docId: {$eq: docId}},
+          });
+          if (documentMatches.matches?.length) {
+            chunks = documentMatches.matches.map((chunk: any) => ({
+              ...chunk,
+              metadata: chunk.metadata || {},
+            }));
+          }
+        } catch (error) {
+          console.warn(`Adjacent chunk lookup failed for ${docId}:`, error);
+        }
+      }
+
+      const contextualChunks = selectContextualChunks(
+        chunks,
+        bestChunk,
+        bestChunkIndex
+      );
+      const combinedContent = contextualChunks
         .map((c) => c.metadata?.text || c.metadata?.content || c.metadata?.chunk_text || "")
         .filter((text) => text.trim())
         .join("\n\n");
 
       if (!combinedContent.trim()) continue;
 
+      const title = bestChunk.metadata?.originalTitle ||
+        bestChunk.metadata?.title || "Untitled";
+      const vectorScore = bestChunk.score || 0;
+      const lexicalScore = calculateLexicalScore(
+        queryTerms,
+        `${title}\n${combinedContent}`
+      );
+
       results.push({
         ibID: docId,
-        ib_title: topChunks[0].metadata?.title || "Untitled",
+        ib_title: title,
         content: combinedContent.trim(),
-        source: topChunks[0].metadata?.source || "Unknown",
-        categoryID: topChunks[0].metadata?.category || "General",
-        similarity_score: topChunks[0].score || 0,
+        source: bestChunk.metadata?.source || "Unknown",
+        categoryID: bestChunk.metadata?.category || "General",
+        similarity_score: vectorScore,
+        ranking_score: (vectorScore * 0.8) + (lexicalScore * 0.2),
         chunk_info: {
           total_chunks_found: chunks.length,
-          chunks_used: topChunks.length,
+          chunks_used: contextualChunks.length,
+          best_chunk_index: bestChunkIndex,
         },
       });
     }
 
-    results.sort((a, b) => b.similarity_score - a.similarity_score);
+    results.sort((a, b) => b.ranking_score - a.ranking_score);
+    console.info(
+      `Retrieved ${results.length} documents for query; ` +
+      `top score=${results[0]?.ranking_score?.toFixed(3) ?? "n/a"}`
+    );
     return results.slice(0, topK);
-  } catch {
+  } catch (error) {
+    console.error("Pinecone document retrieval failed:", error);
     return [];
   }
+}
+
+function getChunkIndex(chunk: any): number | null {
+  const value = chunk?.metadata?.chunkIndex ?? chunk?.metadata?.chunk_index;
+  return Number.isInteger(value) ? value : null;
+}
+
+function selectContextualChunks(
+  chunks: any[],
+  bestChunk: any,
+  bestChunkIndex: number | null
+): any[] {
+  if (bestChunkIndex === null) return [bestChunk];
+
+  const adjacent = chunks
+    .filter((chunk) => {
+      const index = getChunkIndex(chunk);
+      return index !== null && Math.abs(index - bestChunkIndex) <= 1;
+    })
+    .sort((a, b) => (getChunkIndex(a) ?? 0) - (getChunkIndex(b) ?? 0));
+
+  return adjacent.length > 0 ? adjacent : [bestChunk];
+}
+
+function getSearchTerms(text: string): string[] {
+  const stopWords = new Set([
+    "a", "an", "and", "are", "for", "how", "is", "of", "on", "the",
+    "to", "what", "when", "where", "which", "who", "why",
+  ]);
+  return Array.from(new Set(
+    normalizeFAQText(text).split(" ")
+      .filter((term) => term.length > 1 && !stopWords.has(term))
+  ));
+}
+
+function calculateLexicalScore(queryTerms: string[], text: string): number {
+  if (queryTerms.length === 0) return 0;
+  const searchableText = ` ${normalizeFAQText(text)} `;
+  const matchedTerms = queryTerms.filter(
+    (term) => searchableText.includes(` ${term} `)
+  ).length;
+  return matchedTerms / queryTerms.length;
 }
 
 export const generateAnswer = onRequest(
@@ -460,7 +547,6 @@ export const generateAnswer = onRequest(
         topK = 5,
         minSimilarityScore = 0.30,
         stream = true,
-        isFAQSelection = false,
       } = req.body;
 
       if (!query || typeof query !== "string" || query.trim().length === 0) {
@@ -472,10 +558,9 @@ export const generateAnswer = onRequest(
         return;
       }
 
-      // Free-typed messages must not be classified as FAQs. FAQ matching is
-      // enabled only when the user selected an item from the FAQ section.
+      // Exact FAQ matching applies to both typed questions and FAQ selections.
       stage = "direct_faq_lookup";
-      const directFAQMatch = isFAQSelection ? await findDirectFAQMatch(query) : null;
+      const directFAQMatch = await findDirectFAQMatch(query);
       if (directFAQMatch) {
         if (stream) {
           res.setHeader("Content-Type", "text/event-stream");
@@ -523,7 +608,7 @@ export const generateAnswer = onRequest(
 
       stage = "semantic_faq_lookup";
       const [faqMatch, pineconeIndex] = await Promise.all([
-        isFAQSelection ? findMatchingFAQ(query, queryEmbedding, cohereKey) : Promise.resolve(null),
+        findMatchingFAQ(query, queryEmbedding, cohereKey),
         Promise.resolve(pineconeClient.Index(PINECONE_INDEX_NAME)),
       ]);
 
@@ -578,7 +663,7 @@ export const generateAnswer = onRequest(
 
         const fallbackPrompt = `OASP Assist, CMU. Date: ${dateInfo}
 ${conversationContext ? `History:\n${conversationContext}\n` : ""}Q: ${query}
-Rules: Use general guidance only. If OASP-specific info is missing, say contact OASP staff.
+Rules: Start immediately with the answer. Never begin with "Based on" or refer to the document, policy, KB, context, or provided information. Include only supported answer content. Do not mention missing or unknown information, contacting staff, or escalation.
 A:`;
 
         if (stream) {
@@ -608,7 +693,7 @@ A:`;
             res.write("data: [DONE]\n\n");
             res.end();
           } catch {
-            const errorMsg = "I'm having trouble processing your request. Please contact OASP staff directly for assistance.";
+            const errorMsg = "I'm having trouble processing your request. Please try again.";
             res.write(`data: ${JSON.stringify({
               type: "content-delta",
               delta: {message: {content: {text: errorMsg}}},
@@ -628,7 +713,7 @@ A:`;
             res.json({answer: answer.trim(), source: "ai_fallback"});
           } catch {
             res.json({
-              answer: "I'm having trouble processing your request. Please contact OASP staff directly for assistance.",
+              answer: "I'm having trouble processing your request. Please try again.",
               source: "error",
             });
           }
@@ -747,7 +832,7 @@ A:`;
       }
 
       const answer =
-        "I'm having trouble processing your request right now. Please try again or contact OASP staff directly.";
+        "I'm having trouble processing your request right now. Please try again.";
 
       if (req.body?.stream && !res.writableEnded) {
         if (!res.headersSent) {
@@ -1187,7 +1272,7 @@ function buildContextAwarePrompt(
 ${historySection}Q: ${query}
 KB:
 ${knowledgeSection}
-Rules: Use KB first. Use history only for follow-ups. If OASP-specific details are missing, say contact OASP staff.
+Rules: Start immediately with the answer. Never begin with "Based on" or refer to the document, policy, KB, context, or provided information. Use history only for follow-ups. Include only facts supported by the KB. Do not mention missing or unknown information, contacting staff, or escalation.
 A:`;
 }
 
@@ -1211,7 +1296,7 @@ function buildPartialInfoPrompt(
 ${historySection}Q: ${query}
 Info:
 ${knowledgeSection}
-Rules: Use provided info first. If OASP-specific details are missing, say contact OASP staff.
+Rules: Start immediately with the answer. Never begin with "Based on" or refer to the document, policy, KB, context, or provided information. Include only supported facts. Do not mention missing or unknown information, contacting staff, or escalation.
 A:`;
 }
 
