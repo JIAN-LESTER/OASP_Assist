@@ -214,7 +214,7 @@ class AppDistributionQrButton extends StatelessWidget {
     if (!context.mounted) return;
 
     try {
-      final callable = FirebaseFunctions.instanceFor(region: 'asia-southeast1')
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
           .httpsCallable(
             'sendAppDistributionInvite',
             options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
