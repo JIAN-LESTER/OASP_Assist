@@ -1784,7 +1784,7 @@ async function createInfoBankFromCategory(
       while (retries > 0 && !embedding) {
         try {
           embedding = await createCohereEmbedding(
-            chunk.text,
+            `Document title: ${title}\nSection text: ${chunk.text}`,
             COHERE_API_KEY.value(),
             "search_document"
           );
@@ -2638,7 +2638,7 @@ async function syncCategoryToInfoBank(
       const chunk = chunks[i];
 
       const embedding = await createCohereEmbedding(
-        chunk.text,
+        `Document title: ${title}\nSection text: ${chunk.text}`,
         COHERE_API_KEY.value(),
         "search_document"
       );
@@ -3216,7 +3216,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
             const chunk = chunks[i];
 
             const embedding = await createCohereEmbedding(
-              chunk.text,
+              `Document title: ${title}\nSection text: ${chunk.text}`,
               COHERE_API_KEY.value(),
               "search_document"
             );

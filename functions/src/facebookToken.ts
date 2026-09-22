@@ -198,7 +198,7 @@ async function getUserPages(longUserToken: string): Promise<any> {
   const resp = await axios.get(url, {
     params: {
       access_token: longUserToken,
-      fields: "id,name,access_token,tasks,perms",
+      fields: "id,name,access_token,tasks",
       limit: 100,
     },
   });
