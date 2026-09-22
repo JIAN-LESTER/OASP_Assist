@@ -12,19 +12,20 @@ class GeminiService {
   final bool _isDesktop;
 
   // Desktop-only fields
-  late final String _apiKey;
+  late final String _cohereApiKey;
+  late final String _geminiApiKey;
   late final String _embedUrl;
 
   GeminiService() : _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
-      _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
+      _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
-      if (_apiKey.isEmpty) {
-        throw Exception('Gemini API access is not configured for this client.');
+      if (_cohereApiKey.isEmpty) {
+        throw Exception('Cohere API access is not configured for this client.');
       }
 
-      _embedUrl =
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_apiKey";
+      _embedUrl = 'https://api.cohere.ai/v1/embed';
 
       if (kDebugMode) {
         print('🖥️ Using desktop Gemini implementation');
@@ -68,37 +69,44 @@ class GeminiService {
     try {
       final response = await http.post(
         Uri.parse(_embedUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Authorization': 'Bearer $_cohereApiKey',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
-          'model': 'models/gemini-embedding-001',
-          'content': {
-            'parts': [
-              {'text': text},
-            ],
-          },
-          'embedContentConfig': {
-            'taskType': taskType,
-            'outputDimensionality': 768,
-            'autoTruncate': true,
-          },
+          'texts': [text],
+          'model': 'embed-multilingual-v3.0',
+          'input_type': taskType == 'RETRIEVAL_QUERY' || taskType == 'search_query'
+              ? 'search_query'
+              : 'search_document',
+          'embedding_types': ['float'],
         }),
       );
 
       if (response.statusCode != 200) {
-        print(' Gemini Embed API error: ${response.body}');
+        print(' Cohere Embed API error: ${response.body}');
         throw Exception('Failed to generate embedding: ${response.body}');
       }
 
       final data = jsonDecode(response.body);
-      final embedding = data['embedding']['values'] as List;
+      final embeddings = data['embeddings'];
+      final embedding = embeddings is Map
+          ? embeddings['float'][0] as List
+          : embeddings[0] as List;
       final embeddingList =
           embedding.map((e) => (e as num).toDouble()).toList();
+
+      if (embeddingList.length != 1024) {
+        throw Exception(
+          'Expected 1024 embedding dimensions, got ${embeddingList.length}',
+        );
+      }
 
       print(' Generated ${embeddingList.length}-dimensional embedding');
 
       return embeddingList;
     } catch (e) {
-      print(' Error generating Gemini embedding: $e');
+      print(' Error generating Cohere embedding: $e');
       rethrow;
     }
   }
@@ -108,7 +116,7 @@ class GeminiService {
     String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
     try {
-      final callable = functions.httpsCallable('generateGeminiEmbedding');
+      final callable = functions.httpsCallable('generateCohereEmbedding');
       final result = await callable.call({'text': text, 'taskType': taskType});
 
       final embedding = result.data['embedding'] as List;
@@ -118,7 +126,7 @@ class GeminiService {
       print(' Generated ${embeddingList.length}-dimensional embedding');
       return embeddingList;
     } catch (e) {
-      print(' Error generating Gemini embedding: $e');
+      print(' Error generating Cohere embedding: $e');
       rethrow;
     }
   }
@@ -146,7 +154,7 @@ class GeminiService {
   Future<String> _generateResponseDesktop(String prompt) async {
     try {
       final chatUrl =
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_apiKey';
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=$_geminiApiKey';
 
       final response = await http.post(
         Uri.parse(chatUrl),

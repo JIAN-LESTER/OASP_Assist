@@ -3,7 +3,13 @@ import {defineSecret} from "firebase-functions/params";
 import axios from "axios";
 import {Pinecone} from "@pinecone-database/pinecone";
 import * as admin from "firebase-admin";
-import {logGeminiUsage} from "./geminiUsage";
+import {
+  COHERE_EMBEDDING_DIMENSIONS,
+  COHERE_EMBEDDING_MODEL,
+  PINECONE_INDEX_NAME,
+  createCohereEmbedding,
+  normalizeCohereInputType,
+} from "./cohereEmbedding";
 
 type JsonResponse = Record<string, any>;
 
@@ -11,46 +17,6 @@ const PINECONE_HOST = defineSecret("PINECONE_HOST");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
-const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
-const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
-const GEMINI_EMBEDDING_DIMENSIONS = 768;
-
-function normalizeEmbeddingTaskType(taskType?: string): string {
-  switch (taskType) {
-  case "search_query":
-  case "RETRIEVAL_QUERY":
-    return "RETRIEVAL_QUERY";
-  case "search_document":
-  case "RETRIEVAL_DOCUMENT":
-    return "RETRIEVAL_DOCUMENT";
-  case "SEMANTIC_SIMILARITY":
-  case "CLASSIFICATION":
-  case "CLUSTERING":
-  case "QUESTION_ANSWERING":
-  case "FACT_VERIFICATION":
-  case "CODE_RETRIEVAL_QUERY":
-    return taskType;
-  default:
-    return "RETRIEVAL_DOCUMENT";
-  }
-}
-
-function buildGeminiEmbeddingRequest(
-  text: string,
-  taskType?: string
-): JsonResponse {
-  return {
-    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
-    content: {parts: [{text}]},
-    taskType: normalizeEmbeddingTaskType(taskType),
-    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-    embedContentConfig: {
-      taskType: normalizeEmbeddingTaskType(taskType),
-      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-    },
-  };
-}
-
 export const checkPineconeHealth = onCall(
   {
     secrets: [PINECONE_API_KEY],
@@ -61,7 +27,7 @@ export const checkPineconeHealth = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       // Try to get index stats as a health check
       await index.describeIndexStats();
@@ -81,7 +47,7 @@ export const checkPineconeHealth = onCall(
 );
 
 export const generateGeminiEmbedding = onCall(
-  { secrets: [GEMINI_API_KEY], timeoutSeconds: 60 },
+  { secrets: [COHERE_API_KEY], timeoutSeconds: 60 },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
 
@@ -91,42 +57,16 @@ export const generateGeminiEmbedding = onCall(
     }
 
     try {
-      const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
-        buildGeminiEmbeddingRequest(text.trim(), taskType),
-        {
-          headers: {"Content-Type": "application/json"},
-          timeout: 30000,
-        }
+      const embedding = await createCohereEmbedding(
+        text.trim(),
+        COHERE_API_KEY.value(),
+        normalizeCohereInputType(taskType)
       );
 
-      const embedding = response.data?.embedding?.values;
-
-      await logGeminiUsage({
-        userId: request.auth.uid ?? null,
-        conversationId: null,
-        model: GEMINI_EMBEDDING_MODEL,
-        inputTokens: response.data?.usageMetadata?.promptTokenCount ??
-          Math.ceil(text.length / 4),
-        outputTokens: 0,
-      }).catch(() => undefined);
-
-      if (!Array.isArray(embedding) || embedding.length === 0) {
-        console.error(
-          " Unexpected Gemini response:",
-          JSON.stringify(response.data)
-        );
-        throw new HttpsError("internal", "No embedding returned from Gemini");
-      }
-      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
-        throw new HttpsError(
-          "internal",
-          `Unexpected embedding dimension: ${embedding.length} ` +
-          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
-        );
-      }
-
-      console.log(` Embedding generated: ${embedding.length} dimensions`);
+      console.warn(
+        "Legacy generateGeminiEmbedding callable used; returned Cohere embedding"
+      );
+      console.info(`Embedding generated: ${embedding.length} dimensions`);
       return { embedding };
     } catch (error: any) {
       if (error instanceof HttpsError) throw error;
@@ -134,12 +74,12 @@ export const generateGeminiEmbedding = onCall(
       const msg = error.response?.data?.error?.message ??
         error.message ??
         "Unknown error";
-      console.error(" Gemini embedding error:", msg);
+      console.error(" Cohere embedding error:", msg);
       console.error(
-        " Full Gemini error:",
+        " Full Cohere error:",
         JSON.stringify(error.response?.data ?? {})
       );
-      throw new HttpsError("internal", `Gemini embedding failed: ${msg}`);
+      throw new HttpsError("internal", `Cohere embedding failed: ${msg}`);
     }
   }
 );
@@ -182,31 +122,19 @@ export const generateCohereEmbedding = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {text} = request.data;
+    const {text, taskType} = request.data;
     if (!text) throw new Error("Text required");
 
     try {
-      const response = await axios.post<JsonResponse>(
-        "https://api.cohere.ai/v1/embed",
-        {
-          texts: [text],
-          model: "embed-multilingual-v3.0",
-          input_type: "search_document",
-        },
-        {
-          headers: {
-            "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000,
-        }
+      const embedding = await createCohereEmbedding(
+        text.trim(),
+        COHERE_API_KEY.value(),
+        normalizeCohereInputType(taskType)
       );
-
-      const embedding = response.data?.embeddings?.[0];
-      if (!Array.isArray(embedding)) {
-        throw new Error("Invalid Cohere embedding");
-      }
-
+      console.info(
+        `Cohere ${COHERE_EMBEDDING_MODEL} embedding generated: ` +
+        `${embedding.length} dimensions`
+      );
       return {embedding};
     } catch (error: any) {
       console.error(" Cohere embedding error:", error.message);
@@ -276,7 +204,7 @@ async function writePineconeUsage({
   await admin.firestore().collection("pinecone_usage").add({
     userId: userId ?? null,
     tool: "Pinecone",
-    index: "oasp-assist-gemini",
+    index: PINECONE_INDEX_NAME,
     operation,
     source: source ?? "document_upload",
     namespace: namespace ?? null,
@@ -320,13 +248,16 @@ export const queryPinecone = onCall(
     if (!request.auth) throw new Error("Unauthorized");
 
     const {embedding, topK = 5, namespace, filter} = request.data;
-    if (!embedding || !Array.isArray(embedding)) {
-      throw new Error("Valid embedding array required");
+    if (!embedding || !Array.isArray(embedding) ||
+        embedding.length !== COHERE_EMBEDDING_DIMENSIONS) {
+      throw new Error(
+        `A ${COHERE_EMBEDDING_DIMENSIONS}-dimensional embedding is required`
+      );
     }
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       const results = await index.query({
         vector: embedding,
@@ -361,13 +292,17 @@ export const insertPineconeDocument = onCall(
     if (!request.auth) throw new Error("Unauthorized");
 
     const {id, embedding, metadata, namespace} = request.data;
-    if (!id || !embedding || !metadata) {
-      throw new Error("ID, embedding, and metadata required");
+    if (!id || !Array.isArray(embedding) ||
+        embedding.length !== COHERE_EMBEDDING_DIMENSIONS || !metadata) {
+      throw new Error(
+        `ID, metadata, and a ${COHERE_EMBEDDING_DIMENSIONS}-dimensional ` +
+        "embedding are required"
+      );
     }
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       await index.upsert([{
         id,
@@ -408,11 +343,17 @@ export const insertPineconeDocumentBatch = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       const vectors = documents.map((doc) => {
         if (!doc.id || !doc.embedding || !doc.metadata) {
           throw new Error("Each document must have id, embedding, and metadata");
+        }
+        if (!Array.isArray(doc.embedding) ||
+            doc.embedding.length !== COHERE_EMBEDDING_DIMENSIONS) {
+          throw new Error(
+            `Each embedding must have ${COHERE_EMBEDDING_DIMENSIONS} dimensions`
+          );
         }
         return {
           id: doc.id,
@@ -467,7 +408,7 @@ export const deletePineconeDocuments = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       await index.deleteMany(ids);
 
@@ -501,7 +442,7 @@ export const fetchPineconeVectors = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       const results = await index.fetch(ids);
 
@@ -571,7 +512,7 @@ export const getPineconeStats = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       const stats = await index.describeIndexStats();
 
@@ -621,7 +562,7 @@ export const deleteAllPineconeVectors = onCall(
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
-      const index = pinecone.Index("oasp-assist-gemini");
+      const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       if (namespace) {
         await index.deleteAll();

@@ -7,6 +7,13 @@ import {Pinecone} from "@pinecone-database/pinecone";
 import axios from "axios";
 import {onSchedule} from "firebase-functions/scheduler";
 import {Firestore, FieldValue} from "@google-cloud/firestore";
+import {
+  COHERE_EMBEDDING_DIMENSIONS,
+  COHERE_EMBEDDING_MODEL,
+  PINECONE_INDEX_NAME,
+  createCohereEmbedding,
+  normalizeCohereInputType,
+} from "./cohereEmbedding";
 
 type JsonResponse = Record<string, any>;
 type FAQMatch = {
@@ -70,63 +77,12 @@ async function logGeminiUsage({userId, conversationId, model, inputTokens, outpu
 
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
+const COHERE_MODEL = "command-r-08-2024";
 const MAX_CONTEXT_CHARS = 600;
 const MAX_HISTORY_CHARS = 140;
 const FAQ_SIMILARITY_THRESHOLD = 0.88;
 const FAQ_STRONG_SIMILARITY = 0.92;
 const FAQ_SIMILARITY_MARGIN = 0.03;
-const GEMINI_EMBEDDING_MODEL = "gemini-embedding-001";
-const GEMINI_EMBEDDING_MODEL_RESOURCE = `models/${GEMINI_EMBEDDING_MODEL}`;
-const GEMINI_EMBEDDING_DIMENSIONS = 768;
-
-type GeminiEmbeddingTaskType =
-  | "RETRIEVAL_QUERY"
-  | "RETRIEVAL_DOCUMENT"
-  | "SEMANTIC_SIMILARITY"
-  | "CLASSIFICATION"
-  | "CLUSTERING"
-  | "QUESTION_ANSWERING"
-  | "FACT_VERIFICATION"
-  | "CODE_RETRIEVAL_QUERY";
-
-function normalizeEmbeddingTaskType(taskType?: string): GeminiEmbeddingTaskType {
-  switch (taskType) {
-  case "search_query":
-  case "RETRIEVAL_QUERY":
-    return "RETRIEVAL_QUERY";
-  case "search_document":
-  case "RETRIEVAL_DOCUMENT":
-    return "RETRIEVAL_DOCUMENT";
-  case "SEMANTIC_SIMILARITY":
-  case "CLASSIFICATION":
-  case "CLUSTERING":
-  case "QUESTION_ANSWERING":
-  case "FACT_VERIFICATION":
-  case "CODE_RETRIEVAL_QUERY":
-    return taskType;
-  default:
-    return "RETRIEVAL_DOCUMENT";
-  }
-}
-
-function buildGeminiEmbeddingRequest(
-  text: string,
-  taskType?: string
-): JsonResponse {
-  return {
-    model: GEMINI_EMBEDDING_MODEL_RESOURCE,
-    content: {
-      parts: [{text}],
-    },
-    taskType: normalizeEmbeddingTaskType(taskType),
-    outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-    embedContentConfig: {
-      taskType: normalizeEmbeddingTaskType(taskType),
-      outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
-    },
-  };
-}
-
 function getAxiosErrorMessage(error: any): string {
   return error.response?.data?.error?.message ??
     error.message ??
@@ -156,73 +112,21 @@ export const generateCohereEmbedding = onCall(
   async (request) => {
     if (!request.auth) throw new Error("Unauthorized");
 
-    const {text} = request.data;
+    const {text, taskType} = request.data;
     if (!text) throw new Error("Text required");
 
-    const response = await axios.post<JsonResponse>(
-      "https://api.cohere.ai/v1/embed",
-      {
-        texts: [text],
-        model: "embed-multilingual-v3.0",
-        input_type: "search_document",
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${COHERE_API_KEY.value()}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      }
+    const embedding = await createCohereEmbedding(
+      text,
+      COHERE_API_KEY.value(),
+      normalizeCohereInputType(taskType)
     );
-
-    const embedding = response.data?.embeddings?.[0];
-    if (!Array.isArray(embedding)) {
-      throw new Error("Invalid Cohere embedding");
-    }
-
+    console.info(`Cohere embedding generated: ${embedding.length} dimensions`);
     return {embedding};
   }
 );
 
-async function generateGeminiEmbedding(
-  text: string,
-  apiKey: string,
-  inputType: "search_document" | "search_query" = "search_document"
-): Promise<number[]> {
-  const response = await axios.post<JsonResponse>(
-    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${apiKey}`,
-    buildGeminiEmbeddingRequest(text, inputType),
-    {
-      headers: {"Content-Type": "application/json"},
-      timeout: 30000,
-    }
-  );
-
-  const embedding = response.data?.embedding?.values;
-  if (!Array.isArray(embedding) || embedding.length === 0) {
-    throw new Error("Invalid embedding response");
-  }
-
-  if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
-    throw new Error(
-      `Unexpected embedding size: ${embedding.length} ` +
-      `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
-    );
-  }
-
-  await logGeminiUsage({
-    userId: null,
-    conversationId: null,
-    model: GEMINI_EMBEDDING_MODEL,
-    inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
-    outputTokens: 0,
-  }).catch(() => undefined);
-
-  return embedding;
-}
-
 export const generateEmbedding = onCall(
-  {secrets: [GEMINI_API_KEY]},
+  {secrets: [COHERE_API_KEY]},
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
     const {text, taskType} = request.data;
@@ -231,39 +135,18 @@ export const generateEmbedding = onCall(
     }
 
     try {
-      const response = await axios.post<JsonResponse>(
-        `https://generativelanguage.googleapis.com/v1beta/${GEMINI_EMBEDDING_MODEL_RESOURCE}:embedContent?key=${GEMINI_API_KEY.value()}`,
-        buildGeminiEmbeddingRequest(text.trim(), taskType),
-        {
-          headers: {"Content-Type": "application/json"},
-          timeout: 30000,
-        }
+      const embedding = await createCohereEmbedding(
+        text.trim(),
+        COHERE_API_KEY.value(),
+        normalizeCohereInputType(taskType)
       );
-
-      const embedding = response.data?.embedding?.values;
-      if (!Array.isArray(embedding) || embedding.length === 0) {
-        throw new Error("Invalid Gemini embedding response");
-      }
-      if (embedding.length !== GEMINI_EMBEDDING_DIMENSIONS) {
-        throw new Error(
-          `Unexpected embedding dimension: ${embedding.length} ` +
-          `(expected ${GEMINI_EMBEDDING_DIMENSIONS})`
-        );
-      }
-      await logGeminiUsage({
-        userId: request.auth.uid ?? null,
-        conversationId: null,
-        model: GEMINI_EMBEDDING_MODEL,
-        inputTokens: response.data?.usageMetadata?.promptTokenCount ?? Math.ceil(text.length / 4),
-        outputTokens: 0,
-      }).catch(() => undefined);
-
+      console.info(`Cohere embedding generated: ${embedding.length} dimensions`);
       return {embedding};
     } catch (error: any) {
       const msg = getAxiosErrorMessage(error);
-      console.error("Gemini embedding error:", msg);
+      console.error("Cohere embedding error:", msg);
       console.error(
-        "Gemini embedding response:",
+        "Cohere embedding response:",
         JSON.stringify(error.response?.data ?? {})
       );
       throw new HttpsError("internal", `Embedding failed: ${msg}`);
@@ -293,7 +176,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
 async function findMatchingFAQ(
   _query: string,
   queryEmbedding: number[],
-  geminiApiKey: string,
+  cohereApiKey: string,
   similarityThreshold = FAQ_SIMILARITY_THRESHOLD
 ): Promise<FAQMatch | null> {
   try {
@@ -317,23 +200,29 @@ async function findMatchingFAQ(
 
       let faqEmbedding: number[];
       const storedEmbedding =
+        data.cohereEmbedding ??
         data.contextEmbedding ??
         data.faqContextEmbedding ??
         data.embedding ??
         data.geminiEmbedding;
 
-      if (storedEmbedding && Array.isArray(storedEmbedding) && storedEmbedding.length === 768) {
+      if (storedEmbedding && Array.isArray(storedEmbedding) &&
+          storedEmbedding.length === COHERE_EMBEDDING_DIMENSIONS) {
         faqEmbedding = storedEmbedding as number[];
       } else {
-        faqEmbedding = await generateGeminiEmbedding(
+        faqEmbedding = await createCohereEmbedding(
           buildFAQContext(faqQuestion, faqAnswer),
-          geminiApiKey,
+          cohereApiKey,
           "search_document"
         );
 
         await doc.ref.update({
+          embedding: faqEmbedding,
+          cohereEmbedding: faqEmbedding,
           contextEmbedding: faqEmbedding,
           faqContextEmbedding: faqEmbedding,
+          embeddingModel: COHERE_EMBEDDING_MODEL,
+          embeddingDimensions: COHERE_EMBEDDING_DIMENSIONS,
           embeddingUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
@@ -538,7 +427,7 @@ async function retrieveRelevantDocuments(
 
 export const generateAnswer = onRequest(
   {
-    secrets: [PINECONE_API_KEY, GEMINI_API_KEY],
+    secrets: [PINECONE_API_KEY, GEMINI_API_KEY, COHERE_API_KEY],
     cors: true,
     timeoutSeconds: 60,
     memory: "1GiB",
@@ -623,18 +512,19 @@ export const generateAnswer = onRequest(
 
 
       const geminiKey = GEMINI_API_KEY.value();
+      const cohereKey = COHERE_API_KEY.value();
       const pineconeKey = PINECONE_API_KEY.value();
 
       stage = "query_embedding";
       const [queryEmbedding, pineconeClient] = await Promise.all([
-        generateGeminiEmbedding(query, geminiKey, "search_query"),
+        createCohereEmbedding(query, cohereKey, "search_query"),
         Promise.resolve(new Pinecone({apiKey: pineconeKey})),
       ]);
 
       stage = "semantic_faq_lookup";
       const [faqMatch, pineconeIndex] = await Promise.all([
-        isFAQSelection ? findMatchingFAQ(query, queryEmbedding, geminiKey) : Promise.resolve(null),
-        Promise.resolve(pineconeClient.Index("oasp-assist-gemini")),
+        isFAQSelection ? findMatchingFAQ(query, queryEmbedding, cohereKey) : Promise.resolve(null),
+        Promise.resolve(pineconeClient.Index(PINECONE_INDEX_NAME)),
       ]);
 
       // FAQ MATCH
@@ -698,7 +588,11 @@ A:`;
 
           try {
             stage = "ai_fallback_stream";
-            for await (const chunk of generateGeminiResponseStream(fallbackPrompt, geminiKey)) {
+            for await (const chunk of generateResponseStreamWithFallback(
+              fallbackPrompt,
+              geminiKey,
+              cohereKey
+            )) {
               if (chunk && chunk.length > 0) {
                 res.write(`data: ${JSON.stringify({
                   type: "content-delta",
@@ -726,7 +620,11 @@ A:`;
         } else {
           try {
             stage = "ai_fallback_generate";
-            const answer = await generateGeminiResponse(fallbackPrompt, geminiKey);
+            const answer = await generateResponseWithFallback(
+              fallbackPrompt,
+              geminiKey,
+              cohereKey
+            );
             res.json({answer: answer.trim(), source: "ai_fallback"});
           } catch {
             res.json({
@@ -757,7 +655,11 @@ A:`;
 
         try {
           stage = "rag_stream";
-          for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
+          for await (const chunk of generateResponseStreamWithFallback(
+            prompt,
+            geminiKey,
+            cohereKey
+          )) {
             if (chunk && chunk.length > 0) {
               streamSucceeded = true;
               res.write(`data: ${JSON.stringify({
@@ -776,13 +678,26 @@ A:`;
             res.end();
             return;
           }
-        } catch {
+        } catch (error: any) {
+          console.error("RAG response stream failed:", getAxiosErrorMessage(error));
+          if (streamSucceeded) {
+            res.write(`data: ${JSON.stringify({
+              type: "error",
+              error: "The response stream ended unexpectedly",
+            })}\n\n`);
+            res.end();
+            return;
+          }
         }
 
         // FALLBACK IF STREAMING FAILS
         try {
           stage = "rag_generate_fallback";
-          const fullAnswer = await generateGeminiResponse(prompt, geminiKey);
+          const fullAnswer = await generateResponseWithFallback(
+            prompt,
+            geminiKey,
+            cohereKey
+          );
 
           const chunkSize = 30;
           for (let i = 0; i < fullAnswer.length; i += chunkSize) {
@@ -809,7 +724,11 @@ A:`;
         }
       } else {
         stage = "rag_generate";
-        const answer = await generateGeminiResponse(prompt, geminiKey);
+        const answer = await generateResponseWithFallback(
+          prompt,
+          geminiKey,
+          cohereKey
+        );
         res.json({
           answer: answer.trim(),
           source: "information_bank",
@@ -918,6 +837,62 @@ async function generateGeminiResponse(
   throw lastError instanceof Error ? lastError : new Error("Gemini response failed");
 }
 
+async function generateCohereResponse(
+  prompt: string,
+  apiKey: string
+): Promise<string> {
+  try {
+    const response = await axios.post<JsonResponse>(
+      "https://api.cohere.com/v2/chat",
+      {
+        model: COHERE_MODEL,
+        messages: [{role: "user", content: prompt}],
+        temperature: 0.3,
+        max_tokens: 1024,
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      }
+    );
+
+    const content = response.data?.message?.content;
+    const text = Array.isArray(content) ? content
+      .map((part: any) => typeof part?.text === "string" ? part.text : "")
+      .filter((part: string) => part.length > 0)
+      .join("") : "";
+
+    if (!text) {
+      throw new Error("Empty response from Cohere");
+    }
+
+    console.info(`Cohere fallback generation succeeded with ${COHERE_MODEL}`);
+    return text;
+  } catch (error: any) {
+    console.error("Cohere fallback generation failed:", getAxiosErrorMessage(error));
+    throw error;
+  }
+}
+
+async function generateResponseWithFallback(
+  prompt: string,
+  geminiKey: string,
+  cohereKey: string
+): Promise<string> {
+  try {
+    return await generateGeminiResponse(prompt, geminiKey);
+  } catch (error: any) {
+    console.warn(
+      "Gemini generation unavailable; switching to Cohere:",
+      getAxiosErrorMessage(error)
+    );
+    return generateCohereResponse(prompt, cohereKey);
+  }
+}
+
 function extractGeminiText(data: any): string {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return "";
@@ -1018,6 +993,120 @@ async function* generateGeminiResponseStream(
       }
     }
   } catch (error) {
+    throw error;
+  }
+}
+
+async function* generateCohereResponseStream(
+  prompt: string,
+  apiKey: string
+): AsyncGenerator<string, void, unknown> {
+  const response = await fetch("https://api.cohere.com/v2/chat", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: COHERE_MODEL,
+      messages: [{role: "user", content: prompt}],
+      temperature: 0.3,
+      max_tokens: 1024,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Cohere Stream API error: ${response.status} ${response.statusText}`
+    );
+  }
+  if (!response.body) {
+    throw new Error("Cohere response body is null");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, {stream: true});
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine.startsWith("data:")) continue;
+
+      const jsonText = trimmedLine.substring(5).trim();
+      if (!jsonText || jsonText === "[DONE]") continue;
+
+      try {
+        const event = JSON.parse(jsonText);
+        if (event?.type === "content-delta") {
+          const text = event?.delta?.message?.content?.text;
+          if (typeof text === "string" && text.length > 0) yield text;
+        }
+      } catch {
+        // Ignore malformed or incomplete SSE events.
+      }
+    }
+  }
+
+  const finalLine = buffer.trim();
+  if (finalLine.startsWith("data:")) {
+    try {
+      const event = JSON.parse(finalLine.substring(5).trim());
+      const text = event?.type === "content-delta" ?
+        event?.delta?.message?.content?.text : "";
+      if (typeof text === "string" && text.length > 0) yield text;
+    } catch {
+      // Ignore an incomplete final event.
+    }
+  }
+}
+
+async function* generateResponseStreamWithFallback(
+  prompt: string,
+  geminiKey: string,
+  cohereKey: string
+): AsyncGenerator<string, void, unknown> {
+  let geminiEmittedContent = false;
+
+  try {
+    for await (const chunk of generateGeminiResponseStream(prompt, geminiKey)) {
+      geminiEmittedContent = true;
+      yield chunk;
+    }
+    if (!geminiEmittedContent) throw new Error("Gemini returned an empty stream");
+    return;
+  } catch (error: any) {
+    if (geminiEmittedContent) {
+      console.error(
+        "Gemini stream failed after emitting content; Cohere fallback skipped:",
+        getAxiosErrorMessage(error)
+      );
+      throw error;
+    }
+    console.warn(
+      "Gemini stream unavailable; switching to Cohere:",
+      getAxiosErrorMessage(error)
+    );
+  }
+
+  let cohereEmittedContent = false;
+  try {
+    for await (const chunk of generateCohereResponseStream(prompt, cohereKey)) {
+      cohereEmittedContent = true;
+      yield chunk;
+    }
+    if (!cohereEmittedContent) throw new Error("Cohere returned an empty stream");
+    console.info(`Cohere fallback stream succeeded with ${COHERE_MODEL}`);
+  } catch (error: any) {
+    console.error("Cohere fallback stream failed:", getAxiosErrorMessage(error));
     throw error;
   }
 }

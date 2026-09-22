@@ -225,10 +225,10 @@ class _AddFaqContentState extends State<AddFaqContent> {
 
           if (embedding != null) {
             faqData['embedding'] = embedding;
-            faqData['geminiEmbedding'] = embedding;
+            faqData['cohereEmbedding'] = embedding;
             faqData['contextEmbedding'] = embedding;
             faqData['faqContextEmbedding'] = embedding;
-            faqData['embeddingModel'] = 'gemini-embedding-001';
+            faqData['embeddingModel'] = 'embed-multilingual-v3.0';
             faqData['embeddingDimensions'] = embedding.length;
           }
 

@@ -1,5 +1,5 @@
 name: capstone_project
-description: "A new Flutter project."
+description: "A Cross-Platform Inquiry Assistant Application for CMU-OASP Using AI-Driven Retrieval."
 publish_to: 'none'
 version: 0.1.0
 
@@ -38,6 +38,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   qr_flutter: ^4.1.0
   url_launcher: ^6.3.2
+  
   flutter_linkify: ^6.0.0
   docx_to_text: ^1.0.1
   universal_html: ^2.3.0

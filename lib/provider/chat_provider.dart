@@ -1315,8 +1315,7 @@ $question
   }
 
   // =========================================================================
-  // FIX 1: FAQ Match - resolve embedding field (handles both 'embedding' and
-  // 'geminiEmbedding') so predefined and auto-promoted FAQs both work.
+  // Resolve the current Cohere embedding first, while tolerating legacy fields.
   // =========================================================================
   Map<String, dynamic>? _findBestFAQMatch(
     String question,
@@ -1341,7 +1340,10 @@ $question
         }
 
         final rawEmbedding =
-            data['contextEmbedding'] ?? data['faqContextEmbedding'];
+            data['cohereEmbedding'] ??
+            data['contextEmbedding'] ??
+            data['faqContextEmbedding'] ??
+            data['embedding'];
 
         if (rawEmbedding == null) {
           print('⚠️ FAQ missing embedding: $faqQuestion');
@@ -1364,13 +1366,13 @@ $question
           continue;
         }
 
-        // FIX: Strict dimension check - only compare 768-dim embeddings.
+        // Only compare Cohere embed-multilingual-v3.0 vectors.
         // Mixing different embedding models produces nonsense similarity scores.
-        if (faqEmbedding.length != 768 || questionEmbedding.length != 768) {
+        if (faqEmbedding.length != 1024 || questionEmbedding.length != 1024) {
           print(
             '⚠️ Embedding dimension mismatch or wrong model: '
             'FAQ=${faqEmbedding.length}, Query=${questionEmbedding.length} '
-            '(expected 768). Skipping.',
+            '(expected 1024). Skipping.',
           );
           continue;
         }
@@ -1504,7 +1506,7 @@ $question
 
   // =========================================================================
   // FIX 2: FAQ cache loader - resolve both embedding field names and enforce
-  // 768-dimension check so mismatched embeddings never enter the cache.
+  // 1024-dimension check so mismatched embeddings never enter the cache.
   // =========================================================================
   Future<void> _ensureFAQCacheLoaded() async {
     if (FAQCache.isExpired || FAQCache.cache.isEmpty) {
@@ -1538,7 +1540,10 @@ $question
           }
 
           final rawEmbedding =
-              data['contextEmbedding'] ?? data['faqContextEmbedding'];
+              data['cohereEmbedding'] ??
+              data['contextEmbedding'] ??
+              data['faqContextEmbedding'] ??
+              data['embedding'];
 
           if (rawEmbedding == null ||
               rawEmbedding is! List ||
@@ -1551,11 +1556,11 @@ $question
             continue;
           }
 
-          // FIX: Enforce 768 dimensions - reject wrong-model embeddings.
-          if ((rawEmbedding as List).length != 768) {
+          // Enforce 1024 dimensions and reject wrong-model embeddings.
+          if ((rawEmbedding as List).length != 1024) {
             print(
               '⚠️ Skipping FAQ ${doc.id}: Wrong embedding size '
-              '${rawEmbedding.length} (expected 768) - '
+              '${rawEmbedding.length} (expected 1024) - '
               '"${question.substring(0, min(50, question.length))}"',
             );
             skippedCount++;
@@ -2474,7 +2479,7 @@ $question
                   .map((e) => (e as num).toDouble())
                   .toList();
 
-          if (pastEmbedding.length != 768 || currentEmbedding.length != 768) {
+          if (pastEmbedding.length != 1024 || currentEmbedding.length != 1024) {
             continue;
           }
 
@@ -2518,13 +2523,15 @@ $question
           bool semanticDuplicateFound = false;
           for (var cacheEntry in FAQCache.cache.values) {
             final rawEmb =
-                cacheEntry['embedding'] ?? cacheEntry['geminiEmbedding'];
+                cacheEntry['cohereEmbedding'] ??
+                cacheEntry['embedding'] ??
+                cacheEntry['geminiEmbedding'];
             if (rawEmb == null) continue;
             try {
               final existingEmb = List<double>.from(
                 (rawEmb as List).map((e) => (e as num).toDouble()),
               );
-              if (existingEmb.length != 768) continue;
+              if (existingEmb.length != 1024) continue;
               final sim = cosineSimilarity(currentEmbedding, existingEmb);
               if (sim > 0.92) {
                 print(
@@ -2586,7 +2593,7 @@ $question
               final embList = List<double>.from(
                 (cdEmb as List).map((e) => (e as num).toDouble()),
               );
-              if (embList.length != 768) continue;
+              if (embList.length != 1024) continue;
               final sim = cosineSimilarity(currentEmbedding, embList);
               if (sim > 0.92) {
                 // Bump that existing candidate instead.
@@ -2895,7 +2902,7 @@ $question
     }
   }
 
-  late final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+  late final String _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
 
   Future<List<double>> generateEmbedding(
     String question, {
@@ -2913,49 +2920,48 @@ $question
     String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
     try {
-      print('🪟 Windows: Generating Gemini embedding via Direct HTTP');
+      print('🪟 Windows: Generating Cohere embedding via Direct HTTP');
 
-      if (_geminiApiKey.isEmpty) {
-        throw Exception('GEMINI_API_KEY is not defined.');
+      if (_cohereApiKey.isEmpty) {
+        throw Exception('COHERE_API_KEY is not defined.');
       }
 
       final response = await http.post(
-        Uri.parse(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey",
-        ),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('https://api.cohere.ai/v1/embed'),
+        headers: {
+          'Authorization': 'Bearer $_cohereApiKey',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
-          "model": "models/gemini-embedding-001",
-          "content": {
-            "parts": [
-              {"text": question},
-            ],
-          },
-          "taskType": taskType,
-          "outputDimensionality": 768,
-          "embedContentConfig": {
-            "taskType": taskType,
-            "outputDimensionality": 768,
-          },
+          'texts': [question],
+          'model': 'embed-multilingual-v3.0',
+          'input_type': taskType == 'RETRIEVAL_QUERY' || taskType == 'search_query'
+              ? 'search_query'
+              : 'search_document',
+          'embedding_types': ['float'],
         }),
       );
 
       if (response.statusCode != 200) {
         throw Exception(
-          'Gemini API error: ${response.statusCode} - ${response.body}',
+          'Cohere API error: ${response.statusCode} - ${response.body}',
         );
       }
 
       final data = jsonDecode(response.body);
+      final embeddings = data['embeddings'];
+      final rawEmbedding = embeddings is Map
+          ? embeddings['float'][0] as List
+          : embeddings[0] as List;
       final embedding =
-          (data['embedding']['values'] as List)
+          rawEmbedding
               .map((e) => (e as num).toDouble())
               .toList();
 
-      // Safety assertion: ensure we always get 768 dimensions.
-      if (embedding.length != 768) {
+      // Safety assertion: Cohere embed-multilingual-v3.0 returns 1024 dimensions.
+      if (embedding.length != 1024) {
         throw Exception(
-          'Unexpected embedding dimension: ${embedding.length} (expected 768)',
+          'Unexpected embedding dimension: ${embedding.length} (expected 1024)',
         );
       }
 
@@ -2971,7 +2977,7 @@ $question
     String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
     try {
-      print('📱 Mobile/Web: Generating Gemini embedding via Firebase');
+      print('📱 Mobile/Web: Generating Cohere embedding via Firebase');
 
       final callable = FirebaseFunctions.instance.httpsCallable(
         'generateEmbedding',
@@ -2986,11 +2992,11 @@ $question
               .map((e) => (e as num).toDouble())
               .toList();
 
-      // Safety assertion: ensure we always get 768 dimensions.
-      if (embedding.length != 768) {
+      // Safety assertion: Cohere embed-multilingual-v3.0 returns 1024 dimensions.
+      if (embedding.length != 1024) {
         throw Exception(
           'Unexpected embedding dimension from Firebase: ${embedding.length} '
-          '(expected 768)',
+          '(expected 1024)',
         );
       }
 

@@ -40,7 +40,15 @@ export async function generateCohereEmbedding(
     }
 
     const data = response.data as { embeddings: number[][] };
-    return data.embeddings[0];
+    const embedding = data.embeddings[0];
+    if (!Array.isArray(embedding) || embedding.length !== 1024) {
+      throw new Error(
+        `Unexpected Cohere embedding dimension: ${embedding?.length ?? 0} ` +
+        "(expected 1024)"
+      );
+    }
+    console.info(`Cohere embedding generated: ${embedding.length} dimensions`);
+    return embedding;
   } catch (error) {
     console.error("Error generating Cohere embedding:", error);
     throw error;

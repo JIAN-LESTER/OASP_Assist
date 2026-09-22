@@ -6,10 +6,12 @@ import {defineSecret} from "firebase-functions/params";
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import {logGeminiUsage} from "./geminiUsage";
+import {
+  COHERE_EMBEDDING_DIMENSIONS,
+  createCohereEmbedding,
+} from "./cohereEmbedding";
 
 // Define secrets
-const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 const PINECONE_API_KEY = defineSecret("PINECONE_API_KEY");
 const PINECONE_HOST = defineSecret("PINECONE_HOST");
@@ -534,7 +536,7 @@ export const syncFacebookPosts = onSchedule(
     timeoutSeconds: 540,
     memory: "1GiB",
     secrets: [
-      COHERE_API_KEY, GEMINI_API_KEY,
+      COHERE_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -596,7 +598,7 @@ export const manualSyncFacebookPosts = onCall(
     timeoutSeconds: 540,
     memory: "1GiB",
     secrets: [
-      COHERE_API_KEY, GEMINI_API_KEY,
+      COHERE_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -625,7 +627,7 @@ export const manualSyncFacebookPostsHttp = onRequest(
     timeoutSeconds: 540,
     memory: "1GiB",
     secrets: [
-      COHERE_API_KEY, GEMINI_API_KEY,
+      COHERE_API_KEY,
       PINECONE_API_KEY,
       PINECONE_HOST,
     ],
@@ -1781,51 +1783,12 @@ async function createInfoBankFromCategory(
 
       while (retries > 0 && !embedding) {
         try {
-          const embeddingResponse = await axios.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
-            {
-              model: "gemini-embedding-001",
-              content: {
-                parts: [
-                  {text: chunk.text},
-                ],
-              },
-              taskType: "RETRIEVAL_DOCUMENT",
-              outputDimensionality: 768,
-              embedContentConfig: {
-                taskType: "RETRIEVAL_DOCUMENT",
-                outputDimensionality: 768,
-              },
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-              timeout: 30000,
-            }
+          embedding = await createCohereEmbedding(
+            chunk.text,
+            COHERE_API_KEY.value(),
+            "search_document"
           );
-
-          const responseData = embeddingResponse.data as any;
-          await logGeminiUsage({
-            userId: null,
-            conversationId: null,
-            model: "gemini-embedding-001",
-            inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
-            outputTokens: 0,
-          }).catch(() => undefined);
-
-          // Try multiple possible response structures
-          if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
-            embedding = responseData.embedding.values;
-          } else if (responseData?.embeddings?.[0]?.values && Array.isArray(responseData.embeddings[0].values)) {
-            embedding = responseData.embeddings[0].values;
-          } else if (Array.isArray(responseData?.values)) {
-            embedding = responseData.values;
-          }
-
-          if (!embedding || embedding.length === 0) {
-            throw new Error("Invalid embedding response");
-          }
+          console.info(`Generated ${embedding.length}-dimensional Cohere embedding`);
         } catch (error: any) {
           retries--;
 
@@ -2115,9 +2078,11 @@ async function storePineconeVector(
   }
 
   // Validate embedding
-  if (!Array.isArray(embedding) || embedding.length === 0) {
+  if (!Array.isArray(embedding) ||
+      embedding.length !== COHERE_EMBEDDING_DIMENSIONS) {
     throw new Error(
-      `Invalid embedding for vector ${id}: not an array or empty`
+      `Invalid embedding for vector ${id}: expected ` +
+      `${COHERE_EMBEDDING_DIMENSIONS} dimensions`
     );
   }
 
@@ -2177,7 +2142,7 @@ export const batchSyncCategoriesToInfoBank = onCall(
     cors: true,
     timeoutSeconds: 540,
     memory: "1GiB",
-    secrets: [COHERE_API_KEY, GEMINI_API_KEY, PINECONE_API_KEY],
+    secrets: [COHERE_API_KEY, PINECONE_API_KEY],
   },
   async (request) => {
     try {
@@ -2570,7 +2535,7 @@ export const reprocessExistingAnnouncements = onCall(
   {
     cors: true,
     timeoutSeconds: 540,
-    secrets: [COHERE_API_KEY, GEMINI_API_KEY],
+    secrets: [COHERE_API_KEY],
   },
   async (request) => {
     try {
@@ -2672,52 +2637,12 @@ async function syncCategoryToInfoBank(
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
 
-      // Generate embedding using Gemini
-      const embeddingResponse = await axios.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
-        {
-          model: "gemini-embedding-001",
-          content: {
-            parts: [
-              {text: chunk.text},
-            ],
-          },
-          taskType: "RETRIEVAL_DOCUMENT",
-          outputDimensionality: 768,
-          embedContentConfig: {
-            taskType: "RETRIEVAL_DOCUMENT",
-            outputDimensionality: 768,
-          },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      const embedding = await createCohereEmbedding(
+        chunk.text,
+        COHERE_API_KEY.value(),
+        "search_document"
       );
-
-      //   Handle correct Gemini API response structure
-      const responseData = embeddingResponse.data as any;
-      await logGeminiUsage({
-        userId: null,
-        conversationId: null,
-        model: "gemini-embedding-001",
-        inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
-        outputTokens: 0,
-      }).catch(() => undefined);
-      let embedding: number[] | null = null;
-
-      if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
-        embedding = responseData.embedding.values;
-      } else if (responseData?.embeddings?.[0]?.values && Array.isArray(responseData.embeddings[0].values)) {
-        embedding = responseData.embeddings[0].values;
-      } else if (Array.isArray(responseData?.values)) {
-        embedding = responseData.values;
-      }
-
-      if (!embedding || embedding.length === 0) {
-        throw new Error("Invalid embedding response from Gemini API");
-      }
+      console.info(`Generated ${embedding.length}-dimensional Cohere embedding`);
 
       const chunkTitle = chunks.length > 1 ?
         `${title} (Part ${i + 1}/${chunks.length})` :
@@ -2985,7 +2910,7 @@ export const testCreateInfoBank = onCall(
   {
     cors: true,
     timeoutSeconds: 300,
-    secrets: [COHERE_API_KEY, GEMINI_API_KEY, PINECONE_API_KEY],
+    secrets: [COHERE_API_KEY, PINECONE_API_KEY],
   },
   async (request) => {
     try {
@@ -3223,7 +3148,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
     cors: true,
     timeoutSeconds: 540,
     memory: "1GiB",
-    secrets: [COHERE_API_KEY, GEMINI_API_KEY, PINECONE_API_KEY, PINECONE_HOST],
+    secrets: [COHERE_API_KEY, PINECONE_API_KEY, PINECONE_HOST],
   },
   async (request) => {
     try {
@@ -3290,51 +3215,12 @@ export const fixAnnouncementInfoBankMetadata = onCall(
             const chunkId = chunkIds[i];
             const chunk = chunks[i];
 
-            // Generate new embedding with correct model
-            const embeddingResponse = await axios.post(
-              "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=" + GEMINI_API_KEY.value(),
-              {
-                model: "gemini-embedding-001",
-                content: {
-                  parts: [
-                    {text: chunk.text},
-                  ],
-                },
-                taskType: "RETRIEVAL_DOCUMENT",
-                outputDimensionality: 768,
-                embedContentConfig: {
-                  taskType: "RETRIEVAL_DOCUMENT",
-                  outputDimensionality: 768,
-                },
-              },
-              {
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              }
+            const embedding = await createCohereEmbedding(
+              chunk.text,
+              COHERE_API_KEY.value(),
+              "search_document"
             );
-
-            const responseData = embeddingResponse.data as any;
-            await logGeminiUsage({
-              userId: null,
-              conversationId: null,
-              model: "gemini-embedding-001",
-              inputTokens: responseData?.usageMetadata?.promptTokenCount ?? Math.ceil(chunk.text.length / 4),
-              outputTokens: 0,
-            }).catch(() => undefined);
-            let embedding: number[] | null = null;
-
-            if (responseData?.embedding?.values && Array.isArray(responseData.embedding.values)) {
-              embedding = responseData.embedding.values;
-            } else if (responseData?.embeddings?.[0]?.values && Array.isArray(responseData.embeddings[0].values)) {
-              embedding = responseData.embeddings[0].values;
-            } else if (Array.isArray(responseData?.values)) {
-              embedding = responseData.values;
-            }
-
-            if (!embedding) {
-              throw new Error("Failed to generate embedding");
-            }
+            console.info(`Generated ${embedding.length}-dimensional Cohere embedding`);
 
             const chunkTitle = chunks.length > 1 ?
               `${title} (Part ${i + 1}/${chunks.length})` :

@@ -111,7 +111,10 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
         print(' Failed to generate context embedding: $e');
       }
 
-      final faqEmbedding = contextEmbedding ?? widget.candidate.embedding;
+      if (contextEmbedding == null || contextEmbedding.length != 1024) {
+        throw Exception('A valid 1024-dimensional Cohere embedding is required.');
+      }
+      final faqEmbedding = contextEmbedding;
       final db = FirebaseFirestore.instance;
       final batch = db.batch();
 
@@ -125,9 +128,11 @@ class _PromoteFAQModalState extends State<_PromoteFAQModal> {
         'isPredefined': false,
         'createdAt': Timestamp.now(),
         'embedding': faqEmbedding,
-        'geminiEmbedding': faqEmbedding,
-        if (contextEmbedding != null) 'contextEmbedding': contextEmbedding,
-        if (contextEmbedding != null) 'faqContextEmbedding': contextEmbedding,
+        'cohereEmbedding': faqEmbedding,
+        'contextEmbedding': contextEmbedding,
+        'faqContextEmbedding': contextEmbedding,
+        'embeddingModel': 'embed-multilingual-v3.0',
+        'embeddingDimensions': faqEmbedding.length,
         'similarityCount': widget.candidate.occurrenceCount,
         'lastAsked': widget.candidate.lastSeen,
       });

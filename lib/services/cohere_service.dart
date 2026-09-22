@@ -11,22 +11,19 @@ class CohereService {
 
   // Desktop-only fields
   late final String _cohereApiKey;
-  late final String _geminiApiKey;
   late final Uri _chatUrl;
   late final String _embedUrl;
 
   CohereService() : _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
       _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
-      _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
 
-      if (_cohereApiKey.isEmpty || _geminiApiKey.isEmpty) {
-        throw Exception('Cohere/Gemini API access is not configured for this client.');
+      if (_cohereApiKey.isEmpty) {
+        throw Exception('Cohere API access is not configured for this client.');
       }
 
       _chatUrl = Uri.parse('https://api.cohere.ai/v1/chat');
-      _embedUrl =
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=$_geminiApiKey";
+      _embedUrl = 'https://api.cohere.ai/v1/embed';
 
       if (kDebugMode) {
         print('🖥️ Using desktop Cohere implementation');
@@ -49,7 +46,7 @@ class CohereService {
   }
 
   // =========================================================================
-  // Embed Text (using Gemini)
+  // Embed Text (using Cohere, 1024 dimensions)
   // =========================================================================
 
   Future<List<double>> embedText(
@@ -70,33 +67,38 @@ class CohereService {
     try {
       final response = await http.post(
         Uri.parse(_embedUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Authorization': 'Bearer $_cohereApiKey',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({
-          'model': 'models/gemini-embedding-001',
-          'content': {
-            'parts': [
-              {'text': text},
-            ],
-          },
-          'taskType': taskType,
-          'outputDimensionality': 768,
-          'embedContentConfig': {
-            'taskType': taskType,
-            'outputDimensionality': 768,
-          },
+          'texts': [text],
+          'model': 'embed-multilingual-v3.0',
+          'input_type': taskType == 'RETRIEVAL_QUERY' || taskType == 'search_query'
+              ? 'search_query'
+              : 'search_document',
+          'embedding_types': ['float'],
         }),
       );
 
       if (response.statusCode != 200) {
-        print(' Gemini Embed API error: ${response.body}');
+        print(' Cohere Embed API error: ${response.body}');
         throw Exception('Failed to generate embedding: ${response.body}');
       }
 
       final data = jsonDecode(response.body);
-      final embedding = data['embedding']['values'] as List;
-      return embedding.map((e) => (e as num).toDouble()).toList();
+      final embeddings = data['embeddings'];
+      final embedding = embeddings is Map
+          ? embeddings['float'][0] as List
+          : embeddings[0] as List;
+      final values = embedding.map((e) => (e as num).toDouble()).toList();
+      if (values.length != 1024) {
+        throw Exception('Expected 1024 embedding dimensions, got ${values.length}');
+      }
+      print(' Generated ${values.length}-dimensional Cohere embedding');
+      return values;
     } catch (e) {
-      print(' Error generating Gemini embedding: $e');
+      print(' Error generating Cohere embedding: $e');
       rethrow;
     }
   }
@@ -106,7 +108,7 @@ class CohereService {
     String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
     try {
-      final callable = functions.httpsCallable('generateGeminiEmbedding');
+      final callable = functions.httpsCallable('generateCohereEmbedding');
       final result = await callable.call({'text': text, 'taskType': taskType});
 
       final embedding = result.data['embedding'] as List;
