@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:capstone_project/profile.dart';
@@ -289,20 +290,13 @@ class _EditProfileModalState extends State<EditProfileModal> {
     String? excludeUserId,
   }) async {
     try {
-      final query =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('studentId', isEqualTo: studentId.trim())
-              .get();
-
-      if (query.docs.isEmpty) return true;
-
-      // If excluding a user (for edit), check if the only match is that user
-      if (excludeUserId != null) {
-        return query.docs.every((doc) => doc.id == excludeUserId);
-      }
-
-      return false;
+      final result = await FirebaseFunctions.instanceFor(
+        region: 'asia-southeast1',
+      ).httpsCallable('checkUserFieldAvailability').call({
+        'field': 'studentId',
+        'value': studentId.trim(),
+      });
+      return result.data['available'] == true;
     } catch (e) {
       print('Error checking student ID uniqueness: $e');
       return false;
@@ -311,20 +305,13 @@ class _EditProfileModalState extends State<EditProfileModal> {
 
   Future<bool> _isLRNUnique(String lrn, {String? excludeUserId}) async {
     try {
-      final query =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('lrn', isEqualTo: lrn.trim())
-              .get();
-
-      if (query.docs.isEmpty) return true;
-
-      // If excluding a user (for edit), check if the only match is that user
-      if (excludeUserId != null) {
-        return query.docs.every((doc) => doc.id == excludeUserId);
-      }
-
-      return false;
+      final result = await FirebaseFunctions.instanceFor(
+        region: 'asia-southeast1',
+      ).httpsCallable('checkUserFieldAvailability').call({
+        'field': 'lrn',
+        'value': lrn.trim(),
+      });
+      return result.data['available'] == true;
     } catch (e) {
       print('Error checking LRN uniqueness: $e');
       return false;

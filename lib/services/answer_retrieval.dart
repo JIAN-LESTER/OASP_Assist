@@ -2,12 +2,28 @@
 import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:capstone_project/models/message.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AnswerRetrievalService {
   // Use the stable Firebase Functions URL instead of the generated Cloud Run
   // service URL, which can change after redeploys.
   final String cloudFunctionUrl =
       'https://us-central1-cmu-oasp-assist.cloudfunctions.net/generateAnswer';
+  final String healthCheckUrl =
+      'https://us-central1-cmu-oasp-assist.cloudfunctions.net/healthCheck';
+
+  Future<Map<String, String>> _authenticatedHeaders({String? accept}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('You must be signed in to use the assistant.');
+    }
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      if (accept != null) 'Accept': accept,
+    };
+  }
 
   /// Generate an answer using streaming for real-time response.
   Stream<String> generateAnswerStream(
@@ -36,8 +52,9 @@ class AnswerRetrievalService {
       };
 
       final request = http.Request('POST', Uri.parse(cloudFunctionUrl));
-      request.headers['Content-Type'] = 'application/json';
-      request.headers['Accept'] = 'text/event-stream';
+      request.headers.addAll(
+        await _authenticatedHeaders(accept: 'text/event-stream'),
+      );
       request.body = json.encode(requestBody);
 
       final streamedResponse = await request.send();
@@ -297,7 +314,7 @@ class AnswerRetrievalService {
       final response = await http
           .post(
             Uri.parse(cloudFunctionUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: await _authenticatedHeaders(),
             body: jsonEncode(requestBody),
           )
           .timeout(
@@ -350,14 +367,10 @@ class AnswerRetrievalService {
   Future<bool> testConnection() async {
     try {
       final response = await http
-          .post(
-            Uri.parse(cloudFunctionUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'query': 'test', 'conversationHistory': []}),
-          )
+          .get(Uri.parse(healthCheckUrl))
           .timeout(const Duration(seconds: 10));
 
-      return response.statusCode == 200 || response.statusCode == 400;
+      return response.statusCode == 200;
     } catch (e) {
       print('Connection test failed: $e');
       return false;

@@ -126,35 +126,8 @@ class _RegisterPageState extends State<RegisterPage>
         print(' Auth check timeout/error: $e');
       }
 
-      print(' Checking Firestore for: $email');
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email.trim())
-          .limit(1)
-          .get(const GetOptions(source: Source.cache))
-          .timeout(const Duration(seconds: 2))
-          .catchError((_) async {
-            return await _firestore
-                .collection('users')
-                .where('email', isEqualTo: email.trim())
-                .limit(1)
-                .get()
-                .timeout(const Duration(seconds: 3));
-          });
-
-      if (querySnapshot.docs.isNotEmpty) {
-        print(' Email found in Firestore but not in Auth (orphaned): $email');
-        try {
-          final docId = querySnapshot.docs.first.id;
-          await _firestore.collection('users').doc(docId).delete();
-          print(' Cleaned up orphaned Firestore document for: $email');
-          return false;
-        } catch (e) {
-          print(' Failed to cleanup orphaned doc: $e');
-          return true;
-        }
-      }
-
+      // Firebase Authentication is the source of truth for account existence.
+      // Do not query or delete private user profiles from an unauthenticated form.
       print(' Email is available: $email');
       return false;
     } catch (e) {

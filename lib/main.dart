@@ -543,7 +543,7 @@ void configureFirebaseFunctions() {
       print(
         ' Firebase Functions configured for: ${functions.app.options.projectId}',
       );
-      print('   Region: asia-southeast1');
+      print('   Default region: us-central1');
     } else {
       print(' Firebase Functions configured for production');
       print('   Project: ${functions.app.options.projectId}');

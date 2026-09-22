@@ -1,13 +1,7 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
 import 'package:capstone_project/services/admin_functions.dart'
     show FirebaseFunctionsService;
 import 'package:capstone_project/utils/snackbar_util.dart';
@@ -1167,54 +1161,8 @@ Future<void> _deleteFromPinecone(
 ) async {
   if (chunkIds.isEmpty) return;
 
-  // 1. Check if the platform is Windows
-  // Note: kIsWeb must be checked first because Platform.isWindows throws on Web
-  if (!kIsWeb && Platform.isWindows) {
-    print('🪟 Windows detected: Using direct HTTP client');
-    await _deleteFromPineconeDirect(chunkIds, namespace);
-  } else {
-    print(' Mobile/Web detected: Using Firebase Functions');
-    await _deleteFromPineconeFirebase(chunkIds, namespace);
-  }
-}
-
-Future<void> _deleteFromPineconeDirect(
-  List<String> chunkIds,
-  String? pineconeNamespace,
-) async {
-  late final String apiKey;
-  late final String indexHost;
-  try {
-    // Fetching from Environment Variables
-    apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
-    indexHost = dotenv.env['PINECONE_HOST'] ?? '';
-
-    if (apiKey.isEmpty || indexHost.isEmpty) {
-      throw Exception("Missing Pinecone Environment Variables");
-    }
-
-    final authHeader = {'Content-Type': 'application/json', 'Api-Key': apiKey};
-    final deleteUrl = Uri.parse('$indexHost/vectors/delete');
-
-    final body = jsonEncode({
-      'ids': chunkIds,
-      if (pineconeNamespace != null && pineconeNamespace.isNotEmpty)
-        'namespace': pineconeNamespace,
-    });
-
-    final res = await http
-        .post(deleteUrl, headers: authHeader, body: body)
-        .timeout(const Duration(seconds: 30));
-
-    if (res.statusCode == 200) {
-      print(" Pinecone vectors deleted successfully via Direct HTTP");
-    } else {
-      throw Exception("Pinecone Direct Delete Failed: ${res.statusCode}");
-    }
-  } catch (e) {
-    print(" Direct Pinecone Error: $e");
-    rethrow;
-  }
+  // Keep Pinecone credentials on the server on every platform.
+  await _deleteFromPineconeFirebase(chunkIds, namespace);
 }
 
 Future<void> _deleteFromPineconeFirebase(

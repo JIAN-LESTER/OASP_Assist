@@ -1,10 +1,8 @@
 // gemini_service.dart
 import 'dart:convert';
-import 'dart:io';
 import 'package:capstone_project/services/pinecone_service.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class GeminiService {
@@ -18,8 +16,8 @@ class GeminiService {
 
   GeminiService() : _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
-      _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
-      _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+      _cohereApiKey = '';
+      _geminiApiKey = '';
 
       if (_cohereApiKey.isEmpty) {
         throw Exception('Cohere API access is not configured for this client.');
@@ -38,13 +36,8 @@ class GeminiService {
   }
 
   static bool _checkIfDesktop() {
-    if (kIsWeb) return false;
-
-    try {
-      return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    } catch (e) {
-      return false;
-    }
+    // Keep third-party credentials on the server for every platform.
+    return false;
   }
 
   // =========================================================================

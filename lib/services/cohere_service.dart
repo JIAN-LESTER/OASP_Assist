@@ -1,9 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CohereService {
   final FirebaseFunctions functions = FirebaseFunctions.instance;
@@ -16,7 +14,7 @@ class CohereService {
 
   CohereService() : _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
-      _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
+      _cohereApiKey = '';
 
       if (_cohereApiKey.isEmpty) {
         throw Exception('Cohere API access is not configured for this client.');
@@ -36,13 +34,8 @@ class CohereService {
   }
 
   static bool _checkIfDesktop() {
-    if (kIsWeb) return false;
-
-    try {
-      return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    } catch (e) {
-      return false;
-    }
+    // Keep third-party credentials on the server for every platform.
+    return false;
   }
 
   // =========================================================================

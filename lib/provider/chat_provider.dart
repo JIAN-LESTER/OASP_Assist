@@ -1,6 +1,4 @@
 ﻿import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 import 'package:capstone_project/provider/embedding_cache.dart';
 import 'package:capstone_project/provider/faq_cache.dart';
@@ -8,13 +6,8 @@ import 'package:capstone_project/provider/question_group.dart';
 import 'package:capstone_project/responsive/user_constant.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-import 'package:http/http.dart' as http;
 
 import 'package:capstone_project/models/conversations.dart';
 import 'package:capstone_project/models/message.dart';
@@ -146,7 +139,6 @@ class ChatProvider extends ChangeNotifier {
                 final now = DateTime.now();
                 _userDailyMessageCount = 0;
                 _userLastResetDate = now;
-                _saveCurrentUserMessageReset(now);
                 notifyListeners();
                 return;
               }
@@ -197,24 +189,8 @@ class ChatProvider extends ChangeNotifier {
     _userDailyMessageCount = 0;
     _userLastResetDate = now;
 
-    await _saveCurrentUserMessageReset(now);
-
     if (!_isDisposed) {
       notifyListeners();
-    }
-  }
-
-  Future<void> _saveCurrentUserMessageReset(DateTime resetAt) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    try {
-      await _firestore.collection('users').doc(userId).set({
-        'dailyMessageCount': 0,
-        'lastMessageResetDate': Timestamp.fromDate(resetAt),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      print('❌ Error saving message reset: $e');
     }
   }
 
@@ -567,7 +543,6 @@ class ChatProvider extends ChangeNotifier {
           final now = DateTime.now();
           _userDailyMessageCount = 0;
           _userLastResetDate = now;
-          await _saveCurrentUserMessageReset(now);
         }
 
         print(
@@ -576,82 +551,12 @@ class ChatProvider extends ChangeNotifier {
       } else {
         _userDailyMessageCount = 0;
         _userLastResetDate = null;
-
-        await _firestore.collection('users').doc(userId).set({
-          'dailyMessageCount': 0,
-          'lastMessageResetDate': Timestamp.now(),
-        }, SetOptions(merge: true));
-
-        print(
-          '✅ Initialized new user with message count: 0/$MAX_DAILY_MESSAGES',
-        );
+        print('⚠️ User profile is missing; message quota cannot be initialized');
       }
 
       notifyListeners();
     } catch (e) {
       print('❌ Error loading user message count: $e');
-    }
-  }
-
-  Future<void> _updateUserMessageCount() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
-
-    try {
-      final now = DateTime.now();
-      final userRef = _firestore.collection('users').doc(userId);
-
-      final userDoc = await userRef.get();
-
-      if (!userDoc.exists) {
-        await userRef.set({
-          'dailyMessageCount': 1,
-          'lastMessageResetDate': Timestamp.now(),
-        }, SetOptions(merge: true));
-
-        _userDailyMessageCount = 1;
-        _userLastResetDate = now;
-
-        print('✅ New user first message - count set to 1');
-        notifyListeners();
-        return;
-      }
-
-      final data = userDoc.data()!;
-      final currentCount = data['dailyMessageCount'] ?? 0;
-      final lastReset = (data['lastMessageResetDate'] as Timestamp?)?.toDate();
-
-      final shouldReset =
-          lastReset == null ||
-          _shouldResetMessageCount(lastReset, currentCount);
-
-      if (shouldReset) {
-        await userRef.update({
-          'dailyMessageCount': 1,
-          'lastMessageResetDate': Timestamp.now(),
-        });
-
-        _userDailyMessageCount = 1;
-        _userLastResetDate = now;
-
-        print('✅ Message count RESET - new count: 1');
-      } else {
-        await _firestore.runTransaction((transaction) async {
-          final snapshot = await transaction.get(userRef);
-          final currentCount = snapshot.data()?['dailyMessageCount'] ?? 0;
-          final newCount = currentCount + 1;
-
-          transaction.update(userRef, {'dailyMessageCount': newCount});
-        });
-
-        _userDailyMessageCount = currentCount + 1;
-
-        print('✅ User message count incremented to $_userDailyMessageCount');
-      }
-
-      notifyListeners();
-    } catch (e) {
-      print('❌ Error updating user message count: $e');
     }
   }
 
@@ -1072,10 +977,6 @@ class ChatProvider extends ChangeNotifier {
         print('⚠️ Background save error: $e');
       });
 
-      _updateUserMessageCount().catchError((e) {
-        print('⚠️ Background count update error: $e');
-      });
-
       List<double>? currentEmbedding;
 
       String questionCategory;
@@ -1137,6 +1038,9 @@ class ChatProvider extends ChangeNotifier {
       String finalAnswer = "";
 
       if (_isFastGeneralMessage(question)) {
+        await FirebaseFunctions.instance
+            .httpsCallable('consumeMessageQuota')
+            .call();
         final answer = _fastGeneralReply(question);
         _streamingContent[botMessageId] = answer;
         finalAnswer = answer;
@@ -2902,74 +2806,11 @@ $question
     }
   }
 
-  late final String _cohereApiKey = dotenv.env['COHERE_API_KEY'] ?? '';
-
   Future<List<double>> generateEmbedding(
     String question, {
     String taskType = 'RETRIEVAL_DOCUMENT',
   }) async {
-    if (!kIsWeb && Platform.isWindows) {
-      return await _generateEmbeddingDirect(question, taskType: taskType);
-    } else {
-      return await _generateEmbeddingFirebase(question, taskType: taskType);
-    }
-  }
-
-  Future<List<double>> _generateEmbeddingDirect(
-    String question, {
-    String taskType = 'RETRIEVAL_DOCUMENT',
-  }) async {
-    try {
-      print('🪟 Windows: Generating Cohere embedding via Direct HTTP');
-
-      if (_cohereApiKey.isEmpty) {
-        throw Exception('COHERE_API_KEY is not defined.');
-      }
-
-      final response = await http.post(
-        Uri.parse('https://api.cohere.ai/v1/embed'),
-        headers: {
-          'Authorization': 'Bearer $_cohereApiKey',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'texts': [question],
-          'model': 'embed-multilingual-v3.0',
-          'input_type': taskType == 'RETRIEVAL_QUERY' || taskType == 'search_query'
-              ? 'search_query'
-              : 'search_document',
-          'embedding_types': ['float'],
-        }),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Cohere API error: ${response.statusCode} - ${response.body}',
-        );
-      }
-
-      final data = jsonDecode(response.body);
-      final embeddings = data['embeddings'];
-      final rawEmbedding = embeddings is Map
-          ? embeddings['float'][0] as List
-          : embeddings[0] as List;
-      final embedding =
-          rawEmbedding
-              .map((e) => (e as num).toDouble())
-              .toList();
-
-      // Safety assertion: Cohere embed-multilingual-v3.0 returns 1024 dimensions.
-      if (embedding.length != 1024) {
-        throw Exception(
-          'Unexpected embedding dimension: ${embedding.length} (expected 1024)',
-        );
-      }
-
-      return embedding;
-    } catch (e) {
-      print('❌ Direct Embedding Error: $e');
-      rethrow;
-    }
+    return _generateEmbeddingFirebase(question, taskType: taskType);
   }
 
   Future<List<double>> _generateEmbeddingFirebase(

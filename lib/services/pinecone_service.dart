@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class PineconeCloudService {
   final FirebaseFunctions functions;
@@ -19,8 +17,8 @@ class PineconeCloudService {
       _isDesktop = _checkIfDesktop() {
     if (_isDesktop) {
       // Load from environment variables for desktop
-      _baseUrl = dotenv.env['PINECONE_HOST'] ?? '';
-      _apiKey = dotenv.env['PINECONE_API_KEY'] ?? '';
+      _baseUrl = '';
+      _apiKey = '';
 
       if (_baseUrl.isEmpty || _apiKey.isEmpty) {
         throw Exception('Pinecone credentials are not configured for this client.');
@@ -37,13 +35,8 @@ class PineconeCloudService {
   }
 
   static bool _checkIfDesktop() {
-    if (kIsWeb) return false;
-
-    try {
-      return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
-    } catch (e) {
-      return false;
-    }
+    // Keep third-party credentials on the server for every platform.
+    return false;
   }
 
   Map<String, String> get _headers => {
