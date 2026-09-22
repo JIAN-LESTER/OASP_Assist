@@ -533,7 +533,7 @@ Future<void> _handleDeleteFAQ(
   required Route<dynamic>? confirmationRoute,
 }) async {
   final navigator = Navigator.of(context);
-  final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+  final feedbackContext = context;
 
   try {
     final docData = doc.data() as Map<String, dynamic>;
@@ -565,6 +565,9 @@ Future<void> _handleDeleteFAQ(
     });
 
     print(' FAQ deleted successfully: ${doc.id}');
+    if (feedbackContext.mounted) {
+      SnackbarUtil.showSuccess(feedbackContext, 'FAQ deleted successfully');
+    }
     if (navigator.mounted) {
       if (confirmationRoute?.isActive ?? false) {
         navigator.removeRoute(confirmationRoute!);
@@ -572,9 +575,6 @@ Future<void> _handleDeleteFAQ(
       if (infoRoute?.isActive ?? false) {
         navigator.removeRoute(infoRoute!);
       }
-    }
-    if (feedbackContext.mounted) {
-      SnackbarUtil.showSuccess(feedbackContext, 'FAQ deleted successfully');
     }
   } catch (error) {
     print(' FAQ deletion failed for ${doc.id}: $error');

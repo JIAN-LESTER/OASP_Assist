@@ -516,11 +516,7 @@ Widget _buildActionButtons(
 
                           try {
                             final navigator = Navigator.of(context);
-                            final feedbackContext =
-                                Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                ).context;
+                            final feedbackContext = context;
 
                             if (customDeleteHandler != null) {
                               await customDeleteHandler(feedbackContext, doc);

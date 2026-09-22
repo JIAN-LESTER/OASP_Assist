@@ -121,7 +121,14 @@ class SnackbarUtil {
     VoidCallback? onActionPressed,
     required ToastLocation location,
   }) {
-    final overlay = Overlay.of(context);
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      debugPrint(
+        'Unable to show ${type.name} alert because no Overlay was found: $message',
+      );
+      return;
+    }
+
     late OverlayEntry overlayEntry;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;

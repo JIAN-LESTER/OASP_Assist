@@ -565,7 +565,7 @@ Future<void> _handleDeleteLog(
   required Route<dynamic>? confirmationRoute,
 }) async {
   final navigator = Navigator.of(context);
-  final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+  final feedbackContext = context;
 
   try {
     // Show loading
@@ -628,6 +628,14 @@ Future<void> _handleDeleteLog(
     }
 
     print(' Log deleted successfully: ${doc.id}');
+    if (feedbackContext.mounted) {
+      SnackbarUtil.showSuccess(
+        feedbackContext,
+        collectionName == 'message_logs'
+            ? 'Message log deleted successfully'
+            : 'Activity log deleted successfully',
+      );
+    }
     if (navigator.mounted) {
       navigator.pop(); // Close loading dialog.
       if (confirmationRoute?.isActive ?? false) {
@@ -636,14 +644,6 @@ Future<void> _handleDeleteLog(
       if (infoRoute?.isActive ?? false) {
         navigator.removeRoute(infoRoute!);
       }
-    }
-    if (feedbackContext.mounted) {
-      SnackbarUtil.showSuccess(
-        feedbackContext,
-        collectionName == 'message_logs'
-            ? 'Message log deleted successfully'
-            : 'Activity log deleted successfully',
-      );
     }
   } catch (error) {
     print(' Log deletion failed for ${doc.id}: $error');

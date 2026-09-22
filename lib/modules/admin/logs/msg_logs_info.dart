@@ -560,7 +560,7 @@ Future<void> _handleDeleteLog(
   required Route<dynamic>? confirmationRoute,
 }) async {
   final navigator = Navigator.of(context);
-  final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+  final feedbackContext = context;
 
   try {
     // Show loading
@@ -607,15 +607,6 @@ Future<void> _handleDeleteLog(
     });
 
     print(' Message log deleted successfully: ${doc.id}');
-    if (navigator.mounted) {
-      navigator.pop(); // Close loading dialog.
-      if (confirmationRoute?.isActive ?? false) {
-        navigator.removeRoute(confirmationRoute!);
-      }
-      if (infoRoute?.isActive ?? false) {
-        navigator.removeRoute(infoRoute!);
-      }
-    }
     if (feedbackContext.mounted) {
       ScaffoldMessenger.of(feedbackContext).showSnackBar(
         SnackBar(
@@ -631,6 +622,15 @@ Future<void> _handleDeleteLog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
+    }
+    if (navigator.mounted) {
+      navigator.pop(); // Close loading dialog.
+      if (confirmationRoute?.isActive ?? false) {
+        navigator.removeRoute(confirmationRoute!);
+      }
+      if (infoRoute?.isActive ?? false) {
+        navigator.removeRoute(infoRoute!);
+      }
     }
   } catch (error) {
     print(' Message log deletion failed for ${doc.id}: $error');
