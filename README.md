@@ -107,6 +107,7 @@ Run these commands from `functions/`:
 npm run build       # Compile TypeScript to functions/lib
 npm run build:watch # Compile continuously during development
 npm run seed:faqs   # Build and seed predefined FAQs
+npm run seed:academics # Build and seed colleges and academic programs
 npm run serve       # Build and start the Functions emulator
 npm run shell       # Build and open the Functions shell
 npm run deploy      # Deploy Functions
@@ -132,6 +133,20 @@ npm run seed:faqs
 ```
 
 Review `functions/src/scripts/seedFaqs.ts` before running it in a production project if the seed content needs to change.
+
+## Seed colleges and programs
+
+The academic seed writes 10 colleges, 20 bachelor programs, and 20 masteral
+programs to the Firestore `colleges` and `programs` collections. Stable document
+IDs make the command safe to run again without creating duplicate seed records:
+
+```bash
+cd functions
+npm run seed:academics
+```
+
+Review `functions/src/scripts/seedAcademicData.ts` before running it against a
+production project if the college or program list needs to change.
 
 ## Project structure
 
