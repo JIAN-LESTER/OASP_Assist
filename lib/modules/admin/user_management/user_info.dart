@@ -491,14 +491,9 @@ Widget _buildActionButtons(
                 DeleteConfigs.users,
                 'users',
                 customDeleteHandler: (ctx, document) async {
-                  // Perform the delete operation
                   await handleUserDelete(ctx, document);
-
-                  // Close user info modal after successful deletion
-                  if (context.mounted) {
-                    Navigator.of(context).pop();
-                  }
                 },
+                closeOriginOnSuccess: true,
               );
             },
             icon: const Icon(Icons.delete_outline, size: 18),

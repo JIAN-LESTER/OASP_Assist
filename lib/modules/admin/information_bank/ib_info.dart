@@ -353,7 +353,14 @@ Widget _buildActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () =>showDeleteConfirmation(context, doc, DeleteConfigs.document, 'information_bank', customDeleteHandler: handleInformationBankDelete),
+            onPressed: () => showDeleteConfirmation(
+              context,
+              doc,
+              DeleteConfigs.document,
+              'information_bank',
+              customDeleteHandler: handleInformationBankDelete,
+              closeOriginOnSuccess: true,
+            ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',
@@ -660,7 +667,14 @@ Widget _buildFullContentActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: OutlinedButton.icon(
-            onPressed: () => showDeleteConfirmation(context, doc, DeleteConfigs.document, 'information_bank', customDeleteHandler: handleInformationBankDelete),
+            onPressed: () => showDeleteConfirmation(
+              context,
+              doc,
+              DeleteConfigs.document,
+              'information_bank',
+              customDeleteHandler: handleInformationBankDelete,
+              closeOriginOnSuccess: true,
+            ),
             icon: const Icon(Icons.delete_outline, size: 18),
             label: Text(
               'Delete',

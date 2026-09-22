@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -315,6 +313,7 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
   final data = doc.data() as Map<String, dynamic>;
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
+  final infoRoute = ModalRoute.of(context);
 
   showGeneralDialog(
     context: context,
@@ -322,7 +321,8 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
     barrierLabel: 'Delete Confirmation',
     barrierColor: Colors.black.withOpacity(0.6),
     transitionDuration: const Duration(milliseconds: 250),
-    pageBuilder: (context, animation, secondaryAnimation) {
+    pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      final confirmationRoute = ModalRoute.of(dialogContext);
       return Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
@@ -432,7 +432,13 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
                     const SizedBox(height: 24),
 
                     // Action Buttons
-                    _buildDeleteActionButtons(context, doc, isMobile),
+                    _buildDeleteActionButtons(
+                      dialogContext,
+                      doc,
+                      isMobile,
+                      infoRoute: infoRoute,
+                      confirmationRoute: confirmationRoute,
+                    ),
                   ],
                 ),
               ),
@@ -458,8 +464,10 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
 Widget _buildDeleteActionButtons(
   BuildContext context,
   DocumentSnapshot doc,
-  bool isMobile,
-) {
+  bool isMobile, {
+  required Route<dynamic>? infoRoute,
+  required Route<dynamic>? confirmationRoute,
+}) {
   double buttonHeight = isMobile ? 40 : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
@@ -491,7 +499,13 @@ Widget _buildDeleteActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton(
-            onPressed: () => _handleDeleteFAQ(context, doc),
+            onPressed:
+                () => _handleDeleteFAQ(
+                  context,
+                  doc,
+                  infoRoute: infoRoute,
+                  confirmationRoute: confirmationRoute,
+                ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
@@ -514,67 +528,58 @@ Widget _buildDeleteActionButtons(
 
 Future<void> _handleDeleteFAQ(
   BuildContext context,
-  DocumentSnapshot doc,
-) async {
+  DocumentSnapshot doc, {
+  required Route<dynamic>? infoRoute,
+  required Route<dynamic>? confirmationRoute,
+}) async {
+  final navigator = Navigator.of(context);
+  final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+
   try {
-    // Show loading
     final docData = doc.data() as Map<String, dynamic>;
     String deletedQuestion = docData['question'] ?? 'Unknown';
-    final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    String actorName = 'Unknown';
 
-    unawaited(() async {
-      try {
-        final currentUser = FirebaseAuth.instance.currentUser;
-        String actorName = 'Unknown';
-
-        if (currentUser != null) {
-          final currentUserDoc =
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(currentUser.uid)
-                  .get();
-          if (currentUserDoc.exists) {
-            final currentUserData =
-                currentUserDoc.data() as Map<String, dynamic>;
-            actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
-          }
-        }
-
-        await FirebaseFirestore.instance.collection('faqs').doc(doc.id).delete();
-
-        final logRef = FirebaseFirestore.instance.collection('logs').doc();
-        await logRef.set({
-          'logId': logRef.id,
-          'user': actorName,
-          'action': 'Deleted FAQ: $deletedQuestion',
-          'time': Timestamp.now(),
-        });
-
-        if (feedbackContext.mounted) {
-          SnackbarUtil.showSuccess(feedbackContext, 'FAQ deleted successfully');
-        }
-      } catch (error) {
-        if (feedbackContext.mounted) {
-          SnackbarUtil.showError(
-            feedbackContext,
-            'FAQ deletion failed: $error',
-          );
-        }
+    if (currentUser != null) {
+      final currentUserDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+      if (currentUserDoc.exists) {
+        final currentUserData =
+            currentUserDoc.data() as Map<String, dynamic>;
+        actorName = currentUserData['name'] ?? currentUser.email ?? 'Unknown';
       }
-    }());
+    }
 
-    if (context.mounted) {
-      Navigator.of(context).pop();
-      Navigator.of(context).pop();
-      SnackbarUtil.showInfo(context, 'FAQ deleted successfully');
+    await FirebaseFirestore.instance.collection('faqs').doc(doc.id).delete();
+
+    final logRef = FirebaseFirestore.instance.collection('logs').doc();
+    await logRef.set({
+      'logId': logRef.id,
+      'user': actorName,
+      'action': 'Deleted FAQ: $deletedQuestion',
+      'time': Timestamp.now(),
+    });
+
+    print(' FAQ deleted successfully: ${doc.id}');
+    if (navigator.mounted) {
+      if (confirmationRoute?.isActive ?? false) {
+        navigator.removeRoute(confirmationRoute!);
+      }
+      if (infoRoute?.isActive ?? false) {
+        navigator.removeRoute(infoRoute!);
+      }
+    }
+    if (feedbackContext.mounted) {
+      SnackbarUtil.showSuccess(feedbackContext, 'FAQ deleted successfully');
     }
   } catch (error) {
-    if (context.mounted) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-
-      // Show error snackbar using SnackbarUtil
-      SnackbarUtil.showError(context, 'FAQ deletion failed');
+    print(' FAQ deletion failed for ${doc.id}: $error');
+    if (feedbackContext.mounted) {
+      SnackbarUtil.showError(feedbackContext, 'FAQ deletion failed: $error');
     }
   }
 }

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -154,10 +153,12 @@ void showDeleteConfirmation(
   String collection, {
   Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
   Set<String>? deletedItemsTracker,
+  bool closeOriginOnSuccess = false,
 }) {
   final data = doc.data() as Map<String, dynamic>;
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
+  final originRoute = ModalRoute.of(context);
 
   showGeneralDialog(
     context: context,
@@ -295,6 +296,8 @@ void showDeleteConfirmation(
                       isMobile,
                       customDeleteHandler: customDeleteHandler,
                       deletedItemsTracker: deletedItemsTracker,
+                      originRoute: originRoute,
+                      closeOriginOnSuccess: closeOriginOnSuccess,
                     ),
                   ],
                 ),
@@ -460,6 +463,8 @@ Widget _buildActionButtons(
   bool isMobile, {
   Future<void> Function(BuildContext, DocumentSnapshot)? customDeleteHandler,
   Set<String>? deletedItemsTracker,
+  required Route<dynamic>? originRoute,
+  required bool closeOriginOnSuccess,
 }) {
   double buttonHeight = 48;
   double fontSize = isMobile ? 15 : 16;
@@ -510,46 +515,35 @@ Widget _buildActionButtons(
                           isDeleting.value = true;
 
                           try {
+                            final navigator = Navigator.of(context);
                             final feedbackContext =
                                 Navigator.of(
                                   context,
                                   rootNavigator: true,
                                 ).context;
 
-                            unawaited(() async {
-                              try {
-                                if (customDeleteHandler != null) {
-                                  await customDeleteHandler(
-                                    feedbackContext,
-                                    doc,
-                                  );
-                                } else {
-                                  await _performStandardDelete(
-                                    feedbackContext,
-                                    doc,
-                                    config,
-                                    collection,
-                                    deletedItemsTracker: deletedItemsTracker,
-                                  );
-                                }
-                              } catch (error) {
-                                print(" Delete operation failed: $error");
+                            if (customDeleteHandler != null) {
+                              await customDeleteHandler(feedbackContext, doc);
+                            } else {
+                              await _performStandardDelete(
+                                feedbackContext,
+                                doc,
+                                config,
+                                collection,
+                                deletedItemsTracker: deletedItemsTracker,
+                              );
+                            }
 
-                                if (feedbackContext.mounted) {
-                                  SnackbarUtil.showError(
-                                    feedbackContext,
-                                    '${config.title.split(' ').last} deletion failed: ${error.toString()}',
-                                  );
-                                }
-                              }
-                            }());
-
-                            SnackbarUtil.showInfo(
-                              context,
-                              '${config.title.split(' ').last} deleted successfully',
+                            print(
+                              ' Delete completed successfully: $collection/${doc.id}',
                             );
-                            Navigator.of(context, rootNavigator: false).pop();
-                            return;
+                            if (navigator.mounted) {
+                              navigator.pop();
+                              if (closeOriginOnSuccess &&
+                                  (originRoute?.isActive ?? false)) {
+                                navigator.removeRoute(originRoute!);
+                              }
+                            }
                           } catch (error) {
                             print(" Delete operation failed: $error");
 
@@ -842,11 +836,7 @@ Future<void> handleInformationBankDelete(
     }
   } catch (error) {
     print(" Delete operation failed: $error");
-
-    if (context.mounted) {
-      Navigator.of(context).pop(); // Close loading
-      SnackbarUtil.showError(context, 'Document deletion failed: $error');
-    }
+    throw Exception('Document deletion failed: $error');
   }
 }
 

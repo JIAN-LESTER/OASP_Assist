@@ -340,6 +340,7 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
   final data = doc.data() as Map<String, dynamic>;
   final screenWidth = MediaQuery.of(context).size.width;
   final isMobile = screenWidth < 600;
+  final infoRoute = ModalRoute.of(context);
 
   showGeneralDialog(
     context: context,
@@ -347,7 +348,8 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
     barrierLabel: 'Delete Confirmation',
     barrierColor: Colors.black.withOpacity(0.6),
     transitionDuration: const Duration(milliseconds: 250),
-    pageBuilder: (context, animation, secondaryAnimation) {
+    pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      final confirmationRoute = ModalRoute.of(dialogContext);
       return Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.all(isMobile ? 16 : 32),
@@ -459,7 +461,13 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
                     const SizedBox(height: 24),
 
                     // Action Buttons
-                    _buildDeleteActionButtons(context, doc, isMobile),
+                    _buildDeleteActionButtons(
+                      dialogContext,
+                      doc,
+                      isMobile,
+                      infoRoute: infoRoute,
+                      confirmationRoute: confirmationRoute,
+                    ),
                   ],
                 ),
               ),
@@ -486,8 +494,10 @@ void _showDeleteConfirmation(BuildContext context, DocumentSnapshot doc) {
 Widget _buildDeleteActionButtons(
   BuildContext context,
   DocumentSnapshot doc,
-  bool isMobile,
-) {
+  bool isMobile, {
+  required Route<dynamic>? infoRoute,
+  required Route<dynamic>? confirmationRoute,
+}) {
   double buttonHeight = isMobile ? 40 : 46;
   double fontSize = isMobile ? 14 : 15;
   double borderRadius = 10;
@@ -519,7 +529,13 @@ Widget _buildDeleteActionButtons(
         child: SizedBox(
           height: buttonHeight,
           child: ElevatedButton(
-            onPressed: () => _handleDeleteLog(context, doc),
+            onPressed:
+                () => _handleDeleteLog(
+                  context,
+                  doc,
+                  infoRoute: infoRoute,
+                  confirmationRoute: confirmationRoute,
+                ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
@@ -544,8 +560,13 @@ Widget _buildDeleteActionButtons(
 
 Future<void> _handleDeleteLog(
   BuildContext context,
-  DocumentSnapshot doc,
-) async {
+  DocumentSnapshot doc, {
+  required Route<dynamic>? infoRoute,
+  required Route<dynamic>? confirmationRoute,
+}) async {
+  final navigator = Navigator.of(context);
+  final feedbackContext = Navigator.of(context, rootNavigator: true).context;
+
   try {
     // Show loading
     showDialog(
@@ -606,27 +627,31 @@ Future<void> _handleDeleteLog(
       });
     }
 
-    if (context.mounted) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-      // Close confirmation dialog
-      Navigator.of(context).pop();
-      // Close info modal
-      Navigator.of(context).pop();
-
+    print(' Log deleted successfully: ${doc.id}');
+    if (navigator.mounted) {
+      navigator.pop(); // Close loading dialog.
+      if (confirmationRoute?.isActive ?? false) {
+        navigator.removeRoute(confirmationRoute!);
+      }
+      if (infoRoute?.isActive ?? false) {
+        navigator.removeRoute(infoRoute!);
+      }
+    }
+    if (feedbackContext.mounted) {
       SnackbarUtil.showSuccess(
-        context,
+        feedbackContext,
         collectionName == 'message_logs'
             ? 'Message log deleted successfully'
             : 'Activity log deleted successfully',
       );
     }
   } catch (error) {
-    if (context.mounted) {
-      // Close loading dialog
-      Navigator.of(context).pop();
-
-      SnackbarUtil.showError(context, 'Delete failed: $error');
+    print(' Log deletion failed for ${doc.id}: $error');
+    if (navigator.mounted) {
+      navigator.pop(); // Close loading dialog only.
+    }
+    if (feedbackContext.mounted) {
+      SnackbarUtil.showError(feedbackContext, 'Delete failed: $error');
     }
   }
 }
