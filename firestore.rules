@@ -1,0 +1,218 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Assumed model: users contain private profile data; conversations and
+    // escalations use userId or legacy userID ownership; managed knowledge is
+    // authenticated-readable and staff/admin writable.
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function userRole() {
+      return isAuthenticated()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.admin == true || userRole() == 'admin');
+    }
+
+    function isStaffOrAdmin() {
+      return isAuthenticated() && (isAdmin() || userRole() == 'staff');
+    }
+
+    function uidUnchanged(userId) {
+      return !('uid' in request.resource.data) || request.resource.data.uid == userId;
+    }
+
+    function uidNotModified() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uid']);
+    }
+
+    function optionalString(data, field, maxLength) {
+      return !(field in data) || data[field] == null ||
+        (data[field] is string && data[field].size() <= maxLength);
+    }
+
+    function ownsData(data) {
+      return isAuthenticated() &&
+        (('userId' in data && data.userId == request.auth.uid) ||
+         ('userID' in data && data.userID == request.auth.uid) ||
+         ('uid' in data && data.uid == request.auth.uid));
+    }
+
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() <= 320 &&
+        data.name is string && data.name.size() <= 150 &&
+        data.role in ['user', 'staff', 'admin'] &&
+        optionalString(data, 'displayName', 150) &&
+        optionalString(data, 'photoURL', 2048) &&
+        optionalString(data, 'studentId', 80) &&
+        optionalString(data, 'lrn', 80) &&
+        optionalString(data, 'affiliation', 150) &&
+        optionalString(data, 'serviceUnit', 150) &&
+        optionalString(data, 'college', 200) &&
+        optionalString(data, 'program', 200) &&
+        optionalString(data, 'scholarship', 300);
+    }
+
+    function isValidConversation(data) {
+      return ownsData(data) && optionalString(data, 'title', 300) &&
+        optionalString(data, 'status', 40);
+    }
+
+    function isValidMessage(data) {
+      return optionalString(data, 'content', 20000) &&
+        optionalString(data, 'sender', 30) &&
+        optionalString(data, 'category', 100) &&
+        optionalString(data, 'status', 40) && optionalString(data, 'type', 40);
+    }
+
+    function isValidEscalation(data) {
+      return ownsData(data) && optionalString(data, 'question', 10000) &&
+        optionalString(data, 'response', 20000) &&
+        optionalString(data, 'status', 40) && optionalString(data, 'category', 150);
+    }
+
+    function isValidManagedContent(data) {
+      return optionalString(data, 'title', 500) && optionalString(data, 'name', 500) &&
+        optionalString(data, 'question', 5000) && optionalString(data, 'answer', 20000) &&
+        optionalString(data, 'content', 100000) &&
+        optionalString(data, 'description', 50000) &&
+        optionalString(data, 'category', 150) &&
+        optionalString(data, 'source', 2048) && optionalString(data, 'sourceId', 256);
+    }
+
+    function isValidNotification(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+        optionalString(data, 'title', 500) && optionalString(data, 'message', 5000) &&
+        optionalString(data, 'type', 100);
+    }
+
+    function isValidLog(data) {
+      return optionalString(data, 'user', 200) && optionalString(data, 'action', 2000) &&
+        optionalString(data, 'userId', 128);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isStaffOrAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
+        request.resource.data.role == 'user' && uidUnchanged(userId);
+      allow update: if (isAdmin() && isValidUser(request.resource.data)) ||
+        (isOwner(userId) && isValidUser(request.resource.data) && uidNotModified() &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+           'role', 'isAdmin', 'createdBy', 'createdAt', 'isActive',
+           'isVerified', 'emailVerified', 'verifiedAt',
+           'dailyMessageCount', 'lastMessageResetDate'
+         ]));
+      allow delete: if isAdmin();
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if ownsData(resource.data) || isStaffOrAdmin();
+      allow create: if isValidConversation(request.resource.data);
+      allow update: if (ownsData(resource.data) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['userId', 'userID', 'uid']) &&
+        optionalString(request.resource.data, 'title', 300) &&
+        optionalString(request.resource.data, 'status', 40)) || isStaffOrAdmin();
+      allow delete: if ownsData(resource.data) || isAdmin();
+
+      match /messages/{messageId} {
+        function canAccessParent() {
+          return exists(/databases/$(database)/documents/conversations/$(conversationId)) &&
+            (ownsData(get(/databases/$(database)/documents/conversations/$(conversationId)).data) ||
+             isStaffOrAdmin());
+        }
+        allow read: if canAccessParent();
+        allow create, update: if canAccessParent() && isValidMessage(request.resource.data);
+        allow delete: if canAccessParent();
+      }
+    }
+
+    match /escalations/{escalationId} {
+      allow read: if ownsData(resource.data) || isStaffOrAdmin();
+      allow create: if isValidEscalation(request.resource.data);
+      allow update: if (isStaffOrAdmin() && isValidEscalation(request.resource.data)) ||
+        (ownsData(resource.data) && isValidEscalation(request.resource.data) &&
+         !request.resource.data.diff(resource.data).affectedKeys()
+           .hasAny(['userId', 'userID', 'uid', 'respondedBy', 'resolvedBy']));
+      allow delete: if ownsData(resource.data) || isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isValidNotification(request.resource.data) &&
+        (isAdmin() || (isAuthenticated() &&
+         request.resource.data.userId == request.auth.uid));
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+        isValidNotification(request.resource.data) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['read', 'readAt', 'readBy']);
+      allow delete: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+
+    match /fcm_tokens/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId) &&
+        request.resource.data.userId == request.auth.uid &&
+        optionalString(request.resource.data, 'token', 4096);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /faq_candidates/{candidateId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() &&
+        isValidManagedContent(request.resource.data);
+      allow delete: if isStaffOrAdmin();
+    }
+
+    match /{collectionName}/{documentId} {
+      // Academic reference lists are required before sign-in by registration.
+      allow read: if collectionName in ['colleges', 'programs', 'affiliations'] ||
+        (isAuthenticated() && collectionName in [
+        'announcements', 'faqs', 'admissions', 'scholarships', 'placements',
+        'information_bank', 'colleges', 'programs', 'affiliations'
+      ]);
+      allow create, update: if isStaffOrAdmin() && collectionName in [
+        'announcements', 'faqs', 'admissions', 'scholarships', 'placements',
+        'information_bank', 'colleges', 'programs', 'affiliations'
+      ] && isValidManagedContent(request.resource.data);
+      allow delete: if isAdmin() && collectionName in [
+        'announcements', 'faqs', 'admissions', 'scholarships', 'placements',
+        'information_bank', 'colleges', 'programs', 'affiliations'
+      ];
+    }
+
+    match /{logCollection}/{logId} {
+      allow read: if isStaffOrAdmin() && logCollection in ['logs', 'message_logs'];
+      allow create: if isAuthenticated() &&
+        logCollection in ['logs', 'message_logs'] && isValidLog(request.resource.data);
+      allow update: if isAdmin() &&
+        logCollection in ['logs', 'message_logs'] && isValidLog(request.resource.data);
+      allow delete: if isAdmin() && logCollection in ['logs', 'message_logs'];
+    }
+
+    match /{privateCollection}/{documentId} {
+      allow read, create, update, delete: if isAdmin() && privateCollection in [
+        'fb_tokens', 'fb_app_credentials', 'settings', 'config',
+        'firebase_usage', 'gemini_usage', 'pinecone_usage', 'ai_rate_limits',
+        'scheduled_runs',
+        'notification_processing', 'deleted_announcements',
+        'category_creation_errors', 'info_bank_errors', 'info_bank_fix_errors'
+      ];
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
