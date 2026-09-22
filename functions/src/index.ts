@@ -32,6 +32,9 @@ export {
   generateGeminiResponse,
   generateCohereEmbedding,
   generateCohereResponse,
+  analyzeCohereAdmission,
+  analyzeCohereScholarship,
+  analyzeCoherePlacement,
   checkPineconeHealth,
 
 } from "./documentCrud";
@@ -42,6 +45,8 @@ export {
   deleteUser,
   updateUser,
   setAdminRole,
+  checkUserFieldAvailability,
+  onUserDelete,
 } from "./userCrud";
 
 // Announcement & Facebook Sync Functions
@@ -61,6 +66,7 @@ export {
 export {
   exchangeToken,
   exchangeTokenHttp,
+  getTokenStatus,
 
 } from "./facebookToken";
 
@@ -95,3 +101,5 @@ export {
   sendCustomPasswordReset,
   sendCustomEmailChangeVerification,
 } from "./authEmail";
+
+export {resetDailyMessageCounts, consumeMessageQuota} from "./ragChat";

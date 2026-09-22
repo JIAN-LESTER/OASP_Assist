@@ -34,15 +34,14 @@ export const createUser = onCall(
   {
     region: "asia-southeast1",
     cors: true,
-    invoker: "private",
     timeoutSeconds: 60,
     memory: "256MiB",
   },
   async (request) => {
     console.log("========================================");
     console.log(" createUser function called");
-    console.log(" Request auth:", JSON.stringify(request.auth, null, 2));
-    console.log(" Request data:", JSON.stringify(request.data, null, 2));
+    console.log(" Request auth UID:", request.auth?.uid ?? "none");
+    console.log(" Requested user role:", request.data?.role ?? "user");
     console.log("========================================");
 
     try {
@@ -75,6 +74,18 @@ export const createUser = onCall(
         scholarship,
         lrn,
         serviceUnit,
+        isEnrolled,
+        studentType,
+        college,
+        collegeId,
+        mastersProgram,
+        graduateType,
+        graduatedCollege,
+        graduatedCollegeId,
+        graduatedProgram,
+        intendedMastersProgram,
+        otherAffiliation,
+        customAffiliation,
       } = request.data;
 
       if (!email || !password) {
@@ -91,6 +102,12 @@ export const createUser = onCall(
         displayName: displayName || "",
         emailVerified: true,
       });
+      if ((role || "user") === "admin") {
+        await admin.auth().setCustomUserClaims(userRecord.uid, {admin: true});
+      }
+      if (role !== undefined && !["user", "staff", "admin"].includes(role)) {
+        throw new HttpsError("invalid-argument", "Invalid user role.");
+      }
 
       // Prepare Firestore data based on role
       const firestoreData: any = {
@@ -99,7 +116,7 @@ export const createUser = onCall(
         displayName: displayName || "",
         name: displayName || email.split("@")[0],
         role: role || "user",
-        profileComplete: false,
+        profileComplete: true,
         createdAt: admin.firestore.FieldValue.serverTimestamp(), 
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         verifiedAt: admin.firestore.FieldValue.serverTimestamp(), 
@@ -119,15 +136,28 @@ export const createUser = onCall(
       // Add role-specific fields
       if (role === "user") {
         firestoreData.affiliation = affiliation || "";
-
-        if (affiliation === "CMU Student") {
-          firestoreData.studentId = studentId || "";
-          firestoreData.year = year || "";
-          firestoreData.program = program || "";
-          firestoreData.scholarship = scholarship || "";
-        } else if (affiliation === "Incoming Freshman Applicant") {
-          firestoreData.lrn = lrn || "";
-        }
+        const optionalUserFields = {
+          isEnrolled,
+          studentType,
+          studentId,
+          year,
+          college,
+          collegeId,
+          program,
+          mastersProgram,
+          scholarship,
+          lrn,
+          graduateType,
+          graduatedCollege,
+          graduatedCollegeId,
+          graduatedProgram,
+          intendedMastersProgram,
+          otherAffiliation,
+          customAffiliation,
+        };
+        Object.entries(optionalUserFields).forEach(([key, value]) => {
+          if (value !== undefined) firestoreData[key] = value;
+        });
       } else if (role === "staff") {
         firestoreData.serviceUnit = serviceUnit || "";
       }
@@ -178,7 +208,6 @@ export const updateUser = onCall(
   {
     region: "asia-southeast1",
     cors: true,
-    invoker: "private",
     timeoutSeconds: 60,
     memory: "256MiB",
   },
@@ -212,10 +241,25 @@ export const updateUser = onCall(
         lrn,
         serviceUnit,
         isActive,
+        isEnrolled,
+        studentType,
+        college,
+        collegeId,
+        mastersProgram,
+        graduateType,
+        graduatedCollege,
+        graduatedCollegeId,
+        graduatedProgram,
+        intendedMastersProgram,
+        otherAffiliation,
+        customAffiliation,
       } = request.data;
 
       if (!uid) {
         throw new HttpsError("invalid-argument", "User ID (uid) is required.");
+      }
+      if (role !== undefined && !["user", "staff", "admin"].includes(role)) {
+        throw new HttpsError("invalid-argument", "Invalid user role.");
       }
 
       // Update Firebase Authentication
@@ -229,6 +273,13 @@ export const updateUser = onCall(
 
       if (Object.keys(authUpdateData).length > 0) {
         await admin.auth().updateUser(uid, authUpdateData);
+      }
+      if (role !== undefined) {
+        const targetUser = await admin.auth().getUser(uid);
+        await admin.auth().setCustomUserClaims(uid, {
+          ...(targetUser.customClaims ?? {}),
+          admin: role === "admin",
+        });
       }
 
       // Prepare Firestore update based on role
@@ -247,34 +298,29 @@ export const updateUser = onCall(
       // Handle role-specific fields
       if (role === "user") {
         firestoreUpdate.affiliation = affiliation || "";
-
-        if (affiliation === "CMU Student") {
-          if (studentId !== undefined) firestoreUpdate.studentId = studentId;
-          if (year !== undefined) firestoreUpdate.year = year;
-          if (program !== undefined) firestoreUpdate.program = program;
-          if (scholarship !== undefined) firestoreUpdate.scholarship = scholarship;
-
-          // Remove fields that don't belong
-          firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
-          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
-        } else if (affiliation === "Incoming Freshman Applicant") {
-          if (lrn !== undefined) firestoreUpdate.lrn = lrn;
-
-          // Remove fields that don't belong
-          firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
-          firestoreUpdate.year = admin.firestore.FieldValue.delete();
-          firestoreUpdate.program = admin.firestore.FieldValue.delete();
-          firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
-          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
-        } else {
-          // Other affiliations - remove all specific fields
-          firestoreUpdate.studentId = admin.firestore.FieldValue.delete();
-          firestoreUpdate.year = admin.firestore.FieldValue.delete();
-          firestoreUpdate.program = admin.firestore.FieldValue.delete();
-          firestoreUpdate.scholarship = admin.firestore.FieldValue.delete();
-          firestoreUpdate.lrn = admin.firestore.FieldValue.delete();
-          firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
-        }
+        const optionalUserFields = {
+          isEnrolled,
+          studentType,
+          studentId,
+          year,
+          college,
+          collegeId,
+          program,
+          mastersProgram,
+          scholarship,
+          lrn,
+          graduateType,
+          graduatedCollege,
+          graduatedCollegeId,
+          graduatedProgram,
+          intendedMastersProgram,
+          otherAffiliation,
+          customAffiliation,
+        };
+        Object.entries(optionalUserFields).forEach(([key, value]) => {
+          if (value !== undefined) firestoreUpdate[key] = value;
+        });
+        firestoreUpdate.serviceUnit = admin.firestore.FieldValue.delete();
       } else if (role === "staff") {
         if (serviceUnit !== undefined) firestoreUpdate.serviceUnit = serviceUnit;
 
@@ -330,7 +376,6 @@ export const deleteUser = onCall(
   {
     region: "asia-southeast1",
     cors: true,
-    invoker: "private",
     timeoutSeconds: 120,
     memory: "512MiB",
   },
@@ -363,49 +408,39 @@ export const deleteUser = onCall(
       }
 
       // Delete conversations and messages
-      let conversationsSnapshot = await db
-        .collection("conversations")
-        .where("userID", "==", uid)
-        .get();
+      const conversationSnapshots = await Promise.all([
+        db.collection("conversations").where("userID", "==", uid).get(),
+        db.collection("conversations").where("userId", "==", uid).get(),
+      ]);
+      const conversations = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+      conversationSnapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((doc) => conversations.set(doc.id, doc));
+      });
 
-      if (conversationsSnapshot.empty) {
-        conversationsSnapshot = await db
-          .collection("conversations")
-          .where("userId", "==", uid)
-          .get();
-      }
+      console.log(` Found ${conversations.size} conversations`);
 
-      console.log(` Found ${conversationsSnapshot.size} conversations`);
-
-      for (const doc of conversationsSnapshot.docs) {
+      for (const doc of conversations.values()) {
         console.log(`➡ Deleting conversation: ${doc.id}`);
-        try {
-          await db.recursiveDelete(doc.ref);
-        } catch (deleteError) {
-          console.error(` Failed to delete conversation ${doc.id}:`, deleteError);
-        }
+        await db.recursiveDelete(doc.ref);
       }
 
       console.log(` Deleted all conversations & messages for ${uid}`);
 
       // Delete escalations
-      let escSnapshot = await db
-        .collection("escalations")
-        .where("userID", "==", uid)
-        .get();
+      const escalationSnapshots = await Promise.all([
+        db.collection("escalations").where("userID", "==", uid).get(),
+        db.collection("escalations").where("userId", "==", uid).get(),
+      ]);
+      const escalations = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+      escalationSnapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((doc) => escalations.set(doc.id, doc));
+      });
 
-      if (escSnapshot.empty) {
-        escSnapshot = await db
-          .collection("escalations")
-          .where("userId", "==", uid)
-          .get();
-      }
-
-      if (!escSnapshot.empty) {
+      if (escalations.size > 0) {
         const batch = db.batch();
-        escSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        escalations.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        console.log(` Deleted ${escSnapshot.size} escalations`);
+        console.log(` Deleted ${escalations.size} escalations`);
       } else {
         console.log(` No escalations found for ${uid}`);
       }
@@ -415,23 +450,20 @@ export const deleteUser = onCall(
         await admin.auth().deleteUser(uid);
         console.log(` Auth user deleted: ${uid}`);
       } catch (authError: any) {
-        console.warn(` Could not delete auth user: ${authError.message}`);
+        if (authError.code !== "auth/user-not-found") throw authError;
+        console.warn(` Auth user already absent: ${uid}`);
       }
 
       // Delete user document from Firestore
-      try {
-        await db.collection("users").doc(uid).delete();
-        console.log(` User document deleted: ${uid}`);
-      } catch (firestoreError) {
-        console.warn(" Could not delete user from Firestore:", firestoreError);
-      }
+      await db.collection("users").doc(uid).delete();
+      console.log(` User document deleted: ${uid}`);
 
       // Create log entry
       await db.collection("logs").add({
         action: "Admin deleted user account (cascade)",
         userId: uid,
-        deletedConversations: conversationsSnapshot.size,
-        deletedEscalations: escSnapshot.size,
+        deletedConversations: conversations.size,
+        deletedEscalations: escalations.size,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         deletedBy: callerUid,
       });
@@ -441,8 +473,8 @@ export const deleteUser = onCall(
       return {
         success: true,
         message: `User ${uid} and all related data deleted successfully.`,
-        deletedConversations: conversationsSnapshot.size,
-        deletedEscalations: escSnapshot.size,
+        deletedConversations: conversations.size,
+        deletedEscalations: escalations.size,
       };
     } catch (error: any) {
       console.error(" Error deleting user:", error);
@@ -460,7 +492,6 @@ export const setAdminRole = onCall(
   {
     region: "asia-southeast1",
     cors: true,
-    invoker: "private",
     timeoutSeconds: 60,
     memory: "256MiB",
   },
@@ -485,13 +516,18 @@ export const setAdminRole = onCall(
       if (!uid) {
         throw new HttpsError("invalid-argument", "User ID (uid) is required.");
       }
+      if (typeof makeAdmin !== "boolean") {
+        throw new HttpsError("invalid-argument", "isAdmin must be a boolean.");
+      }
 
       await db.collection("users").doc(uid).update({
         role: makeAdmin ? "admin" : "user",
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      const targetUser = await admin.auth().getUser(uid);
       await admin.auth().setCustomUserClaims(uid, {
+        ...(targetUser.customClaims ?? {}),
         admin: makeAdmin,
       });
 
@@ -508,6 +544,34 @@ export const setAdminRole = onCall(
 
       throw new HttpsError("internal", error.message || "Failed to set admin role");
     }
+  }
+);
+
+export const checkUserFieldAvailability = onCall(
+  {region: "asia-southeast1", cors: true},
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const field = request.data?.field;
+    const value = request.data?.value;
+    if (!(field === "studentId" || field === "lrn") ||
+        typeof value !== "string" || value.trim().length === 0) {
+      throw new HttpsError("invalid-argument", "A valid field and value are required.");
+    }
+
+    const snapshot = await db.collection("users")
+      .where(field, "==", value.trim())
+      .limit(2)
+      .get();
+    const available = snapshot.docs.every((doc) => doc.id === request.auth?.uid);
+    console.info("Checked user field availability", {
+      field,
+      uid: request.auth.uid,
+      available,
+    });
+    return {available};
   }
 );
 
@@ -529,21 +593,18 @@ export const onUserDelete = onDocumentDeleted(
       }
 
       // Delete conversations
-      let conversationsSnapshot = await db
-        .collection("conversations")
-        .where("userID", "==", userId)
-        .get();
+      const conversationSnapshots = await Promise.all([
+        db.collection("conversations").where("userID", "==", userId).get(),
+        db.collection("conversations").where("userId", "==", userId).get(),
+      ]);
+      const conversations = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+      conversationSnapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((doc) => conversations.set(doc.id, doc));
+      });
 
-      if (conversationsSnapshot.empty) {
-        conversationsSnapshot = await db
-          .collection("conversations")
-          .where("userId", "==", userId)
-          .get();
-      }
+      console.log(` [TRIGGER] Found ${conversations.size} conversations`);
 
-      console.log(` [TRIGGER] Found ${conversationsSnapshot.size} conversations`);
-
-      for (const doc of conversationsSnapshot.docs) {
+      for (const doc of conversations.values()) {
         console.log(`➡ [TRIGGER] Deleting conversation: ${doc.id}`);
         await db.recursiveDelete(doc.ref);
       }
@@ -551,23 +612,20 @@ export const onUserDelete = onDocumentDeleted(
       console.log(` [TRIGGER] Deleted all conversations & messages for ${userId}`);
 
       // Delete escalations
-      let escSnapshot = await db
-        .collection("escalations")
-        .where("userID", "==", userId)
-        .get();
+      const escalationSnapshots = await Promise.all([
+        db.collection("escalations").where("userID", "==", userId).get(),
+        db.collection("escalations").where("userId", "==", userId).get(),
+      ]);
+      const escalations = new Map<string, admin.firestore.QueryDocumentSnapshot>();
+      escalationSnapshots.forEach((snapshot) => {
+        snapshot.docs.forEach((doc) => escalations.set(doc.id, doc));
+      });
 
-      if (escSnapshot.empty) {
-        escSnapshot = await db
-          .collection("escalations")
-          .where("userId", "==", userId)
-          .get();
-      }
-
-      if (!escSnapshot.empty) {
+      if (escalations.size > 0) {
         const batch = db.batch();
-        escSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+        escalations.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        console.log(` [TRIGGER] Deleted ${escSnapshot.size} escalations`);
+        console.log(` [TRIGGER] Deleted ${escalations.size} escalations`);
       } else {
         console.log(` [TRIGGER] No escalations found for ${userId}`);
       }
@@ -576,8 +634,8 @@ export const onUserDelete = onDocumentDeleted(
       await db.collection("logs").add({
         action: "Cascade user delete (trigger)",
         userId,
-        deletedConversations: conversationsSnapshot.size,
-        deletedEscalations: escSnapshot.size,
+        deletedConversations: conversations.size,
+        deletedEscalations: escalations.size,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 

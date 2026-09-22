@@ -10,6 +10,7 @@ import {
   createCohereEmbedding,
   normalizeCohereInputType,
 } from "./cohereEmbedding";
+import {requireAdmin, requireAiQuota, requireRole} from "./authz";
 
 type JsonResponse = Record<string, any>;
 
@@ -23,7 +24,7 @@ export const checkPineconeHealth = onCall(
     timeoutSeconds: 30,
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     try {
       const pinecone = new Pinecone({apiKey: PINECONE_API_KEY.value()});
@@ -49,7 +50,7 @@ export const checkPineconeHealth = onCall(
 export const generateGeminiEmbedding = onCall(
   { secrets: [COHERE_API_KEY], timeoutSeconds: 60 },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
+    await requireAiQuota(request.auth);
 
     const { text, taskType } = request.data;
     if (typeof text !== "string" || text.trim().length === 0) {
@@ -87,7 +88,7 @@ export const generateGeminiEmbedding = onCall(
 export const generateGeminiResponse = onCall(
   {secrets: [GEMINI_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireAiQuota(request.auth);
 
     const {prompt} = request.data;
     if (!prompt) throw new Error("Prompt required");
@@ -120,7 +121,7 @@ export const generateGeminiResponse = onCall(
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireAiQuota(request.auth);
 
     const {text, taskType} = request.data;
     if (!text) throw new Error("Text required");
@@ -146,7 +147,7 @@ export const generateCohereEmbedding = onCall(
 export const generateCohereResponse = onCall(
   {secrets: [COHERE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireAiQuota(request.auth);
 
     const {prompt} = request.data;
     if (!prompt) throw new Error("Prompt required");
@@ -177,6 +178,90 @@ export const generateCohereResponse = onCall(
       console.error(" Cohere response error:", error.message);
       throw new Error(`Failed to generate response: ${error.message}`);
     }
+  }
+);
+
+function extractJsonObject(value: string): Record<string, any> {
+  const cleaned = value
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end < start) {
+    throw new Error("The model did not return a JSON object");
+  }
+  return JSON.parse(cleaned.substring(start, end + 1));
+}
+
+async function analyzeWithCohere(
+  message: unknown,
+  instructions: string,
+  apiKey: string
+): Promise<Record<string, any>> {
+  if (typeof message !== "string" || message.trim().length === 0) {
+    throw new HttpsError("invalid-argument", "Message required");
+  }
+
+  const response = await axios.post<JsonResponse>(
+    "https://api.cohere.ai/v1/chat",
+    {
+      model: "command-r-08-2024",
+      message: `${instructions}\n\nSource text:\n${message.trim()}\n\nReturn valid JSON only.`,
+      max_tokens: 3500,
+      temperature: 0,
+    },
+    {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 60000,
+    }
+  );
+
+  return extractJsonObject(response.data?.text ?? "");
+}
+
+export const analyzeCohereAdmission = onCall(
+  {secrets: [COHERE_API_KEY], timeoutSeconds: 60},
+  async (request) => {
+    await requireAiQuota(request.auth);
+    return analyzeWithCohere(
+      request.data?.message,
+      "Extract admission information with keys type, contacts, steps, " +
+        "requirements, academicYear, links, and schedules. contacts and schedules " +
+        "must be arrays; schedules use date, dayOfWeek, and locations.",
+      COHERE_API_KEY.value()
+    );
+  }
+);
+
+export const analyzeCohereScholarship = onCall(
+  {secrets: [COHERE_API_KEY], timeoutSeconds: 60},
+  async (request) => {
+    await requireAiQuota(request.auth);
+    return analyzeWithCohere(
+      request.data?.message,
+      "Extract a scholarships array. Each item must use keys name, description, " +
+        "scholarshipProvider, eligibilityRequirements, privileges, deadline, and " +
+        "application_link. Use YYYY-MM-DD for known deadlines.",
+      COHERE_API_KEY.value()
+    );
+  }
+);
+
+export const analyzeCoherePlacement = onCall(
+  {secrets: [COHERE_API_KEY], timeoutSeconds: 60},
+  async (request) => {
+    await requireAiQuota(request.auth);
+    return analyzeWithCohere(
+      request.data?.message,
+      "Extract a placements array. Each item must use keys placementID, " +
+        "partnerCompany, contacts, positions, deadline, and createdAt. Use " +
+        "YYYY-MM-DD for known deadlines.",
+      COHERE_API_KEY.value()
+    );
   }
 );
 
@@ -245,7 +330,7 @@ export const logPineconeUsage = onCall(
 export const queryPinecone = onCall(
   {secrets: [PINECONE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {embedding, topK = 5, namespace, filter} = request.data;
     if (!embedding || !Array.isArray(embedding) ||
@@ -289,7 +374,7 @@ export const queryPinecone = onCall(
 export const insertPineconeDocument = onCall(
   {secrets: [PINECONE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {id, embedding, metadata, namespace} = request.data;
     if (!id || !Array.isArray(embedding) ||
@@ -333,7 +418,7 @@ export const insertPineconeDocumentBatch = onCall(
     memory: "512MiB",
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {documents, namespace} = request.data;
 
@@ -398,7 +483,7 @@ export const deletePineconeDocuments = onCall(
     timeoutSeconds: 60,
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {ids} = request.data;
 
@@ -432,7 +517,7 @@ export const fetchPineconeVectors = onCall(
     timeoutSeconds: 30,
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {ids} = request.data;
 
@@ -463,9 +548,7 @@ export const fetchPineconeVectors = onCall(
 export const deleteFromPinecone = onCall(
   {secrets: [PINECONE_API_KEY, PINECONE_HOST]},
   async (request) => {
-    if (!request.auth) {
-      throw new Error("Unauthorized");
-    }
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {chunkIds, namespace} = request.data;
 
@@ -506,7 +589,7 @@ export const getPineconeStats = onCall(
     timeoutSeconds: 30,
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireRole(request.auth, ["staff", "admin"]);
 
     const {namespace} = request.data;
 
@@ -549,10 +632,7 @@ export const deleteAllPineconeVectors = onCall(
     timeoutSeconds: 120,
   },
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
-
-    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
-    if (!userDoc.data()?.isAdmin) throw new Error("Admin access required");
+    await requireAdmin(request.auth);
 
     const {namespace, confirm} = request.data;
 
@@ -565,7 +645,7 @@ export const deleteAllPineconeVectors = onCall(
       const index = pinecone.Index(PINECONE_INDEX_NAME);
 
       if (namespace) {
-        await index.deleteAll();
+        await index.namespace(namespace).deleteAll();
         console.log(` Deleted all vectors in namespace: ${namespace}`);
         return {
           success: true,

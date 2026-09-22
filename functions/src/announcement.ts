@@ -11,6 +11,7 @@ import {
   createCohereEmbedding,
 } from "./cohereEmbedding";
 import {GOOGLE_CLOUD_VISION_ENABLED} from "./integrationControls";
+import {requireAdmin} from "./authz";
 
 // Define secrets
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
@@ -606,9 +607,7 @@ export const manualSyncFacebookPosts = onCall(
   },
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const result = await syncFacebookPostsLogic();
       return result;
@@ -654,6 +653,7 @@ export const manualSyncFacebookPostsHttp = onRequest(
         });
         return;
       }
+      await requireAdmin({uid: userId});
 
 
       const result = await syncFacebookPostsLogic();
@@ -1523,6 +1523,7 @@ async function createScholarshipFromAnnouncement(
 export const debugInfoBank = onCall(
   {cors: true, secrets: [COHERE_API_KEY]},
   async (request) => {
+    await requireAdmin(request.auth);
     const announcementId = request.data.announcementId;
 
     const announcement = await db
@@ -2147,9 +2148,7 @@ export const batchSyncCategoriesToInfoBank = onCall(
   },
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const categoryTypes: Array<"admission" | "scholarship" | "placement"> = [
         "admission",
@@ -2811,6 +2810,7 @@ export const reprocessExistingAnnouncements = onCall(
   },
   async (request) => {
     try {
+      await requireAdmin(request.auth);
       const snapshot = await db
         .collection("announcements")
         .where("processed_by_cohere", "==", false)
@@ -3186,9 +3186,7 @@ export const testCreateInfoBank = onCall(
   },
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const {announcementId} = request.data;
 
@@ -3333,9 +3331,7 @@ export const listInfoBankEntries = onCall(
   {cors: true, secrets: []},
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
 
       const snapshot = await db.collection("information_bank").get();
@@ -3377,9 +3373,7 @@ export const deleteInfoBankEntry = onCall(
   {cors: true, secrets: []},
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const {infoBankId} = request.data;
 
@@ -3424,9 +3418,7 @@ export const fixAnnouncementInfoBankMetadata = onCall(
   },
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
 
       const pineconeKey = PINECONE_API_KEY.value();

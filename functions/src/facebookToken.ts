@@ -1,6 +1,7 @@
 import {HttpsError, onCall, onRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import {requireAdmin} from "./authz";
 
 const db = admin.firestore();
 const FB_API_VERSION = "v24.0";
@@ -382,6 +383,7 @@ export const exchangeTokenHttp = onRequest(
         });
         return;
       }
+      await requireAdmin({uid: userId});
 
       console.log(` Authenticated as: ${userId}`);
 
@@ -420,9 +422,7 @@ export const exchangeToken = onCall(
     console.log("========================================");
 
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const {uid, short_token, pageId, appId} = request.data;
 
@@ -459,9 +459,7 @@ export const manageAppCredentials = onCall(
   },
   async (request) => {
     try {
-      if (!request.auth) {
-        throw new HttpsError("unauthenticated", "Authentication required");
-      }
+      await requireAdmin(request.auth);
 
       const {action, appId, appSecret} = request.data;
 
@@ -517,5 +515,33 @@ export const manageAppCredentials = onCall(
 
       throw new HttpsError("internal", error.message);
     }
+  }
+);
+
+export const getTokenStatus = onCall(
+  {cors: true},
+  async (request) => {
+    await requireAdmin(request.auth);
+
+    const tokenDoc = await db.collection("fb_tokens").doc("facebook_admin").get();
+    if (!tokenDoc.exists) {
+      return {configured: false, message: "No Facebook token configured"};
+    }
+
+    const data = tokenDoc.data() ?? {};
+    const expiresAt = typeof data.expires_at === "number" ? data.expires_at : null;
+    const now = Date.now();
+    const daysLeft = expiresAt === null ? null :
+      Math.round((expiresAt - now) / (1000 * 60 * 60 * 24));
+
+    return {
+      configured: true,
+      expiresAt,
+      daysLeft,
+      expired: expiresAt !== null && expiresAt <= now,
+      expirationWarning: data.expirationWarning === true,
+      pageId: data.pageId ?? null,
+      needsRenewal: daysLeft !== null && daysLeft <= 60 && daysLeft > 0,
+    };
   }
 );

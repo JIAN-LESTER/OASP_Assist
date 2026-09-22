@@ -14,6 +14,7 @@ import {
   createCohereEmbedding,
   normalizeCohereInputType,
 } from "./cohereEmbedding";
+import {requireAiQuota} from "./authz";
 
 type JsonResponse = Record<string, any>;
 type FAQMatch = {
@@ -29,6 +30,48 @@ const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 const COHERE_API_KEY = defineSecret("COHERE_API_KEY");
 
 const db = admin.firestore();
+const MAX_DAILY_MESSAGES = 3;
+
+async function consumeDailyMessage(uid: string): Promise<boolean> {
+  const userRef = db.collection("users").doc(uid);
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(userRef);
+    if (!snapshot.exists) return false;
+
+    const data = snapshot.data() ?? {};
+    const currentCount = typeof data.dailyMessageCount === "number" ?
+      data.dailyMessageCount : 0;
+    const lastReset = data.lastMessageResetDate?.toDate?.() as Date | undefined;
+    const resetBoundary = new Date();
+    // 00:00 UTC is 08:00 in Asia/Manila, matching the scheduled reset.
+    resetBoundary.setUTCHours(0, 0, 0, 0);
+    const shouldReset = !lastReset || lastReset < resetBoundary;
+
+    if (!shouldReset && currentCount >= MAX_DAILY_MESSAGES) return false;
+
+    transaction.update(userRef, {
+      dailyMessageCount: shouldReset ? 1 : currentCount + 1,
+      lastMessageResetDate: shouldReset ?
+        admin.firestore.Timestamp.fromDate(resetBoundary) :
+        data.lastMessageResetDate,
+    });
+    return true;
+  });
+}
+
+export const consumeMessageQuota = onCall(
+  {memory: "256MiB"},
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Authentication required");
+    }
+    if (!(await consumeDailyMessage(request.auth.uid))) {
+      throw new HttpsError("resource-exhausted", "Daily message limit reached");
+    }
+    console.info("Message quota consumed", {uid: request.auth.uid});
+    return {success: true};
+  }
+);
 
 // ============================================================================
 // GEMINI FUNCTIONS
@@ -110,7 +153,7 @@ function normalizeFAQText(text: string): string {
 export const generateCohereEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new Error("Unauthorized");
+    await requireAiQuota(request.auth);
 
     const {text, taskType} = request.data;
     if (!text) throw new Error("Text required");
@@ -128,7 +171,7 @@ export const generateCohereEmbedding = onCall(
 export const generateEmbedding = onCall(
   {secrets: [COHERE_API_KEY]},
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "Unauthorized");
+    await requireAiQuota(request.auth);
     const {text, taskType} = request.data;
     if (typeof text !== "string" || text.trim().length === 0) {
       throw new HttpsError("invalid-argument", "Text required");
@@ -554,6 +597,30 @@ export const generateAnswer = onRequest(
           error: "Invalid query",
           answer: "Please provide a valid question.",
           source: "error",
+        });
+        return;
+      }
+
+      const authHeader = req.get("authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        res.status(401).json({error: "Authentication required"});
+        return;
+      }
+
+      let authenticatedUid: string;
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(authHeader.substring(7));
+        authenticatedUid = decodedToken.uid;
+      } catch (authError) {
+        console.warn("generateAnswer rejected an invalid ID token", authError);
+        res.status(401).json({error: "Invalid authentication token"});
+        return;
+      }
+
+      if (!(await consumeDailyMessage(authenticatedUid))) {
+        res.status(429).json({
+          error: "Daily message limit reached",
+          answer: "You have reached today's message limit. Please try again after 8:00 AM.",
         });
         return;
       }
