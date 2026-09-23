@@ -551,18 +551,64 @@ class FileService {
   /// Extract text from PDF file
   Future<String> _extractTextFromPdf(File file) async {
     final bytes = await file.readAsBytes();
-    final document = PdfDocument(inputBytes: bytes);
-    final text = PdfTextExtractor(document).extractText();
-    document.dispose();
-    return text;
+    return extractTextFromPdfBytes(bytes);
   }
 
   /// Extract text from PDF bytes
   Future<String> extractTextFromPdfBytes(Uint8List bytes) async {
-    final document = PdfDocument(inputBytes: bytes);
-    final text = PdfTextExtractor(document).extractText();
-    document.dispose();
-    return text;
+    if (bytes.isEmpty) {
+      throw const FormatException('The PDF file is empty.');
+    }
+
+    PdfDocument? document;
+    try {
+      document = PdfDocument(inputBytes: bytes);
+      final extractor = PdfTextExtractor(document);
+      final pages = <String>[];
+
+      // Keep page boundaries so adjacent pages are not merged into one
+      // sentence or paragraph.
+      for (int pageIndex = 0; pageIndex < document.pages.count; pageIndex++) {
+        final pageText = extractor.extractText(
+          startPageIndex: pageIndex,
+          endPageIndex: pageIndex,
+          layoutText: true,
+        );
+        final normalizedPageText = _normalizeExtractedPdfText(pageText);
+        if (normalizedPageText.isNotEmpty) {
+          pages.add(normalizedPageText);
+        }
+      }
+
+      final text = pages.join('\n\n');
+      if (text.trim().isEmpty) {
+        throw const FormatException(
+          'No readable text was found in this PDF. It may contain only scanned images.',
+        );
+      }
+
+      print(
+        ' PDF text extracted successfully '
+        '(${document.pages.count} pages, ${text.length} characters)',
+      );
+      return text;
+    } catch (e) {
+      print(' Error parsing PDF content: $e');
+      rethrow;
+    } finally {
+      document?.dispose();
+    }
+  }
+
+  /// Remove only characters that cannot represent useful PDF text. Layout
+  /// whitespace is intentionally retained for paragraphs, lists, and tables.
+  String _normalizeExtractedPdfText(String text) {
+    return text
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll('\u0000', '')
+        .replaceAll('\u000c', '\n')
+        .trim();
   }
 
   /// Extract text from DOCX file

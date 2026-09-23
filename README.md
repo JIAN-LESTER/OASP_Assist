@@ -140,6 +140,26 @@ The academic seed writes 10 colleges, 20 bachelor programs, and 20 masteral
 programs to the Firestore `colleges` and `programs` collections. Stable document
 IDs make the command safe to run again without creating duplicate seed records:
 
+Because this is a standalone Admin SDK script, configure Google Application
+Default Credentials before running it locally. The recommended development
+setup is:
+
+```powershell
+gcloud auth application-default login
+gcloud config set project cmu-oasp-assist
+```
+
+If the Google Cloud CLI is unavailable, generate a service-account key from
+Firebase Console > Project settings > Service accounts, store the JSON file
+outside the repository, and add its absolute path to `functions/.env`:
+
+```dotenv
+GOOGLE_APPLICATION_CREDENTIALS=C:\secure\cmu-oasp-service-account.json
+```
+
+Never place the JSON key itself in `.env` or commit it to source control. The
+repository ignores `.env` files and Firebase service-account JSON files.
+
 ```bash
 cd functions
 npm run seed:academics

@@ -5,7 +5,7 @@
     "lint": "eslint --ext .js,.ts .",
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "seed:academics": "npm run build && node lib/scripts/seedAcademicData.js",
+    "seed:academics": "npm run build && node --env-file=.env lib/scripts/seedAcademicData.js",
     "seed:faqs": "npm run build && node lib/scripts/seedFaqs.js",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

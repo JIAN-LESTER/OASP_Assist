@@ -22,8 +22,20 @@ class ContentFormatter {
            lowercaseSource.contains('pdf');
   }
 
-  /// Format PDF content with intelligent paragraph detection
+  /// Preserve the structure produced by the PDF extractor.
   static String formatPdfContent(String content) {
+    if (content.isEmpty) return content;
+
+    // Reflowing extracted text here used to remove meaningful line breaks and
+    // repeated spaces from lists, columns, and table-like content.
+    return content
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll('\u0000', '');
+  }
+
+  /// Legacy reflow logic retained for the optional advanced formatter only.
+  static String _reflowPdfContent(String content) {
     if (content.isEmpty) return content;
 
     // Step 1: Normalize line endings
@@ -77,7 +89,7 @@ class ContentFormatter {
   static String formatPdfContentAdvanced(String content) {
     if (content.isEmpty) return content;
 
-    String cleaned = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    String cleaned = _reflowPdfContent(content);
     
     List<String> lines = cleaned.split('\n');
     List<String> formattedLines = [];
@@ -189,13 +201,12 @@ class ContentFormatter {
       return content; // Keep exactly as-is for non-PDF
     }
     
-    // For PDFs, do minimal cleanup for editing
-    String cleaned = content
+    // Preserve extracted indentation and repeated spaces while normalizing
+    // platform-specific line endings.
+    return content
         .replaceAll('\r\n', '\n')
         .replaceAll('\r', '\n')
-        .replaceAll(RegExp(r' {3,}'), '  '); // Reduce excessive spaces but keep some
-    
-    return cleaned;
+        .replaceAll('\u0000', '');
   }
 }
 

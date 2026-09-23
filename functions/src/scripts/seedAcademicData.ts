@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 if (!admin.apps.length) {
   admin.initializeApp({
     // Standalone scripts do not receive the project ID from the Firebase CLI.
+    credential: admin.credential.applicationDefault(),
     projectId:
       process.env.GCLOUD_PROJECT ||
       process.env.GCP_PROJECT ||
@@ -229,6 +230,21 @@ async function seedAcademicData(): Promise<void> {
 }
 
 seedAcademicData().catch((error: unknown) => {
-  console.error("Failed to seed academic data:", error);
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes("Could not load the default credentials")) {
+    console.error(
+      [
+        "Failed to seed academic data: Google credentials were not found.",
+        "Authenticate locally with `gcloud auth application-default login`,",
+        "or set GOOGLE_APPLICATION_CREDENTIALS in functions/.env to the",
+        "absolute path of a Firebase service-account JSON file.",
+        "Never commit the service-account JSON file to source control.",
+      ].join("\n"),
+    );
+  } else {
+    console.error("Failed to seed academic data:", error);
+  }
+
   process.exitCode = 1;
 });
